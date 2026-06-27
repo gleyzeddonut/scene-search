@@ -34,9 +34,21 @@ rm -rf build dist
 echo "==> Building .app with PyInstaller"
 .venv/bin/pyinstaller "packaging/${APP_NAME}.spec" --noconfirm
 
-echo "==> Signing nested binaries (inside-out)"
-find "$APP/Contents" -type f \( -name "*.so" -o -name "*.dylib" \) -print0 \
-    | xargs -0 -r codesign --force --options runtime --timestamp --sign "$IDENTITY"
+echo "==> Signing every nested Mach-O binary (inside-out, frameworks included)"
+# Frameworks store their binary at Versions/A/<Name> with NO extension, so we
+# detect Mach-O files by content (via `file`), not by name. Sign deepest paths
+# first so nested code is sealed before its container.
+while IFS= read -r macho; do
+    codesign --force --options runtime --timestamp --sign "$IDENTITY" "$macho"
+done < <(
+    find "$APP/Contents" -type f -print0 \
+        | xargs -0 file \
+        | grep -E 'Mach-O' \
+        | sed 's/: *Mach-O.*//' \
+        | awk '{ print length, $0 }' \
+        | sort -rn \
+        | cut -d' ' -f2-
+)
 
 echo "==> Signing the app bundle with entitlements"
 codesign --force --options runtime --timestamp \
