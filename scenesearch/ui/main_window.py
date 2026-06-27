@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 
 from ..cache import ScoreCache
 from ..classifier import DEFAULT_THRESHOLD
+from ..model import ScriptEntry
 from ..scanner import default_roots
 from .. import fileops
 from .scan_worker import ScanWorker
@@ -116,7 +117,7 @@ class MainWindow(QMainWindow):
         self.table.setModel(self.proxy)
         self.table.setSortingEnabled(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.table.selectionModel().selectionChanged.connect(self._on_select)
         layout.addWidget(self.table, 1)
@@ -150,7 +151,7 @@ class MainWindow(QMainWindow):
         ):
             actions.addWidget(b)
         layout.addLayout(actions)
-        self._set_actions_enabled(False)
+        self._update_actions(0)
 
     # ---------- Roots ----------
     def _add_folder(self) -> None:
@@ -234,105 +235,152 @@ class MainWindow(QMainWindow):
     def _apply_filter(self, text: str) -> None:
         self.proxy.setFilterFixedString(text)
 
+    def _selected_source_rows(self) -> list[int]:
+        return [
+            self.proxy.mapToSource(idx).row()
+            for idx in self.table.selectionModel().selectedRows()
+        ]
+
+    def _selected_entries(self) -> list:
+        return [self.model.item(r, 0).data(_ENTRY_ROLE) for r in self._selected_source_rows()]
+
     def _selected_entry(self):
-        indexes = self.table.selectionModel().selectedRows()
-        if not indexes:
-            return None
-        source_index = self.proxy.mapToSource(indexes[0])
-        name_item = self.model.item(source_index.row(), 0)
-        return name_item.data(_ENTRY_ROLE)
+        entries = self._selected_entries()
+        return entries[0] if entries else None
+
+    def _remove_source_rows(self, rows) -> None:
+        for r in sorted(set(rows), reverse=True):
+            self.model.removeRow(r)
 
     def _on_select(self, *args) -> None:
-        entry = self._selected_entry()
-        if entry is None:
+        entries = self._selected_entries()
+        self._update_actions(len(entries))
+        if not entries:
             self.detail.clear()
-            self._set_actions_enabled(False)
             return
-        cues = "\n".join(f"  • {c}" for c in entry.matched_cues) or "  (none)"
-        self.detail.setPlainText(
-            f"{entry.path}\n\nConfidence: {entry.confidence:.0%}\nMatched cues:\n{cues}"
-        )
-        self._set_actions_enabled(True)
+        if len(entries) == 1:
+            entry = entries[0]
+            cues = "\n".join(f"  • {c}" for c in entry.matched_cues) or "  (none)"
+            self.detail.setPlainText(
+                f"{entry.path}\n\nConfidence: {entry.confidence:.0%}\nMatched cues:\n{cues}"
+            )
+        else:
+            self.detail.setPlainText(
+                f"{len(entries)} files selected.\n"
+                "Use Move to… or Copy to… (click “New Folder” in the dialog to "
+                "create one), or Delete to Trash, to act on all of them at once."
+            )
 
-    def _set_actions_enabled(self, enabled: bool) -> None:
-        for b in (
-            self.open_btn,
-            self.reveal_btn,
-            self.rename_btn,
-            self.copy_btn,
-            self.move_btn,
-            self.trash_btn,
-        ):
-            b.setEnabled(enabled)
+    def _update_actions(self, count: int) -> None:
+        many = count >= 1
+        for b in (self.open_btn, self.reveal_btn, self.copy_btn, self.move_btn, self.trash_btn):
+            b.setEnabled(many)
+        # Rename only makes sense for a single file.
+        self.rename_btn.setEnabled(count == 1)
 
     # ---------- Actions ----------
     def _action_open(self) -> None:
-        entry = self._selected_entry()
-        if entry:
+        for entry in self._selected_entries():
             fileops.open_external(entry.path)
 
     def _action_reveal(self) -> None:
-        entry = self._selected_entry()
-        if entry:
+        for entry in self._selected_entries():
             fileops.reveal_in_finder(entry.path)
 
     def _action_rename(self) -> None:
-        entry = self._selected_entry()
-        if not entry:
+        rows = self._selected_source_rows()
+        if len(rows) != 1:
             return
+        row = rows[0]
+        entry = self.model.item(row, 0).data(_ENTRY_ROLE)
         new_name, ok = QInputDialog.getText(
             self, "Rename", "New file name:", text=entry.name
         )
-        if ok and new_name and new_name != entry.name:
-            try:
-                fileops.rename(entry.path, new_name)
-                self.status.setText(f"Renamed to {new_name}. Re-scan to refresh.")
-            except Exception as exc:
-                QMessageBox.critical(self, "Rename failed", str(exc))
+        if not (ok and new_name and new_name != entry.name):
+            return
+        try:
+            new_path = fileops.rename(entry.path, new_name)
+        except Exception as exc:
+            QMessageBox.critical(self, "Rename failed", str(exc))
+            return
+        # Update the row in place so the new name/path stays usable.
+        updated = ScriptEntry.from_path(new_path, entry.confidence, entry.matched_cues)
+        item = self.model.item(row, 0)
+        item.setText(updated.name)
+        item.setData(updated.name, _SORT_ROLE)
+        item.setData(updated, _ENTRY_ROLE)
+        self.status.setText(f"Renamed to {new_name}.")
+        self._on_select()
 
     def _action_copy(self) -> None:
-        entry = self._selected_entry()
-        if not entry:
+        entries = self._selected_entries()
+        if not entries:
             return
-        dest = QFileDialog.getExistingDirectory(self, "Copy to folder")
-        if dest:
+        dest = QFileDialog.getExistingDirectory(
+            self, "Copy to folder — click “New Folder” to create one"
+        )
+        if not dest:
+            return
+        copied, errors = 0, []
+        for entry in entries:
             try:
-                result = fileops.copy_to(entry.path, dest)
-                self.status.setText(f"Copied to {result}")
+                fileops.copy_to(entry.path, dest)
+                copied += 1
             except Exception as exc:
-                QMessageBox.critical(self, "Copy failed", str(exc))
+                errors.append(f"{entry.name}: {exc}")
+        if errors:
+            QMessageBox.warning(self, "Some copies failed", "\n".join(errors))
+        self.status.setText(f"Copied {copied} file(s) to {dest}.")
 
     def _action_move(self) -> None:
-        entry = self._selected_entry()
-        if not entry:
+        rows = self._selected_source_rows()
+        entries = [self.model.item(r, 0).data(_ENTRY_ROLE) for r in rows]
+        if not entries:
             return
-        dest = QFileDialog.getExistingDirectory(self, "Move to folder")
+        dest = QFileDialog.getExistingDirectory(
+            self, "Move to folder — click “New Folder” to create one"
+        )
         if not dest:
             return
         if (
-            QMessageBox.question(self, "Move file", f"Move '{entry.name}' to:\n{dest}?")
-            != QMessageBox.Yes
-        ):
-            return
-        try:
-            result = fileops.move_to(entry.path, dest)
-            self.status.setText(f"Moved to {result}. Re-scan to refresh.")
-        except Exception as exc:
-            QMessageBox.critical(self, "Move failed", str(exc))
-
-    def _action_trash(self) -> None:
-        entry = self._selected_entry()
-        if not entry:
-            return
-        if (
             QMessageBox.question(
-                self, "Delete to Trash", f"Move '{entry.name}' to the Trash?"
+                self, "Move files", f"Move {len(entries)} file(s) to:\n{dest}?"
             )
             != QMessageBox.Yes
         ):
             return
-        try:
-            fileops.delete_to_trash(entry.path)
-            self.status.setText(f"Moved '{entry.name}' to Trash. Re-scan to refresh.")
-        except Exception as exc:
-            QMessageBox.critical(self, "Delete failed", str(exc))
+        done_rows, errors = [], []
+        for row, entry in zip(rows, entries):
+            try:
+                fileops.move_to(entry.path, dest)
+                done_rows.append(row)
+            except Exception as exc:
+                errors.append(f"{entry.name}: {exc}")
+        self._remove_source_rows(done_rows)
+        if errors:
+            QMessageBox.warning(self, "Some moves failed", "\n".join(errors))
+        self.status.setText(f"Moved {len(done_rows)} file(s) to {dest}.")
+
+    def _action_trash(self) -> None:
+        rows = self._selected_source_rows()
+        entries = [self.model.item(r, 0).data(_ENTRY_ROLE) for r in rows]
+        if not entries:
+            return
+        if (
+            QMessageBox.question(
+                self, "Delete to Trash", f"Move {len(entries)} file(s) to the Trash?"
+            )
+            != QMessageBox.Yes
+        ):
+            return
+        done_rows, errors = [], []
+        for row, entry in zip(rows, entries):
+            try:
+                fileops.delete_to_trash(entry.path)
+                done_rows.append(row)
+            except Exception as exc:
+                errors.append(f"{entry.name}: {exc}")
+        self._remove_source_rows(done_rows)
+        if errors:
+            QMessageBox.warning(self, "Some deletes failed", "\n".join(errors))
+        self.status.setText(f"Moved {len(done_rows)} file(s) to Trash.")

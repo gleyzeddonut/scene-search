@@ -41,6 +41,37 @@ def test_move_to(tmp_path):
     assert not src.exists()
 
 
+def test_move_many_into_new_folder(tmp_path):
+    src1 = tmp_path / "a.txt"
+    src1.write_text("1")
+    src2 = tmp_path / "b.txt"
+    src2.write_text("2")
+    dest_dir = tmp_path / "new folder"
+    dest_dir.mkdir()
+
+    results = fileops.move_many([src1, src2], dest_dir)
+
+    assert {p.name for p in results} == {"a.txt", "b.txt"}
+    assert not src1.exists() and not src2.exists()
+    assert (dest_dir / "a.txt").read_text() == "1"
+    assert (dest_dir / "b.txt").read_text() == "2"
+
+
+def test_move_many_same_name_autosuffixes(tmp_path):
+    src1 = tmp_path / "x" / "a.txt"
+    src1.parent.mkdir()
+    src1.write_text("1")
+    src2 = tmp_path / "y" / "a.txt"
+    src2.parent.mkdir()
+    src2.write_text("2")
+    dest_dir = tmp_path / "dest"
+    dest_dir.mkdir()
+
+    results = fileops.move_many([src1, src2], dest_dir)
+
+    assert sorted(p.name for p in results) == ["a (1).txt", "a.txt"]
+
+
 def test_rename(tmp_path):
     src = tmp_path / "old.txt"
     src.write_text("x")

@@ -25,6 +25,14 @@ By default: Downloads, Desktop, Documents, and iCloud Drive Documents. Use
 It looks at `.pdf .fountain .fdx .txt .docx` files and only lists the ones that
 read like screenplays (INT./EXT. headings, FADE IN, character cues, etc.).
 
+## Selecting and moving files
+
+Click a row to act on one file, or ⌘-click / shift-click to select several. The
+**Copy to…**, **Move to…**, and **Delete to Trash** buttons act on every
+selected file at once. In the Copy/Move folder picker, use the **New Folder**
+button to create a fresh destination folder and move the batch straight into it.
+Moved and trashed files drop out of the list immediately.
+
 ## Notes
 
 - Delete always moves files to the Trash — never a permanent delete.

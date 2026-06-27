@@ -35,6 +35,11 @@ def move_to(path, dest_dir) -> Path:
     return dest
 
 
+def move_many(paths, dest_dir) -> list[Path]:
+    """Move each path into dest_dir, resolving name collisions one at a time."""
+    return [move_to(p, dest_dir) for p in paths]
+
+
 def rename(path, new_name: str) -> Path:
     src = Path(path)
     dest = src.with_name(new_name)
