@@ -140,22 +140,24 @@ def verify_bundle(app_path, team_id: str = TEAM_ID) -> bool:
 
 
 def write_swap_script(old_app, new_app, pid) -> Path:
-    old = str(old_app)
-    new = str(new_app)
+    old = Path(old_app)
+    new = Path(new_app)
+    target = old.parent / new.name  # install under the new name (handles rename)
     script = f"""#!/bin/bash
-OLD={shlex.quote(old)}
-NEW={shlex.quote(new)}
+OLD={shlex.quote(str(old))}
+NEW={shlex.quote(str(new))}
+TARGET={shlex.quote(str(target))}
 PID={int(pid)}
 for _ in $(seq 1 120); do
     kill -0 "$PID" 2>/dev/null || break
     sleep 0.5
 done
-if ! ( rm -rf "$OLD" && mv "$NEW" "$OLD" ) 2>/dev/null; then
-    /usr/bin/osascript -e "do shell script \\"rm -rf \\" & quoted form of \\"$OLD\\" & \\" && mv \\" & quoted form of \\"$NEW\\" & \\" \\" & quoted form of \\"$OLD\\" with administrator privileges"
+if ! ( [ "$OLD" != "$TARGET" ] && rm -rf "$OLD"; rm -rf "$TARGET" && mv "$NEW" "$TARGET" ) 2>/dev/null; then
+    /usr/bin/osascript -e "do shell script \\"rm -rf \\" & quoted form of \\"$OLD\\" & \\" ; rm -rf \\" & quoted form of \\"$TARGET\\" & \\" ; mv \\" & quoted form of \\"$NEW\\" & \\" \\" & quoted form of \\"$TARGET\\" with administrator privileges"
 fi
-open "$OLD"
+open "$TARGET"
 """
-    path = Path(tempfile.mkdtemp()) / "scene_search_swap.sh"
+    path = Path(tempfile.mkdtemp()) / "scenesearch_swap.sh"
     path.write_text(script)
     os.chmod(path, 0o755)
     return path

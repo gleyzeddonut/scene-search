@@ -32,6 +32,16 @@ def test_download_writes_bytes_and_reports_progress(tmp_path):
     assert seen and seen[-1] == 100
 
 
+def test_swap_script_targets_new_basename(tmp_path):
+    from scenesearch.updater import write_swap_script
+    old = tmp_path / "Scene Search.app"
+    new = tmp_path / "staged" / "Scripty.app"
+    script = write_swap_script(old, new, 4242)
+    text = script.read_text()
+    # the new bundle should be installed next to the old one, under ITS name
+    assert str(tmp_path / "Scripty.app") in text
+
+
 def test_write_swap_script(tmp_path):
     old = tmp_path / "Scene Search.app"
     new = tmp_path / "staged" / "Scene Search.app"

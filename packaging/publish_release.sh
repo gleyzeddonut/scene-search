@@ -10,8 +10,8 @@ cd "$ROOT"
 REPO="gleyzeddonut/scene-search"
 VERSION="$(.venv/bin/python -c 'from scenesearch.version import __version__; print(__version__)')"
 TAG="v${VERSION}"
-ARM="dist/Scene-Search-macOS-arm64.zip"
-INTEL="dist/Scene-Search-macOS-x86_64.zip"
+ARM="dist/Scripty-macOS-arm64.zip"
+INTEL="dist/Scripty-macOS-x86_64.zip"
 
 for f in "$ARM" "$INTEL"; do
     [ -f "$f" ] || { echo "missing $f — build it first"; exit 1; }

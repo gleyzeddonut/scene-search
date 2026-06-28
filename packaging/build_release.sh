@@ -16,7 +16,7 @@
 #
 set -euo pipefail
 
-APP_NAME="Scene Search"
+APP_NAME="Scripty"
 IDENTITY="Developer ID Application: Daniel Gleyzer (K7VM2MP885)"
 KEYCHAIN_PROFILE="${NOTARY_PROFILE:-scene-search-notary}"
 # Which venv to build from. Default is the arm64 venv; set VENV=.venv-intel to

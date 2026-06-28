@@ -44,7 +44,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="Scene Search",
+    name="Scripty",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -64,17 +64,17 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="Scene Search",
+    name="Scripty",
 )
 
 app = BUNDLE(
     coll,
-    name="Scene Search.app",
+    name="Scripty.app",
     icon=None,
-    bundle_identifier="com.gleyzer.scenesearch",
+    bundle_identifier="com.gleyzer.scripty",
     info_plist={
-        "CFBundleName": "Scene Search",
-        "CFBundleDisplayName": "Scene Search",
+        "CFBundleName": "Scripty",
+        "CFBundleDisplayName": "Scripty",
         "CFBundleShortVersionString": APP_VERSION,
         "CFBundleVersion": APP_VERSION,
         "LSMinimumSystemVersion": "13.0",
