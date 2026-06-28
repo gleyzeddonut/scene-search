@@ -52,5 +52,26 @@ def test_no_form_feeds_means_page_zero():
     assert parse_scenes(SCRIPT)[0].page == 0
 
 
+def test_numbered_shooting_script_headings():
+    text = (
+        "1   INT. WAREHOUSE - NIGHT                 1\n\n"
+        "JACK\nAnyone here?\n\n"
+        "2   EXT. ALLEY - CONTINUOUS                2\n\n"
+        "MARIA\nOver here!\n"
+    )
+    scenes = parse_scenes(text)
+    assert [s.heading for s in scenes] == [
+        "INT. WAREHOUSE - NIGHT 1",
+        "EXT. ALLEY - CONTINUOUS 2",
+    ]
+    assert scenes[0].characters == ["JACK"]
+    assert scenes[1].characters == ["MARIA"]
+
+
+def test_caps_action_or_sound_line_is_not_a_character():
+    text = "INT. KITCHEN - DAY\n\nTHE PHONE RINGS.\n\nBETTY\nHello?\n"
+    assert parse_scenes(text)[0].characters == ["BETTY"]
+
+
 def test_empty_text():
     assert parse_scenes("") == []

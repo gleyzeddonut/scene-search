@@ -4,8 +4,11 @@ import re
 from dataclasses import dataclass, field
 
 _SCENE_RE = re.compile(
-    r"^\s*(INT\.?/EXT\.?|EXT\.?/INT\.?|INT|EXT|I/E|E/I)[\.\s]", re.IGNORECASE
+    r"^\s*(?:\d+[A-Za-z]?[.)]?\s+)?"  # optional leading scene number (shooting scripts)
+    r"(INT\.?/EXT\.?|EXT\.?/INT\.?|INT|EXT|I/E|E/I)[\.\s]",
+    re.IGNORECASE,
 )
+_SCENE_NUM_PREFIX = re.compile(r"^\s*\d+[A-Za-z]?[.)]?\s+")
 _TRANSITION_RE = re.compile(
     r"\b(FADE IN|FADE OUT|FADE TO BLACK|CUT TO|SMASH CUT|MATCH CUT|DISSOLVE TO)\b"
 )
@@ -40,6 +43,8 @@ def _is_cue(line: str) -> bool:
     if not _CUE_RE.match(line):
         return False
     name = _normalize_character(stripped)
+    if name and name[-1] in ".!?":  # action/sound lines like "THE PHONE RINGS."
+        return False
     words = name.split()
     return 1 <= len(words) <= 4 and any(c.isalpha() for c in name)
 
@@ -57,7 +62,7 @@ def parse_scenes(text: str) -> list[Scene]:
         page += raw.count("\f")
         if _SCENE_RE.match(raw):
             current = Scene(
-                heading=" ".join(raw.split()),
+                heading=" ".join(_SCENE_NUM_PREFIX.sub("", raw).split()),
                 index=len(scenes) + 1,
                 page=page if has_pages else 0,
             )

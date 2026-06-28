@@ -5,7 +5,8 @@ import re
 DEFAULT_THRESHOLD = 0.35
 
 _SCENE_RE = re.compile(
-    r"^\s*(INT\.?/EXT\.?|EXT\.?/INT\.?|INT|EXT|I/E|E/I)[\.\s]",
+    r"^\s*(?:\d+[A-Za-z]?[.)]?\s+)?"  # optional leading scene number (shooting scripts)
+    r"(INT\.?/EXT\.?|EXT\.?/INT\.?|INT|EXT|I/E|E/I)[\.\s]",
     re.IGNORECASE | re.MULTILINE,
 )
 _TRANSITION_RE = re.compile(
@@ -28,6 +29,8 @@ def _count_character_cues(text: str) -> int:
         if _TRANSITION_RE.search(stripped):
             continue
         if not _CHAR_CUE_RE.match(line):
+            continue
+        if stripped[-1] in ".!?":  # action/sound lines like "THE PHONE RINGS."
             continue
         words = stripped.split()
         if 1 <= len(words) <= 4 and any(c.isalpha() for c in stripped):
