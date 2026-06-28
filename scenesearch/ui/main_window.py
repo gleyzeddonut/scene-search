@@ -59,6 +59,7 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._load_roots()
+        self._load_ignored()
 
     def _load_roots(self) -> None:
         saved = self._settings.get_roots()
@@ -66,16 +67,21 @@ class MainWindow(QMainWindow):
         for root in roots:
             self.roots_list.addItem(root)
 
+    def _load_ignored(self) -> None:
+        for path in self._settings.get_ignored() or []:
+            self.ignore_list.addItem(path)
+
     # ---------- UI construction ----------
     def _build_ui(self) -> None:
         central = QWidget()
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
 
-        # Roots row
+        # Folders to scan
+        layout.addWidget(QLabel("Folders to scan:"))
         roots_row = QHBoxLayout()
         self.roots_list = QListWidget()
-        self.roots_list.setMaximumHeight(90)
+        self.roots_list.setMaximumHeight(80)
         roots_row.addWidget(self.roots_list, 1)
         roots_btns = QVBoxLayout()
         add_btn = QPushButton("Add Folder…")
@@ -90,6 +96,26 @@ class MainWindow(QMainWindow):
         roots_btns.addStretch(1)
         roots_row.addLayout(roots_btns)
         layout.addLayout(roots_row)
+
+        # Folders to ignore
+        layout.addWidget(QLabel("Folders to ignore (skipped during scan):"))
+        ignore_row = QHBoxLayout()
+        self.ignore_list = QListWidget()
+        self.ignore_list.setMaximumHeight(70)
+        ignore_row.addWidget(self.ignore_list, 1)
+        ignore_btns = QVBoxLayout()
+        ignore_add_btn = QPushButton("Ignore Folder…")
+        ignore_add_btn.clicked.connect(self._add_ignore)
+        ignore_remove_btn = QPushButton("Remove")
+        ignore_remove_btn.clicked.connect(self._remove_ignore)
+        ignore_clear_btn = QPushButton("Clear")
+        ignore_clear_btn.clicked.connect(self._clear_ignore)
+        ignore_btns.addWidget(ignore_add_btn)
+        ignore_btns.addWidget(ignore_remove_btn)
+        ignore_btns.addWidget(ignore_clear_btn)
+        ignore_btns.addStretch(1)
+        ignore_row.addLayout(ignore_btns)
+        layout.addLayout(ignore_row)
 
         # Controls row
         controls = QHBoxLayout()
@@ -188,8 +214,31 @@ class MainWindow(QMainWindow):
     def _persist_roots(self) -> None:
         self._settings.set_roots(self._roots())
 
+    # ---------- Ignore folders ----------
+    def _add_ignore(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, "Choose a folder to ignore")
+        if folder:
+            self.ignore_list.addItem(folder)
+            self._persist_ignored()
+
+    def _remove_ignore(self) -> None:
+        for item in self.ignore_list.selectedItems():
+            self.ignore_list.takeItem(self.ignore_list.row(item))
+        self._persist_ignored()
+
+    def _clear_ignore(self) -> None:
+        self.ignore_list.clear()
+        self._persist_ignored()
+
+    def _ignored(self) -> list[str]:
+        return [self.ignore_list.item(i).text() for i in range(self.ignore_list.count())]
+
+    def _persist_ignored(self) -> None:
+        self._settings.set_ignored(self._ignored())
+
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt override)
         self._persist_roots()
+        self._persist_ignored()
         super().closeEvent(event)
 
     # ---------- Scanning ----------
@@ -206,7 +255,9 @@ class MainWindow(QMainWindow):
         self.status.setText("Scanning…")
 
         self._thread = QThread()
-        self._worker = ScanWorker(roots, DEFAULT_THRESHOLD, self._cache)
+        self._worker = ScanWorker(
+            roots, DEFAULT_THRESHOLD, self._cache, self._ignored()
+        )
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.found.connect(self._on_found)

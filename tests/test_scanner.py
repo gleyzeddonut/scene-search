@@ -28,6 +28,28 @@ def test_skips_noise_directories(tmp_path):
     assert names == {"real.pdf"}
 
 
+def test_ignores_specified_folder(tmp_path):
+    keep = tmp_path / "Scripts"
+    keep.mkdir()
+    (keep / "a.pdf").write_text("x")
+    skip = tmp_path / "Archive"
+    skip.mkdir()
+    (skip / "b.pdf").write_text("x")
+
+    names = {p.name for p in iter_candidates([tmp_path], ignore_dirs=[skip])}
+    assert names == {"a.pdf"}
+
+
+def test_ignores_nested_folder_only(tmp_path):
+    nested = tmp_path / "a" / "old"
+    nested.mkdir(parents=True)
+    (nested / "c.pdf").write_text("x")
+    (tmp_path / "a" / "keep.pdf").write_text("x")
+
+    names = {p.name for p in iter_candidates([tmp_path], ignore_dirs=[nested])}
+    assert names == {"keep.pdf"}
+
+
 def test_deduplicates_overlapping_roots(tmp_path):
     (tmp_path / "x.txt").write_text("x")
     results = list(iter_candidates([tmp_path, tmp_path]))

@@ -19,11 +19,14 @@ def default_roots() -> list[Path]:
     return [c for c in candidates if c.is_dir()]
 
 
-def iter_candidates(roots: Iterable) -> Iterator[Path]:
+def iter_candidates(roots: Iterable, ignore_dirs: Iterable = None) -> Iterator[Path]:
+    ignored = {Path(p).resolve() for p in (ignore_dirs or [])}
     seen: set[Path] = set()
     for root in roots:
         root = Path(root)
         if not root.is_dir():
+            continue
+        if root.resolve() in ignored:
             continue
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames[:] = [
@@ -32,6 +35,7 @@ def iter_candidates(roots: Iterable) -> Iterator[Path]:
                 if not d.startswith(".")
                 and d not in _SKIP_DIR_NAMES
                 and not d.endswith(".app")
+                and (Path(dirpath) / d).resolve() not in ignored
             ]
             for fname in filenames:
                 if fname.startswith("."):

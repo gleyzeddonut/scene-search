@@ -24,6 +24,10 @@ On first launch: Downloads, Desktop, Documents, and iCloud Drive Documents. Use
 `~/Movies/Scripts` folder, an external drive under `/Volumes/…`, etc.). The
 folder list is **remembered between launches**; **Remove** drops the selected
 folder and **Clear** empties the list (and stays empty next time).
+
+To skip places you never want scanned (e.g. a huge `Downloads/archive`), add
+them under **Folders to ignore** — anything inside an ignored folder is left out
+of the scan. The ignore list is remembered between launches too.
 It looks at `.pdf .fountain .fdx .txt .docx` files and only lists the ones that
 read like screenplays (INT./EXT. headings, FADE IN, character cues, etc.).
 

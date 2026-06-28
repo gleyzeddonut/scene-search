@@ -29,6 +29,17 @@ def test_finds_real_script_and_skips_junk(tmp_path):
     assert found[0].entry.confidence >= 0.35
 
 
+def test_scan_respects_ignore_dirs(tmp_path):
+    (tmp_path / "real.fountain").write_text(SCRIPT)
+    skip = tmp_path / "old"
+    skip.mkdir()
+    (skip / "old.fountain").write_text(SCRIPT)
+
+    events = list(scan_for_scripts([tmp_path], ignore_dirs=[skip]))
+    found = [e for e in events if isinstance(e, FoundEvent)]
+    assert {e.entry.name for e in found} == {"real.fountain"}
+
+
 def test_emits_progress_events(tmp_path):
     (tmp_path / "a.txt").write_text("x")
     events = list(scan_for_scripts([tmp_path]))

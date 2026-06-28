@@ -11,11 +11,12 @@ class ScanWorker(QObject):
     progress = Signal(int, str)    # scanned, current path
     finished = Signal(int, int)    # total_found, total_unreadable
 
-    def __init__(self, roots, threshold, cache=None):
+    def __init__(self, roots, threshold, cache=None, ignore_dirs=None):
         super().__init__()
         self._roots = roots
         self._threshold = threshold
         self._cache = cache
+        self._ignore_dirs = ignore_dirs
         self._cancelled = False
 
     def cancel(self) -> None:
@@ -24,7 +25,9 @@ class ScanWorker(QObject):
     def run(self) -> None:
         found_n = 0
         unreadable_n = 0
-        for event in scan_for_scripts(self._roots, self._threshold, self._cache):
+        for event in scan_for_scripts(
+            self._roots, self._threshold, self._cache, self._ignore_dirs
+        ):
             if self._cancelled:
                 break
             if isinstance(event, FoundEvent):

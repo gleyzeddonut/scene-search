@@ -32,9 +32,10 @@ def scan_for_scripts(
     roots,
     threshold: float = DEFAULT_THRESHOLD,
     cache: ScoreCache | None = None,
+    ignore_dirs=None,
 ) -> Iterator[object]:
     scanned = 0
-    for path in iter_candidates(roots):
+    for path in iter_candidates(roots, ignore_dirs):
         scanned += 1
         yield ProgressEvent(scanned, path)
 
