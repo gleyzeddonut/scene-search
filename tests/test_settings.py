@@ -63,6 +63,22 @@ def test_check_updates_round_trip(tmp_path):
     assert Settings(p).get_check_updates() is True
 
 
+def test_theme_defaults_light(tmp_path):
+    assert Settings(tmp_path / "s.json").get_theme() == "light"
+
+
+def test_theme_round_trip(tmp_path):
+    p = tmp_path / "s.json"
+    Settings(p).set_theme("dark")
+    assert Settings(p).get_theme() == "dark"
+
+
+def test_theme_invalid_falls_back_to_light(tmp_path):
+    p = tmp_path / "s.json"
+    Settings(p).set_theme("rainbow")
+    assert Settings(p).get_theme() == "light"
+
+
 def test_corrupt_settings_file_is_ignored(tmp_path):
     p = tmp_path / "settings.json"
     p.write_text("{ not valid json")

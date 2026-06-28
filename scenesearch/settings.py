@@ -52,6 +52,14 @@ class Settings:
         self._data["check_updates"] = bool(value)
         self.save()
 
+    def get_theme(self) -> str:
+        value = self._data.get("theme")
+        return value if value in ("light", "dark") else "light"
+
+    def set_theme(self, name: str) -> None:
+        self._data["theme"] = name if name in ("light", "dark") else "light"
+        self.save()
+
     def _get_list(self, key: str) -> list[str] | None:
         value = self._data.get(key)
         return [str(v) for v in value] if isinstance(value, list) else None
