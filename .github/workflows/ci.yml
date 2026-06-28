@@ -17,11 +17,10 @@ jobs:
           python-version: "3.13"
 
       - name: Install test dependencies
-        # The GUI-free core (which is all the tests cover) needs only these;
-        # PySide6 is not imported by the test suite.
+        # The Python engine + service tests; the UI is a separate Electron app.
         run: |
           python -m pip install --upgrade pip
-          pip install pypdf python-docx Send2Trash pytest
+          pip install pypdf python-docx Send2Trash fastapi uvicorn httpx pytest
 
       - name: Run tests
         run: pytest -q

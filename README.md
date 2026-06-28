@@ -1,120 +1,54 @@
-# Scene Search
+# Scripty
 
-A native macOS app that finds movie/TV scripts scattered across your drive,
-confirms them by reading inside the files, lists them, and lets you copy, move,
-rename, open, or trash them.
+A native macOS app that finds, browses, and prepares movie scripts on your Mac —
+fully offline. The UI is **Electron + React**; the screenplay engine is **Python**,
+run as a local sidecar process the UI talks to over `127.0.0.1` (token-authed).
 
-## Setup
+## Architecture
+
+```
+Electron main (Node)  ─ spawns ─►  Python engine sidecar (FastAPI/uvicorn)
+React renderer  ── fetch(127.0.0.1:<port>, token) ──►  engine
+```
+
+- **Engine** (`scenesearch/`): the offline screenplay engine — scanner, SQLite
+  index (`library`), screenplay parser, gender inference, scene filtering
+  (`finder`) — exposed via `scenesearch/service.py` (FastAPI). GUI-free and
+  unit-tested.
+- **App** (`app/`): Electron + Vite + React + TypeScript. The main process
+  spawns the engine on a random free port with a per-launch token and kills it
+  on quit; the renderer calls the engine via `fetch`.
+
+## Develop
 
 ```bash
+# 1. engine
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pytest          # run the engine + service tests
+
+# 2. app
+cd app
+npm install
+npm run dev                         # launches Electron + the engine sidecar
 ```
 
-## Run
+`npm run dev` opens the window, which starts the Python engine, then shows the
+**Library** (point it at folders, Re-index) and **Browse** (filter scenes by
+size / gender pairing) views. Light/dark themes via the toolbar toggle.
 
-```bash
-.venv/bin/python app.py
-```
+## Status
 
-## What it scans
-
-On first launch: Downloads, Desktop, Documents, and iCloud Drive Documents. Use
-**Add Folder…** to point it anywhere else your scripts live (e.g. a
-`~/Movies/Scripts` folder, an external drive under `/Volumes/…`, etc.). The
-folder list is **remembered between launches**; **Remove** drops the selected
-folder and **Clear** empties the list (and stays empty next time).
-
-To skip places you never want scanned (e.g. a huge `Downloads/archive`), add
-them under **Folders to ignore** — anything inside an ignored folder is left out
-of the scan. The ignore list is remembered between launches too.
-It looks at `.pdf .fountain .fdx .txt .docx` files and only lists the ones that
-read like screenplays (INT./EXT. headings, FADE IN, character cues, etc.).
-
-## Selecting and moving files
-
-Click a row to act on one file, or ⌘-click / shift-click to select several. The
-**Copy to…**, **Move to…**, and **Delete to Trash** buttons act on every
-selected file at once. In the Copy/Move folder picker, use the **New Folder**
-button to create a fresh destination folder and move the batch straight into it.
-Moved and trashed files drop out of the list immediately.
-
-## Finder tab
-
-The **Finder** tab turns one folder into a searchable script *library*. Choose
-the folder and click **Index** once (it parses every script into a local
-database; re-indexing only re-reads changed files). Then filter offline by:
-
-- **# speaking characters in a scene** (set min and max to 2 for two-handers)
-- **Gender pairing** of two-character scenes (M+W, M+M, W+W, or "has unknown")
-
-Indexing runs in the background with a progress bar so you can see it working.
-
-Toggle between **Scenes** (every matching scene) and **Scripts** (which scripts
-qualify, with a count). Double-click a result to open the script.
-
-In the **Scripts** view, re-downloaded duplicates (`Heat.pdf`, `Heat (1).pdf`,
-`Heat copy.pdf`) fold into one expandable row; click the triangle to see each
-copy. The **Delete to Trash** button removes the selected script — and if it's a
-stack of copies, it asks whether to delete just that file or the whole stack.
-
-Gender is inferred offline from first names (and common gendered role words like
-MAN/WOMAN/WAITRESS) and is approximate — unrecognized names (unisex, invented,
-or non-English) fall into an "unknown" bucket.
+- **Phase 1 (done):** working dev app — Electron/React shell + Python engine
+  sidecar; Browse + Library.
+- **Phase 2 (next):** package the engine with PyInstaller + the app with
+  electron-builder; Developer-ID sign + notarize.
+- **Phase 3:** auto-update (electron-updater) and the Prepare/Sides feature.
 
 ## Notes
 
-- Delete always moves files to the Trash — never a permanent delete.
-- Scanned/image-only PDFs have no extractable text, so they can't be detected
-  (the "couldn't read" count in the status bar reflects these).
-- After renaming/moving/deleting from the app, click **Scan** again to refresh.
-
-## Development
-
-```bash
-.venv/bin/python -m pytest        # run the test suite (GUI-free core)
-```
-
-The core (`scenesearch/`) has no Qt dependency and is fully unit-tested; the Qt
-layer (`scenesearch/ui/`, `app.py`) is a thin shell over it.
-
-## Updates
-
-When a newer release is published, the app shows an **"Update available"** banner
-on launch. Click **Update** to download the new build, then **Relaunch to finish**
-— the app swaps itself in and reopens.
-
-For self-update to work, **keep Scene Search in your Applications folder** (drag it
-there once). Apps run straight from Downloads are sandboxed by macOS and can't
-update themselves; the banner will say so if that happens.
-
-### Cutting a release (maintainer)
-
-```bash
-# bump scenesearch/version.py, then:
-./packaging/build_release.sh                  # arm64
-VENV=.venv-intel ./packaging/build_release.sh # Intel
-./packaging/publish_release.sh                # tag + upload to GitHub
-```
-
-## Releases
-
-`./packaging/build_release.sh` builds, Developer-ID-signs, notarizes, staples,
-and zips a distributable `.app`. It produces a zip named by the built
-architecture:
-
-- **Apple Silicon (M1/M2/M3/M4):** `dist/Scene-Search-macOS-arm64.zip`
-- **Intel:** `dist/Scene-Search-macOS-x86_64.zip`
-
-The default (arm64) build uses `.venv`. The Intel build uses an x86_64 Python
-venv (`.venv-intel`, created with `uv`) and runs through Rosetta:
-
-```bash
-# one-time: create the x86_64 venv
-uv python install cpython-3.13.12-macos-x86_64-none
-uv venv --python cpython-3.13.12-macos-x86_64-none .venv-intel
-uv pip install --python .venv-intel/bin/python -r requirements.txt pyinstaller
-
-# build the Intel release
-VENV=.venv-intel ./packaging/build_release.sh
-```
+- Offline-only: the engine binds to `127.0.0.1` and never makes external network
+  calls. Detection reads `.pdf .fountain .fdx .txt .docx`; scanned image-only
+  PDFs can't be read.
+- The previous PySide6 UI was retired in favor of the Electron app (kept in git
+  history); the Python engine and its tests carried over unchanged.
