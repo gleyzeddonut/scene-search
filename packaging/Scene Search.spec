@@ -13,7 +13,12 @@ a = Analysis(
     [os.path.join(PROJECT_ROOT, "app.py")],
     pathex=[PROJECT_ROOT],
     binaries=[],
-    datas=[],
+    datas=[
+        (
+            os.path.join(PROJECT_ROOT, "scenesearch", "screenplay", "names_gender.json"),
+            "scenesearch/screenplay",
+        )
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
