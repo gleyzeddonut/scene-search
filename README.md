@@ -78,6 +78,25 @@ or non-English) fall into an "unknown" bucket.
 The core (`scenesearch/`) has no Qt dependency and is fully unit-tested; the Qt
 layer (`scenesearch/ui/`, `app.py`) is a thin shell over it.
 
+## Updates
+
+When a newer release is published, the app shows an **"Update available"** banner
+on launch. Click **Update** to download the new build, then **Relaunch to finish**
+— the app swaps itself in and reopens.
+
+For self-update to work, **keep Scene Search in your Applications folder** (drag it
+there once). Apps run straight from Downloads are sandboxed by macOS and can't
+update themselves; the banner will say so if that happens.
+
+### Cutting a release (maintainer)
+
+```bash
+# bump scenesearch/version.py, then:
+./packaging/build_release.sh                  # arm64
+VENV=.venv-intel ./packaging/build_release.sh # Intel
+./packaging/publish_release.sh                # tag + upload to GitHub
+```
+
 ## Releases
 
 `./packaging/build_release.sh` builds, Developer-ID-signs, notarizes, staples,
