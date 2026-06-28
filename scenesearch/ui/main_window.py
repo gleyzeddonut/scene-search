@@ -27,6 +27,7 @@ from ..cache import ScoreCache
 from ..classifier import DEFAULT_THRESHOLD
 from ..model import ScriptEntry
 from ..scanner import default_roots
+from ..settings import Settings
 from .. import fileops
 from .scan_worker import ScanWorker
 
@@ -45,19 +46,25 @@ def _human_size(n: int) -> str:
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, settings_path=None, cache_path=None):
         super().__init__()
         self.setWindowTitle("Scene Search")
         self.resize(1000, 640)
 
-        self._cache = ScoreCache(Path.home() / ".scenesearch_cache.json")
+        self._settings = Settings(settings_path or Path.home() / ".scenesearch_settings.json")
+        self._cache = ScoreCache(cache_path or Path.home() / ".scenesearch_cache.json")
         self._thread: QThread | None = None
         self._worker: ScanWorker | None = None
         self._unreadable_count = 0
 
         self._build_ui()
-        for root in default_roots():
-            self.roots_list.addItem(str(root))
+        self._load_roots()
+
+    def _load_roots(self) -> None:
+        saved = self._settings.get_roots()
+        roots = saved if saved is not None else [str(r) for r in default_roots()]
+        for root in roots:
+            self.roots_list.addItem(root)
 
     # ---------- UI construction ----------
     def _build_ui(self) -> None:
@@ -75,8 +82,11 @@ class MainWindow(QMainWindow):
         add_btn.clicked.connect(self._add_folder)
         remove_btn = QPushButton("Remove")
         remove_btn.clicked.connect(self._remove_folder)
+        clear_btn = QPushButton("Clear")
+        clear_btn.clicked.connect(self._clear_folders)
         roots_btns.addWidget(add_btn)
         roots_btns.addWidget(remove_btn)
+        roots_btns.addWidget(clear_btn)
         roots_btns.addStretch(1)
         roots_row.addLayout(roots_btns)
         layout.addLayout(roots_row)
@@ -158,13 +168,26 @@ class MainWindow(QMainWindow):
         folder = QFileDialog.getExistingDirectory(self, "Add folder to scan")
         if folder:
             self.roots_list.addItem(folder)
+            self._persist_roots()
 
     def _remove_folder(self) -> None:
         for item in self.roots_list.selectedItems():
             self.roots_list.takeItem(self.roots_list.row(item))
+        self._persist_roots()
+
+    def _clear_folders(self) -> None:
+        self.roots_list.clear()
+        self._persist_roots()
 
     def _roots(self) -> list[str]:
         return [self.roots_list.item(i).text() for i in range(self.roots_list.count())]
+
+    def _persist_roots(self) -> None:
+        self._settings.set_roots(self._roots())
+
+    def closeEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        self._persist_roots()
+        super().closeEvent(event)
 
     # ---------- Scanning ----------
     def _start_scan(self) -> None:

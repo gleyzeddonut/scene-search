@@ -1,0 +1,32 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+
+class Settings:
+    """Tiny JSON-backed settings store. Currently just the scan-folder list."""
+
+    def __init__(self, path):
+        self.path = Path(path)
+        self._data: dict = {}
+        self.load()
+
+    def load(self) -> None:
+        if self.path.is_file():
+            try:
+                self._data = json.loads(self.path.read_text())
+            except Exception:
+                self._data = {}
+
+    def save(self) -> None:
+        self.path.write_text(json.dumps(self._data))
+
+    def get_roots(self) -> list[str] | None:
+        """Saved roots, or None if the user has never set them (first launch)."""
+        value = self._data.get("roots")
+        return [str(v) for v in value] if isinstance(value, list) else None
+
+    def set_roots(self, roots) -> None:
+        self._data["roots"] = [str(r) for r in roots]
+        self.save()

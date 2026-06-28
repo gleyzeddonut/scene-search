@@ -19,9 +19,11 @@ python3 -m venv .venv
 
 ## What it scans
 
-By default: Downloads, Desktop, Documents, and iCloud Drive Documents. Use
-**Add Folder…** in the app to point it anywhere else your scripts live
-(e.g. a `~/Movies/Scripts` folder, an external drive under `/Volumes/…`, etc.).
+On first launch: Downloads, Desktop, Documents, and iCloud Drive Documents. Use
+**Add Folder…** to point it anywhere else your scripts live (e.g. a
+`~/Movies/Scripts` folder, an external drive under `/Volumes/…`, etc.). The
+folder list is **remembered between launches**; **Remove** drops the selected
+folder and **Clear** empties the list (and stays empty next time).
 It looks at `.pdf .fountain .fdx .txt .docx` files and only lists the ones that
 read like screenplays (INT./EXT. headings, FADE IN, character cues, etc.).
 
