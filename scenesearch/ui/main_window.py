@@ -4,22 +4,24 @@ import os
 import subprocess
 from pathlib import Path
 
-from PySide6.QtCore import QThread, QUrl
+from PySide6.QtCore import Qt, QThread, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
 from PySide6.QtWidgets import (
+    QLabel,
     QMainWindow,
     QMessageBox,
-    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from ..cache import ScoreCache
+from ..library import Library
 from ..settings import Settings
 from ..updater import is_translocated, running_app_bundle, write_swap_script
 from ..version import __version__
-from .finder_tab import FinderTab
-from .search_tab import SearchTab
+from .app_shell import AppShell, load_app_fonts
+from .browse_view import BrowseView
+from .library_view import LibraryView
 from .settings_dialog import SettingsDialog
 from .update_banner import UpdateBanner
 from .update_worker import CheckWorker, DownloadWorker
@@ -53,14 +55,22 @@ class MainWindow(QMainWindow):
         self.update_banner.action_button.clicked.connect(self._on_banner_action)
         layout.addWidget(self.update_banner)
 
-        self.tabs = QTabWidget()
-        layout.addWidget(self.tabs)
+        load_app_fonts()
+        self._library = Library(self._index_path)
+        self.shell = AppShell(self._settings)
+        layout.addWidget(self.shell, 1)
         self.setCentralWidget(container)
 
-        self.search_tab = SearchTab(self._settings, self._cache)
-        self.tabs.addTab(self.search_tab, "Search")
-        self.finder_tab = FinderTab(self._settings, self._index_path)
-        self.tabs.addTab(self.finder_tab, "Finder")
+        self.browse_view = BrowseView(self._library)
+        self.library_view = LibraryView(self._settings, self._library, self._index_path)
+        prepare_placeholder = QLabel("Select a scene in Browse, then “Prepare scene →”.")
+        prepare_placeholder.setAlignment(Qt.AlignCenter)
+
+        self.shell.add_view("browse", self.browse_view, "Browse")
+        self.shell.add_view("prepare", prepare_placeholder, "Prepare")
+        self.shell.add_view("library", self.library_view, "Library")
+        self.shell.searchChanged.connect(self.browse_view.set_search)
+        self.browse_view.prepareRequested.connect(lambda _m: self.shell.show_view("prepare"))
 
         self._build_menus()
         if self._settings.get_check_updates():
@@ -78,12 +88,12 @@ class MainWindow(QMainWindow):
         settings_action.triggered.connect(self._open_settings)
         help_menu.addAction(settings_action)
 
-        about_action = QAction("About Scene Search", self)
+        about_action = QAction("About Scripty", self)
         about_action.setMenuRole(QAction.MenuRole.AboutRole)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
 
-        help_action = QAction("Scene Search Help", self)
+        help_action = QAction("Scripty Help", self)
         help_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
         help_action.triggered.connect(lambda: QDesktopServices.openUrl(QUrl(HELP_URL)))
         help_menu.addAction(help_action)
@@ -99,9 +109,9 @@ class MainWindow(QMainWindow):
     def _show_about(self) -> None:
         QMessageBox.about(
             self,
-            "About Scene Search",
-            f"<b>Scene Search</b><br>Version {__version__}<br><br>"
-            "Find and manage movie scripts on your Mac.",
+            "About Scripty",
+            f"<b>Scripty</b><br>Version {__version__}<br><br>"
+            "Find, browse, and prepare movie scripts on your Mac.",
         )
 
     def _manual_update_check(self) -> None:
@@ -203,9 +213,8 @@ class MainWindow(QMainWindow):
             thread.wait(31000)
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt override)
-        self.search_tab._persist_roots()
-        self.search_tab._persist_ignored()
-        self.finder_tab.stop_indexing()
+        self.library_view._persist()
+        self.library_view.stop_indexing()
         self._stop_thread(self._update_thread)
         self._stop_thread(self._dl_thread)
         super().closeEvent(event)
