@@ -39,6 +39,21 @@ selected file at once. In the Copy/Move folder picker, use the **New Folder**
 button to create a fresh destination folder and move the batch straight into it.
 Moved and trashed files drop out of the list immediately.
 
+## Finder tab
+
+The **Finder** tab turns one folder into a searchable script *library*. Choose
+the folder and click **Index** once (it parses every script into a local
+database; re-indexing only re-reads changed files). Then filter offline by:
+
+- **# speaking characters in a scene** (set min and max to 2 for two-handers)
+- **Gender pairing** of two-character scenes (M+W, M+M, W+W, or "has unknown")
+
+Toggle between **Scenes** (every matching scene) and **Scripts** (which scripts
+qualify, with a count). Double-click a result to open the script.
+
+Gender is inferred offline from first names and is approximate — unrecognized
+names (unisex, invented, or non-English) fall into an "unknown" bucket.
+
 ## Notes
 
 - Delete always moves files to the Trash — never a permanent delete.

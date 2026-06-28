@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QMainWindow, QTabWidget
 
 from ..cache import ScoreCache
 from ..settings import Settings
+from .finder_tab import FinderTab
 from .search_tab import SearchTab
 
 
@@ -24,6 +25,9 @@ class MainWindow(QMainWindow):
 
         self.search_tab = SearchTab(self._settings, self._cache)
         self.tabs.addTab(self.search_tab, "Search")
+
+        self.finder_tab = FinderTab(self._settings, self._index_path)
+        self.tabs.addTab(self.finder_tab, "Finder")
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt override)
         self.search_tab._persist_roots()
