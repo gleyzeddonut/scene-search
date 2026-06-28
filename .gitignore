@@ -7,3 +7,4 @@ scenesearch_cache.json
 build/
 dist/
 *.spec.bak
+.venv-intel/

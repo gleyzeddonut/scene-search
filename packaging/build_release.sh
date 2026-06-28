@@ -19,20 +19,27 @@ set -euo pipefail
 APP_NAME="Scene Search"
 IDENTITY="Developer ID Application: Daniel Gleyzer (K7VM2MP885)"
 KEYCHAIN_PROFILE="${NOTARY_PROFILE:-scene-search-notary}"
+# Which venv to build from. Default is the arm64 venv; set VENV=.venv-intel to
+# build the x86_64 (Intel) app via Rosetta.
+VENV="${VENV:-.venv}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 ENTITLEMENTS="packaging/entitlements.plist"
 APP="dist/${APP_NAME}.app"
-ARCH="$(uname -m)"
-DIST_ZIP="dist/${APP_NAME// /-}-macOS-${ARCH}.zip"
 
-echo "==> Cleaning previous build"
-rm -rf build dist
+echo "==> Cleaning previous build (keeping other arch's distributable zips)"
+rm -rf build "$APP" "dist/${APP_NAME}-notarize.zip"
+mkdir -p dist
 
-echo "==> Building .app with PyInstaller"
-.venv/bin/pyinstaller "packaging/${APP_NAME}.spec" --noconfirm
+echo "==> Building .app with PyInstaller (venv: $VENV)"
+"$VENV/bin/pyinstaller" "packaging/${APP_NAME}.spec" --noconfirm
+
+# Name the distributable by the arch actually baked into the binary.
+APP_ARCH="$(lipo -archs "$APP/Contents/MacOS/${APP_NAME}" | tr ' ' '-')"
+DIST_ZIP="dist/${APP_NAME// /-}-macOS-${APP_ARCH}.zip"
+echo "==> Built architecture: $APP_ARCH"
 
 echo "==> Signing every nested Mach-O binary (inside-out, frameworks included)"
 # Frameworks store their binary at Versions/A/<Name> with NO extension, so we

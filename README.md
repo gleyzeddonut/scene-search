@@ -48,3 +48,25 @@ Moved and trashed files drop out of the list immediately.
 
 The core (`scenesearch/`) has no Qt dependency and is fully unit-tested; the Qt
 layer (`scenesearch/ui/`, `app.py`) is a thin shell over it.
+
+## Releases
+
+`./packaging/build_release.sh` builds, Developer-ID-signs, notarizes, staples,
+and zips a distributable `.app`. It produces a zip named by the built
+architecture:
+
+- **Apple Silicon (M1/M2/M3/M4):** `dist/Scene-Search-macOS-arm64.zip`
+- **Intel:** `dist/Scene-Search-macOS-x86_64.zip`
+
+The default (arm64) build uses `.venv`. The Intel build uses an x86_64 Python
+venv (`.venv-intel`, created with `uv`) and runs through Rosetta:
+
+```bash
+# one-time: create the x86_64 venv
+uv python install cpython-3.13.12-macos-x86_64-none
+uv venv --python cpython-3.13.12-macos-x86_64-none .venv-intel
+uv pip install --python .venv-intel/bin/python -r requirements.txt pyinstaller
+
+# build the Intel release
+VENV=.venv-intel ./packaging/build_release.sh
+```
