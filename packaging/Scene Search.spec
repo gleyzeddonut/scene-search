@@ -66,8 +66,8 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": "Scene Search",
         "CFBundleDisplayName": "Scene Search",
-        "CFBundleShortVersionString": "1.2.0",
-        "CFBundleVersion": "1.2.0",
+        "CFBundleShortVersionString": "1.3.0",
+        "CFBundleVersion": "1.3.0",
         "LSMinimumSystemVersion": "13.0",
         "NSHighResolutionCapable": True,
         "NSHumanReadableCopyright": "© 2026 Daniel Gleyzer",
