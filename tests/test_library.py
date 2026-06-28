@@ -58,6 +58,16 @@ def test_reindex_is_incremental(tmp_path):
     assert lib.scene_count() == 2
 
 
+def test_remove_script(tmp_path):
+    (tmp_path / "a.fountain").write_text(SCRIPT)
+    lib = Library(tmp_path / "index.db")
+    lib.reindex(tmp_path)
+    path = lib.query(min_chars=1)[0].script_path
+    lib.remove_script(path)
+    assert lib.script_count() == 0
+    assert lib.scene_count() == 0
+
+
 def test_reindex_drops_deleted_files(tmp_path):
     f = tmp_path / "a.fountain"
     f.write_text(SCRIPT)

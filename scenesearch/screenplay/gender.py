@@ -17,6 +17,26 @@ def _load_table() -> dict[str, str]:
     return _TABLE
 
 
+_ROLE_GENDER = {
+    "man": "male", "woman": "female", "boy": "male", "girl": "female",
+    "guy": "male", "gal": "female", "gentleman": "male", "lady": "female",
+    "mother": "female", "father": "male", "mom": "female", "mum": "female",
+    "dad": "male", "husband": "male", "wife": "female", "son": "male",
+    "daughter": "female", "brother": "male", "sister": "female",
+    "grandmother": "female", "grandfather": "male", "grandma": "female",
+    "grandpa": "male", "grandson": "male", "granddaughter": "female",
+    "aunt": "female", "uncle": "male", "niece": "female", "nephew": "male",
+    "king": "male", "queen": "female", "prince": "male", "princess": "female",
+    "waiter": "male", "waitress": "female", "actor": "male", "actress": "female",
+    "businessman": "male", "businesswoman": "female", "policeman": "male",
+    "policewoman": "female", "widow": "female", "widower": "male",
+    "bride": "female", "groom": "male", "girlfriend": "female",
+    "boyfriend": "male", "stepmother": "female", "stepfather": "male",
+    "mr": "male", "mrs": "female", "ms": "female", "sir": "male",
+    "madam": "female", "maam": "female",
+}
+
+
 def gender_from_table(name: str, table: dict[str, str]) -> str:
     if not name:
         return "unknown"
@@ -24,8 +44,21 @@ def gender_from_table(name: str, table: dict[str, str]) -> str:
     return table.get(first, "unknown")
 
 
+def role_gender(name: str) -> str:
+    """Infer gender from gendered role words (MAN, WOMAN, WAITRESS, ...)."""
+    found = set()
+    for token in name.split():
+        key = token.lower().strip(".,'\"")
+        if key in _ROLE_GENDER:
+            found.add(_ROLE_GENDER[key])
+    return found.pop() if len(found) == 1 else "unknown"
+
+
 def guess_gender(name: str) -> str:
-    return gender_from_table(name, _load_table())
+    g = gender_from_table(name, _load_table())
+    if g != "unknown":
+        return g
+    return role_gender(name)
 
 
 def pairing_from_genders(genders: list[str]) -> str | None:

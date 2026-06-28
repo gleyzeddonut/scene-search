@@ -84,6 +84,11 @@ class Library:
         self._conn.execute("DELETE FROM scenes WHERE script_path=?", (rp,))
         self._conn.execute("DELETE FROM scripts WHERE path=?", (rp,))
 
+    def remove_script(self, path) -> None:
+        """Drop one script (by its stored path) from the index and commit."""
+        self._delete_script(str(path))
+        self._conn.commit()
+
     def script_count(self) -> int:
         # Only count files that actually parsed into scenes — a grocery list
         # or unreadable PDF (0 scenes) should not inflate "N scripts indexed".

@@ -48,11 +48,19 @@ database; re-indexing only re-reads changed files). Then filter offline by:
 - **# speaking characters in a scene** (set min and max to 2 for two-handers)
 - **Gender pairing** of two-character scenes (M+W, M+M, W+W, or "has unknown")
 
+Indexing runs in the background with a progress bar so you can see it working.
+
 Toggle between **Scenes** (every matching scene) and **Scripts** (which scripts
 qualify, with a count). Double-click a result to open the script.
 
-Gender is inferred offline from first names and is approximate — unrecognized
-names (unisex, invented, or non-English) fall into an "unknown" bucket.
+In the **Scripts** view, re-downloaded duplicates (`Heat.pdf`, `Heat (1).pdf`,
+`Heat copy.pdf`) fold into one expandable row; click the triangle to see each
+copy. The **Delete to Trash** button removes the selected script — and if it's a
+stack of copies, it asks whether to delete just that file or the whole stack.
+
+Gender is inferred offline from first names (and common gendered role words like
+MAN/WOMAN/WAITRESS) and is approximate — unrecognized names (unisex, invented,
+or non-English) fall into an "unknown" bucket.
 
 ## Notes
 

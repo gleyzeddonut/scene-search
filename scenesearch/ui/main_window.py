@@ -32,4 +32,5 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt override)
         self.search_tab._persist_roots()
         self.search_tab._persist_ignored()
+        self.finder_tab.stop_indexing()
         super().closeEvent(event)
