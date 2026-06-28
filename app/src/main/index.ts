@@ -1,10 +1,15 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron'
 import { join } from 'path'
 import { startEngine, EngineHandle } from './engine'
 
 let engine: EngineHandle | null = null
 
 async function createWindow() {
+  const iconPath = join(app.getAppPath(), 'resources', 'icon.png')
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(nativeImage.createFromPath(iconPath))
+  }
+
   engine = await startEngine()
   ipcMain.handle('engine-info', () => ({ port: engine!.port, token: engine!.token }))
   ipcMain.handle('pick-folder', async () => {

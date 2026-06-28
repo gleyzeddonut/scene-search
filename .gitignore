@@ -4,8 +4,8 @@ __pycache__/
 venv/
 .DS_Store
 scenesearch_cache.json
-build/
-dist/
+/build/
+/dist/
 *.spec.bak
 .venv-intel/
 app/node_modules/
