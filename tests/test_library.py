@@ -42,6 +42,14 @@ def test_query_by_char_count(tmp_path):
     assert two[0].script_name == "a.fountain"
 
 
+def test_non_script_files_are_not_counted(tmp_path):
+    (tmp_path / "a.fountain").write_text(SCRIPT)
+    (tmp_path / "notes.txt").write_text("grocery list: milk, eggs, bread")
+    lib = Library(tmp_path / "index.db")
+    lib.reindex(tmp_path)
+    assert lib.script_count() == 1  # notes.txt has 0 scenes
+
+
 def test_reindex_is_incremental(tmp_path):
     (tmp_path / "a.fountain").write_text(SCRIPT)
     lib = Library(tmp_path / "index.db")

@@ -85,7 +85,11 @@ class Library:
         self._conn.execute("DELETE FROM scripts WHERE path=?", (rp,))
 
     def script_count(self) -> int:
-        return self._conn.execute("SELECT COUNT(*) FROM scripts").fetchone()[0]
+        # Only count files that actually parsed into scenes — a grocery list
+        # or unreadable PDF (0 scenes) should not inflate "N scripts indexed".
+        return self._conn.execute(
+            "SELECT COUNT(*) FROM scripts WHERE scene_count > 0"
+        ).fetchone()[0]
 
     def scene_count(self) -> int:
         return self._conn.execute("SELECT COUNT(*) FROM scenes").fetchone()[0]
