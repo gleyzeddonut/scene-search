@@ -4,16 +4,27 @@ import os
 import subprocess
 from pathlib import Path
 
-from PySide6.QtCore import QThread
-from PySide6.QtWidgets import QMainWindow, QTabWidget, QVBoxLayout, QWidget
+from PySide6.QtCore import QThread, QUrl
+from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
+from PySide6.QtWidgets import (
+    QMainWindow,
+    QMessageBox,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..cache import ScoreCache
 from ..settings import Settings
 from ..updater import is_translocated, running_app_bundle, write_swap_script
+from ..version import __version__
 from .finder_tab import FinderTab
 from .search_tab import SearchTab
+from .settings_dialog import SettingsDialog
 from .update_banner import UpdateBanner
 from .update_worker import CheckWorker, DownloadWorker
+
+HELP_URL = "https://github.com/gleyzeddonut/scene-search"
 
 
 class MainWindow(QMainWindow):
@@ -30,6 +41,7 @@ class MainWindow(QMainWindow):
         self._staged_app = None
         self._update_thread: QThread | None = None
         self._update_worker = None
+        self._manual_check = False
         self._dl_thread: QThread | None = None
         self._dl_worker = None
 
@@ -50,15 +62,62 @@ class MainWindow(QMainWindow):
         self.finder_tab = FinderTab(self._settings, self._index_path)
         self.tabs.addTab(self.finder_tab, "Finder")
 
-        self._start_update_check()
+        self._build_menus()
+        if self._settings.get_check_updates():
+            self._start_update_check()
+
+    # ---------- Menus ----------
+    def _build_menus(self) -> None:
+        menubar = self.menuBar()
+        help_menu = menubar.addMenu("Help")
+
+        # PreferencesRole/AboutRole get relocated to the macOS app menu.
+        settings_action = QAction("Settings…", self)
+        settings_action.setMenuRole(QAction.MenuRole.PreferencesRole)
+        settings_action.setShortcut(QKeySequence.StandardKey.Preferences)  # ⌘,
+        settings_action.triggered.connect(self._open_settings)
+        help_menu.addAction(settings_action)
+
+        about_action = QAction("About Scene Search", self)
+        about_action.setMenuRole(QAction.MenuRole.AboutRole)
+        about_action.triggered.connect(self._show_about)
+        help_menu.addAction(about_action)
+
+        help_action = QAction("Scene Search Help", self)
+        help_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
+        help_action.triggered.connect(lambda: QDesktopServices.openUrl(QUrl(HELP_URL)))
+        help_menu.addAction(help_action)
+
+        check_action = QAction("Check for Updates…", self)
+        check_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
+        check_action.triggered.connect(self._manual_update_check)
+        help_menu.addAction(check_action)
+
+    def _open_settings(self) -> None:
+        SettingsDialog(self._settings, self).exec()
+
+    def _show_about(self) -> None:
+        QMessageBox.about(
+            self,
+            "About Scene Search",
+            f"<b>Scene Search</b><br>Version {__version__}<br><br>"
+            "Find and manage movie scripts on your Mac.",
+        )
+
+    def _manual_update_check(self) -> None:
+        self._start_update_check(manual=True)
 
     # ---------- Update check ----------
-    def _start_update_check(self) -> None:
+    def _start_update_check(self, manual: bool = False) -> None:
+        if self._update_thread is not None:
+            return  # a check is already running
+        self._manual_check = manual
         self._update_thread = QThread()
         self._update_worker = CheckWorker()
         self._update_worker.moveToThread(self._update_thread)
         self._update_thread.started.connect(self._update_worker.run)
         self._update_worker.update_available.connect(self._on_update_available)
+        self._update_worker.no_update.connect(self._on_no_update)
         self._update_worker.update_available.connect(self._update_thread.quit)
         self._update_worker.no_update.connect(self._update_thread.quit)
         self._update_thread.finished.connect(self._update_worker.deleteLater)
@@ -69,6 +128,14 @@ class MainWindow(QMainWindow):
     def _clear_update_thread(self) -> None:
         self._update_thread = None
         self._update_worker = None
+
+    def _on_no_update(self) -> None:
+        if self._manual_check:
+            QMessageBox.information(
+                self,
+                "Up to date",
+                f"You're on the latest version (v{__version__}).",
+            )
 
     def _on_update_available(self, info) -> None:
         self._update_info = info

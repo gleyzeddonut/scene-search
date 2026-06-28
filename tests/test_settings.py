@@ -51,6 +51,18 @@ def test_library_round_trip(tmp_path):
     assert Settings(p).get_library() == "/Users/x/Scripts"
 
 
+def test_check_updates_defaults_true(tmp_path):
+    assert Settings(tmp_path / "s.json").get_check_updates() is True
+
+
+def test_check_updates_round_trip(tmp_path):
+    p = tmp_path / "s.json"
+    Settings(p).set_check_updates(False)
+    assert Settings(p).get_check_updates() is False
+    Settings(p).set_check_updates(True)
+    assert Settings(p).get_check_updates() is True
+
+
 def test_corrupt_settings_file_is_ignored(tmp_path):
     p = tmp_path / "settings.json"
     p.write_text("{ not valid json")

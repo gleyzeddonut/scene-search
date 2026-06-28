@@ -44,6 +44,14 @@ class Settings:
         self._data["library"] = str(path)
         self.save()
 
+    def get_check_updates(self) -> bool:
+        value = self._data.get("check_updates")
+        return True if value is None else bool(value)
+
+    def set_check_updates(self, value: bool) -> None:
+        self._data["check_updates"] = bool(value)
+        self.save()
+
     def _get_list(self, key: str) -> list[str] | None:
         value = self._data.get(key)
         return [str(v) for v in value] if isinstance(value, list) else None
