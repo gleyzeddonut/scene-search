@@ -15,6 +15,7 @@ const PAIR: [string, string | null][] = [
   ['W+W', 'WW'],
   ['?', 'has_unknown']
 ]
+const PAIR_PRETTY: Record<string, string> = { MW: 'Man + Woman', MM: 'Man + Man', WW: 'Woman + Woman', has_unknown: 'Has unknown' }
 
 function gletter(g: string) {
   return g === 'female' ? 'W' : g === 'male' ? 'M' : 'U'
@@ -36,31 +37,66 @@ export function BrowseView({ search }: { search: string }) {
       })
   }, [size, pair, search])
 
+  const sizeChip = size !== 0
+  const pairChip = pair !== 0
+  const hasChips = sizeChip || pairChip
+
   return (
     <>
       <div className="rail">
-        <div className="section-label">Scene size</div>
-        <div className="chips">
-          {SIZE.map(([l], i) => (
-            <button key={l} className={'chip' + (i === size ? ' on' : '')} onClick={() => setSize(i)}>
-              {l}
-            </button>
-          ))}
+        <div className="fsection">
+          <div className="fhead">
+            <span className="flabel">Scene size</span>
+            <span className="fsummary">{SIZE[size][0]}</span>
+          </div>
+          <div className="seg-size">
+            {SIZE.map(([l], i) => (
+              <button key={l} className={i === size ? 'on' : ''} onClick={() => setSize(i)}>
+                {l}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="section-label">Partner pairing</div>
-        <div className="chips">
-          {PAIR.map(([l], i) => (
-            <button key={l} className={'chip' + (i === pair ? ' on' : '')} onClick={() => setPair(i)}>
-              {l}
-            </button>
-          ))}
+        <div className="fsection">
+          <div className="fhead">
+            <span className="flabel">Partner pairing</span>
+            <span className="fsummary">{PAIR[pair][0]}</span>
+          </div>
+          <div className="chips">
+            {PAIR.map(([l], i) => (
+              <button key={l} className={'chip' + (i === pair ? ' on' : '')} onClick={() => setPair(i)}>
+                {l}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-      <div className="list-pane">
-        <div className="list-head">
-          {scenes.length} scene{scenes.length !== 1 ? 's' : ''}
+
+      <div className="listpane">
+        <div className="lhead">
+          <div className="meta" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            {hasChips ? (
+              <>
+                {sizeChip && (
+                  <span className="fchip">{SIZE[size][0]} {SIZE[size][0] === '1' ? 'character' : 'characters'}<span className="x" onClick={() => setSize(0)}>✕</span></span>
+                )}
+                {pairChip && (
+                  <span className="fchip">{PAIR_PRETTY[PAIR[pair][1]!]}<span className="x" onClick={() => setPair(0)}>✕</span></span>
+                )}
+              </>
+            ) : (
+              <span>All scenes · no filters applied</span>
+            )}
+          </div>
+          <span className="result">{scenes.length} scene{scenes.length !== 1 ? 's' : ''}</span>
+        </div>
+        <div className="colhead">
+          <span style={{ flex: 1 }}>Scene</span>
+          <span style={{ width: 64 }}>Cast</span>
+          <span style={{ width: 42, textAlign: 'right' }}>Pg</span>
         </div>
         <div className="list">
+          {scenes.length === 0 && <div className="empty">No scenes match these filters.</div>}
           {scenes.map((s) => (
             <div
               key={s.script_path + s.heading}
@@ -68,54 +104,44 @@ export function BrowseView({ search }: { search: string }) {
               onClick={() => setSel(s)}
               onDoubleClick={() => api.openFile(s.script_path)}
             >
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="main">
                 <div className="title">{s.script_name.replace(/\.[^.]+$/, '')}</div>
-                <div className="sub">
-                  {s.heading}
-                  {s.page ? ` · p.${s.page}` : ''}
-                </div>
+                <div className="sub">{s.heading}{s.page ? ` · p.${s.page}` : ''}</div>
               </div>
-              <div style={{ display: 'flex', gap: 4 }}>
+              <div className="cast">
                 {s.characters.slice(0, 3).map((c) => (
                   <div key={c.name} className={'gchip ' + gletter(c.gender)} title={c.name}>
                     {gletter(c.gender)}
                   </div>
                 ))}
               </div>
+              <span className="page">{s.page || '—'}</span>
             </div>
           ))}
         </div>
       </div>
+
       <div className="panel">
         {sel && (
           <>
-            <div className="detail-heading">{sel.heading}</div>
-            <div className="detail-title">{sel.script_name.replace(/\.[^.]+$/, '')}</div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <span className="tag">{sel.char_count === 2 ? 'Two-hander' : `${sel.char_count} cast`}</span>
-              {sel.pairing && <span className="tag">{sel.pairing}</span>}
+            <div className="dheading">{sel.heading}</div>
+            <div className="dtitle">{sel.script_name.replace(/\.[^.]+$/, '')}</div>
+            <div className="dmeta">{sel.characters.map((c) => c.name).join(', ')}</div>
+            <div className="dtags">
+              <span className="tag size">{sel.char_count === 2 ? 'Two-hander' : `${sel.char_count} cast`}</span>
+              {sel.pairing && <span className="tag">{PAIR_PRETTY[sel.pairing] || sel.pairing}</span>}
             </div>
-            <div className="card">
-              <div className="detail-heading">{sel.heading}</div>
+            <div className="dcard">
+              <div className="h">{sel.heading}</div>
               {sel.characters.map((c) => (
-                <div
-                  key={c.name}
-                  style={{ textAlign: 'center', fontFamily: 'Courier Prime, monospace', marginTop: 10 }}
-                >
-                  {c.name}
-                </div>
+                <div key={c.name} className="cue">{c.name}</div>
               ))}
+              <div className="dnote">“Open the file or Prepare the scene to read the full sides.”</div>
             </div>
-            <div style={{ display: 'flex', gap: 9 }}>
-              <button className="btn primary" style={{ flex: 1 }}>
-                Prepare scene →
-              </button>
-              <button className="btn" onClick={() => api.openFile(sel.script_path)}>
-                Open file
-              </button>
-              <button className="btn" onClick={() => api.revealFile(sel.script_path)}>
-                Reveal
-              </button>
+            <div className="dbtns">
+              <button className="prepare">Prepare scene →</button>
+              <button className="ghost" onClick={() => api.openFile(sel.script_path)}>Open file</button>
+              <button className="ghost" onClick={() => api.revealFile(sel.script_path)}>Reveal</button>
             </div>
           </>
         )}
