@@ -61,15 +61,17 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.shell, 1)
         self.setCentralWidget(container)
 
-        self.browse_view = BrowseView(self._library)
+        self.browse_view = BrowseView(self._settings, self._library)
         self.library_view = LibraryView(self._settings, self._library, self._index_path)
         prepare_placeholder = QLabel("Select a scene in Browse, then “Prepare scene →”.")
+        prepare_placeholder.setObjectName("muted")
         prepare_placeholder.setAlignment(Qt.AlignCenter)
 
-        self.shell.add_view("browse", self.browse_view, "Browse")
-        self.shell.add_view("prepare", prepare_placeholder, "Prepare")
-        self.shell.add_view("library", self.library_view, "Library")
+        self.shell.add_view("browse", self.browse_view, "Browse", "browse")
+        self.shell.add_view("prepare", prepare_placeholder, "Prepare", "prepare")
+        self.shell.add_view("library", self.library_view, "Library", "library")
         self.shell.searchChanged.connect(self.browse_view.set_search)
+        self.shell.themeChanged.connect(self.browse_view.refresh)
         self.browse_view.prepareRequested.connect(lambda _m: self.shell.show_view("prepare"))
 
         self._build_menus()

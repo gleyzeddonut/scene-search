@@ -34,33 +34,94 @@ def palette_for(name: str) -> dict:
 
 def build_qss(p: dict) -> str:
     return f"""
-    QWidget {{ background: {p['window']}; color: {p['text']};
+    QWidget {{ background: transparent; color: {p['text']};
         font-family: 'Space Grotesk', -apple-system, sans-serif; font-size: 13px; }}
     QMainWindow, #shell {{ background: {p['app_bg']}; }}
+    QLabel {{ background: transparent; }}
+    QToolTip {{ background: {p['window']}; color: {p['text']};
+        border: 1px solid {p['border']}; padding: 4px 7px; border-radius: 6px; }}
+
+    /* ---- toolbar ---- */
     #toolbar {{ background: {p['chrome']}; border-bottom: 1px solid {p['border']}; }}
+    #wordmark {{ font-size: 15px; font-weight: 700; color: {p['text']}; }}
+    #brandDot {{ background: {p['accent']}; border-radius: 5px; }}
+    #searchField {{ background: {p['field']}; border: 1px solid {p['border']};
+        border-radius: 9px; }}
+    #searchField QLineEdit {{ background: transparent; border: none; padding: 0; }}
+    #kbd {{ color: {p['text_3']}; border: 1px solid {p['border']}; border-radius: 5px;
+        padding: 2px 5px; font-size: 11px; font-weight: 600; }}
+    #segToggle {{ border: 1px solid {p['border']}; border-radius: 8px; }}
+    #segToggle QPushButton {{ background: transparent; border: none; border-radius: 6px;
+        padding: 4px 9px; color: {p['text_3']}; font-size: 13px; }}
+    #segToggle QPushButton:checked {{ background: {p['accent']}; color: white; }}
+
+    /* ---- nav rail ---- */
     #navRail {{ background: {p['nav']}; border-right: 1px solid {p['border']}; }}
+    #navItem {{ background: transparent; border: none; color: {p['text_3']};
+        border-radius: 12px; font-size: 9px; font-weight: 700; }}
+    #navItem:hover {{ background: {p['border_soft']}; }}
+    #navItem:checked {{ background: {p['accent_soft']}; color: {p['accent_text']}; }}
+
+    /* ---- panes ---- */
     #rail {{ background: {p['rail']}; border-right: 1px solid {p['border']}; }}
-    #panel {{ background: {p['panel']}; }}
-    #wordmark {{ font-size: 15px; font-weight: 700; }}
-    QLineEdit {{ background: {p['field']}; border: 1px solid {p['border']};
-        border-radius: 9px; padding: 6px 10px; color: {p['text']}; }}
+    #listPane {{ background: {p['window']}; border-right: 1px solid {p['border']}; }}
+    #panel {{ background: {p['panel']}; border-left: 1px solid {p['border']}; }}
+    #listHeader {{ background: {p['window']}; border-bottom: 1px solid {p['border']}; }}
+
+    /* ---- filter sections ---- */
+    QLabel#sectionLabel {{ color: {p['text_3']}; font-size: 10px; font-weight: 700;
+        letter-spacing: 1px; }}
+    #filterSection {{ border-bottom: 1px solid {p['border_soft']}; }}
+
+    /* ---- chips / segmented filter buttons ---- */
+    QPushButton#chip {{ background: {p['chip']}; border: 1px solid transparent;
+        border-radius: 999px; padding: 6px 13px; color: {p['text_2']};
+        font-size: 12px; font-weight: 600; }}
+    QPushButton#chip:hover {{ border-color: {p['border']}; }}
+    QPushButton#chip:checked {{ background: {p['accent_soft']}; color: {p['accent_text']};
+        border-color: transparent; }}
+
+    /* ---- generic buttons ---- */
     QPushButton {{ background: {p['chip']}; border: 1px solid {p['border']};
-        border-radius: 8px; padding: 7px 12px; color: {p['text_2']}; }}
-    QPushButton:hover {{ border-color: {p['accent']}; }}
-    QPushButton#primary {{ background: {p['accent']}; color: white; border: none; }}
-    QPushButton#navItem {{ background: transparent; border: none; color: {p['text_3']};
-        border-radius: 9px; padding: 8px 4px; font-size: 10px; font-weight: 600; }}
-    QPushButton#navItem:checked {{ background: {p['accent_soft']}; color: {p['accent_text']}; }}
-    QTreeView, QListWidget {{ background: {p['window']}; border: none;
-        outline: 0; alternate-background-color: {p['window']}; }}
-    QTreeView::item, QListWidget::item {{ padding: 6px 8px; border-radius: 7px; }}
-    QTreeView::item:selected, QListWidget::item:selected {{
-        background: {p['sel']}; color: {p['text']}; }}
-    QHeaderView::section {{ background: {p['window']}; color: {p['text_3']};
-        border: none; border-bottom: 1px solid {p['border_soft']};
-        padding: 6px 8px; font-size: 10px; }}
-    QLabel#sectionLabel {{ color: {p['text_3']}; font-size: 10px; font-weight: 700; }}
+        border-radius: 9px; padding: 8px 14px; color: {p['text_2']}; font-weight: 600; }}
+    QPushButton:hover {{ border-color: {p['accent']}; color: {p['text']}; }}
+    QPushButton#primary {{ background: {p['accent']}; color: white; border: none;
+        font-weight: 700; }}
+    QPushButton#primary:hover {{ background: {p['accent_text']}; }}
+
+    /* ---- inputs ---- */
+    QLineEdit {{ background: {p['field']}; border: 1px solid {p['border']};
+        border-radius: 9px; padding: 7px 11px; color: {p['text']}; selection-background-color: {p['accent_soft']}; }}
+    QLineEdit:focus {{ border-color: {p['accent']}; }}
+
+    /* ---- cards ---- */
+    #statCard {{ background: {p['panel']}; border: 1px solid {p['border']};
+        border-radius: 12px; }}
+    #scriptCard {{ background: {p['window']}; border: 1px solid {p['border']};
+        border-radius: 11px; }}
+    #detailTitle {{ font-size: 22px; font-weight: 700; color: {p['text']}; }}
+    #tagChip {{ background: {p['chip']}; color: {p['text_2']}; border-radius: 999px;
+        padding: 5px 11px; font-size: 11px; font-weight: 600; }}
+
+    /* ---- list ---- */
+    QListWidget {{ background: {p['window']}; border: none; outline: 0; }}
+    QListWidget::item {{ border-radius: 9px; margin: 1px 8px; }}
+    QListWidget::item:selected {{ background: {p['sel']}; }}
+    QListWidget::item:hover {{ background: {p['border_soft']}; }}
+    QFrame#folderList {{ background: {p['window']}; border: 1px solid {p['border']};
+        border-radius: 12px; }}
+
+    /* ---- text helpers ---- */
     QLabel#mono {{ font-family: 'Courier Prime', monospace; color: {p['text_2']}; }}
-    QScrollBar:vertical {{ background: transparent; width: 9px; }}
-    QScrollBar::handle:vertical {{ background: {p['border']}; border-radius: 4px; }}
+    QLabel#muted {{ color: {p['text_3']}; font-size: 12px; }}
+    QTextEdit {{ background: {p['window']}; border: 1px solid {p['border']};
+        border-radius: 11px; padding: 14px; color: {p['text']};
+        font-family: 'Courier Prime', monospace; }}
+
+    /* ---- scrollbars ---- */
+    QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px; }}
+    QScrollBar::handle:vertical {{ background: {p['border']}; border-radius: 4px; min-height: 30px; }}
+    QScrollBar::handle:vertical:hover {{ background: {p['text_3']}; }}
+    QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
+    QScrollBar:horizontal {{ height: 0; }}
     """
