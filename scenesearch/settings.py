@@ -36,6 +36,14 @@ class Settings:
     def set_ignored(self, paths) -> None:
         self._set_list("ignored", paths)
 
+    def get_library(self) -> str | None:
+        value = self._data.get("library")
+        return str(value) if isinstance(value, str) else None
+
+    def set_library(self, path) -> None:
+        self._data["library"] = str(path)
+        self.save()
+
     def _get_list(self, key: str) -> list[str] | None:
         value = self._data.get(key)
         return [str(v) for v in value] if isinstance(value, list) else None

@@ -65,3 +65,30 @@ def _extract_fdx(p: Path, max_chars: int) -> str:
     tree = ET.parse(str(p))
     texts = [el.text for el in tree.iter("Text") if el.text]
     return "\n".join(texts)[:max_chars]
+
+
+def extract_paginated(path, max_pages: int = 400, max_chars: int = 400_000) -> str:
+    """Like extract_text but joins PDF pages with form-feed (\\f) so scene page
+    numbers can be recovered. Non-PDF formats return plain text."""
+    p = Path(path)
+    if p.suffix.lower() != ".pdf":
+        return extract_text(p, max_chars=max_chars, pdf_max_pages=max_pages)
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(str(p))
+        if reader.is_encrypted:
+            try:
+                reader.decrypt("")
+            except Exception as exc:
+                raise ExtractionError(p, "encrypted PDF") from exc
+        parts: list[str] = []
+        for page in reader.pages[:max_pages]:
+            parts.append(page.extract_text() or "")
+            if sum(len(x) for x in parts) >= max_chars:
+                break
+        return "\f".join(parts)[:max_chars]
+    except ExtractionError:
+        raise
+    except Exception as exc:
+        raise ExtractionError(p, str(exc)) from exc
