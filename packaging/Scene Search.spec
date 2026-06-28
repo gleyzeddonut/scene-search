@@ -9,6 +9,11 @@ block_cipher = None
 
 PROJECT_ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
 
+import sys as _sys
+if PROJECT_ROOT not in _sys.path:
+    _sys.path.insert(0, PROJECT_ROOT)
+from scenesearch.version import __version__ as APP_VERSION
+
 a = Analysis(
     [os.path.join(PROJECT_ROOT, "app.py")],
     pathex=[PROJECT_ROOT],
@@ -66,8 +71,8 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": "Scene Search",
         "CFBundleDisplayName": "Scene Search",
-        "CFBundleShortVersionString": "1.3.0",
-        "CFBundleVersion": "1.3.0",
+        "CFBundleShortVersionString": APP_VERSION,
+        "CFBundleVersion": APP_VERSION,
         "LSMinimumSystemVersion": "13.0",
         "NSHighResolutionCapable": True,
         "NSHumanReadableCopyright": "© 2026 Daniel Gleyzer",
