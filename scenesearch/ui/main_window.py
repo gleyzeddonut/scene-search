@@ -126,8 +126,19 @@ class MainWindow(QMainWindow):
 
         QApplication.quit()
 
+    @staticmethod
+    def _stop_thread(thread) -> None:
+        # Network workers run a single blocking run(); quit() takes effect once
+        # run() returns (bounded by the socket timeouts in updater.py). Waiting
+        # here avoids "QThread destroyed while still running" on quit.
+        if thread is not None and thread.isRunning():
+            thread.quit()
+            thread.wait(31000)
+
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt override)
         self.search_tab._persist_roots()
         self.search_tab._persist_ignored()
         self.finder_tab.stop_indexing()
+        self._stop_thread(self._update_thread)
+        self._stop_thread(self._dl_thread)
         super().closeEvent(event)

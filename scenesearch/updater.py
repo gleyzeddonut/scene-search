@@ -46,6 +46,8 @@ def parse_release(data: dict) -> tuple[str, dict[str, str]]:
     for asset in data.get("assets", []):
         name = asset.get("name", "")
         url = asset.get("browser_download_url", "")
+        if not name.endswith(".zip"):  # skip checksums/sidecars
+            continue
         if "arm64" in name:
             assets["arm64"] = url
         elif "x86_64" in name:
@@ -88,7 +90,7 @@ def check_for_update(opener=urllib.request.urlopen, arch=None, current=None):
     arch = arch or current_arch()
     current = current or __version__
     try:
-        with opener(_request(API_URL)) as resp:
+        with opener(_request(API_URL), timeout=15) as resp:
             data = json.loads(resp.read())
     except Exception:
         return None
@@ -101,7 +103,7 @@ def check_for_update(opener=urllib.request.urlopen, arch=None, current=None):
 
 
 def download(url, dest, opener=urllib.request.urlopen, progress=None, chunk=65536) -> None:
-    with opener(url) as resp:
+    with opener(url, timeout=30) as resp:
         total = int(getattr(resp, "headers", {}).get("Content-Length") or 0)
         got = 0
         with open(dest, "wb") as f:

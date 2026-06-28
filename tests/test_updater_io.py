@@ -25,7 +25,7 @@ def test_download_writes_bytes_and_reports_progress(tmp_path):
     download(
         "http://x",
         tmp_path / "out.bin",
-        opener=lambda url: _Resp(data),
+        opener=lambda url, timeout=None: _Resp(data),
         progress=seen.append,
     )
     assert (tmp_path / "out.bin").read_bytes() == data

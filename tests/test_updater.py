@@ -67,7 +67,7 @@ class _Resp:
 
 
 def test_check_for_update_returns_info_when_newer():
-    opener = lambda req: _Resp(json.dumps(_release_json()).encode())
+    opener = lambda req, timeout=None: _Resp(json.dumps(_release_json()).encode())
     info = check_for_update(opener=opener, arch="arm64", current="1.4.0")
     assert isinstance(info, UpdateInfo)
     assert info.version == "1.5.0"
@@ -75,13 +75,13 @@ def test_check_for_update_returns_info_when_newer():
 
 
 def test_check_for_update_none_when_same_or_older():
-    opener = lambda req: _Resp(json.dumps(_release_json()).encode())
+    opener = lambda req, timeout=None: _Resp(json.dumps(_release_json()).encode())
     assert check_for_update(opener=opener, arch="arm64", current="1.5.0") is None
     assert check_for_update(opener=opener, arch="arm64", current="2.0.0") is None
 
 
 def test_check_for_update_none_on_network_error():
-    def opener(req):
+    def opener(req, timeout=None):
         raise OSError("offline")
 
     assert check_for_update(opener=opener, arch="arm64", current="1.0.0") is None
@@ -90,5 +90,22 @@ def test_check_for_update_none_on_network_error():
 def test_check_for_update_none_when_arch_missing():
     data = _release_json()
     data["assets"] = [data["assets"][0]]  # arm64 only
-    opener = lambda req: _Resp(json.dumps(data).encode())
+    opener = lambda req, timeout=None: _Resp(json.dumps(data).encode())
     assert check_for_update(opener=opener, arch="x86_64", current="1.4.0") is None
+
+
+def test_parse_release_ignores_non_zip_sidecars():
+    data = {
+        "tag_name": "v1.5.0",
+        "assets": [
+            {"name": "Scene-Search-macOS-arm64.zip",
+             "browser_download_url": "GOOD-arm"},
+            {"name": "Scene-Search-macOS-arm64.zip.sha256",
+             "browser_download_url": "BAD-checksum"},
+            {"name": "Scene-Search-macOS-x86_64.zip",
+             "browser_download_url": "GOOD-intel"},
+        ],
+    }
+    _tag, assets = parse_release(data)
+    assert assets["arm64"] == "GOOD-arm"
+    assert assets["x86_64"] == "GOOD-intel"
