@@ -129,6 +129,9 @@ class MainWindow(QMainWindow):
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        # Hide the left-edge row-number gutter; it shows stale scan-order
+        # positions that look scrambled once the table is sorted.
+        self.table.verticalHeader().setVisible(False)
         self.table.selectionModel().selectionChanged.connect(self._on_select)
         layout.addWidget(self.table, 1)
 
