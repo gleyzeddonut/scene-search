@@ -22,7 +22,11 @@ a = Analysis(
         (
             os.path.join(PROJECT_ROOT, "scenesearch", "screenplay", "names_gender.json"),
             "scenesearch/screenplay",
-        )
+        ),
+        (
+            os.path.join(PROJECT_ROOT, "scenesearch", "fonts"),
+            "scenesearch/fonts",
+        ),
     ],
     hiddenimports=[],
     hookspath=[],
