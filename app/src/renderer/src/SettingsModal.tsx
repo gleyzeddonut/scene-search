@@ -20,9 +20,24 @@ export function SettingsModal(props: { theme: string; onTheme: (t: string) => vo
   const [status, setStatus] = useState('')
 
   useEffect(() => {
-    window.scripty.appVersion().then(setVersion)
-    return window.scripty.onUpdateStatus(setStatus)
+    // guard against an older preload (e.g. dev not fully restarted) so the
+    // modal never crashes the app
+    try {
+      window.scripty.appVersion?.().then(setVersion).catch(() => {})
+      return window.scripty.onUpdateStatus?.(setStatus)
+    } catch {
+      return undefined
+    }
   }, [])
+
+  const check = () => {
+    try {
+      setStatus('checking')
+      window.scripty.checkUpdates?.()
+    } catch {
+      setStatus('error')
+    }
+  }
 
   return (
     <div className="modal-backdrop" onClick={props.onClose}>
@@ -51,13 +66,7 @@ export function SettingsModal(props: { theme: string; onTheme: (t: string) => vo
               {STATUS_TEXT[status] ? ` · ${STATUS_TEXT[status]}` : ''}
             </div>
           </div>
-          <button
-            className="ghost"
-            onClick={() => {
-              setStatus('checking')
-              window.scripty.checkUpdates()
-            }}
-          >
+          <button className="ghost" onClick={check}>
             Check for Updates
           </button>
         </div>
