@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell } from 'electron'
 import { join } from 'path'
 import { startEngine, EngineHandle } from './engine'
+import { setupUpdater, checkForUpdatesManual } from './updater'
 
 const HELP_URL = 'https://github.com/gleyzeddonut/scene-search'
 let engine: EngineHandle | null = null
@@ -40,15 +41,7 @@ function buildMenu() {
       role: 'help',
       submenu: [
         { label: 'Scripty Help', click: () => shell.openExternal(HELP_URL) },
-        {
-          label: 'Check for Updates…',
-          click: () =>
-            dialog.showMessageBox({
-              type: 'info',
-              message: 'Scripty is up to date.',
-              detail: 'Automatic updates arrive in a later version.'
-            })
-        }
+        { label: 'Check for Updates…', click: () => checkForUpdatesManual() }
       ]
     }
   ]
@@ -84,6 +77,8 @@ async function createWindow() {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  if (app.isPackaged) setupUpdater(() => mainWindow)
 }
 
 app.whenReady().then(createWindow)

@@ -1,5 +1,9 @@
 appId: com.gleyzer.scripty
 productName: Scripty
+publish:
+  provider: github
+  owner: gleyzeddonut
+  repo: scene-search
 directories:
   buildResources: build
 files:

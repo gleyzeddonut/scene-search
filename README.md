@@ -58,6 +58,19 @@ For a single arch: build the engine (`./packaging/build_engine.sh` or
 The Intel venv needs the engine deps once:
 `uv pip install --python .venv-intel/bin/python -r requirements.txt pyinstaller`.
 
+### Publishing an auto-updatable release
+
+```bash
+# bump app/package.json "version" first (e.g. 0.1.0 -> 0.2.0)
+export GH_TOKEN="$(gh auth token)"
+PUBLISH=always ./packaging/build_app.sh
+```
+
+This uploads the signed `.dmg`/`.zip` + `latest-mac.yml` to a GitHub release.
+Installed apps (kept in Applications) pick it up on next launch via
+electron-updater and prompt to restart. **Check for Updates…** in the menu
+triggers a manual check.
+
 ## Status
 
 - **Phase 1 (done):** working dev app — Electron/React shell + Python engine

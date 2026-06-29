@@ -5,17 +5,19 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && cd .. && pwd)"
 cd "$ROOT"
+# PUBLISH=always uploads signed artifacts + latest-mac.yml to a GitHub release
+PUBLISH="${PUBLISH:-never}"
 
 echo "==> Building the renderer (arch-independent)"
 ( cd app && npx electron-vite build )
 
 echo "==> arm64: engine binary + signed app"
 VENV=.venv ./packaging/build_engine.sh
-( cd app && npx electron-builder --mac --arm64 )
+( cd app && npx electron-builder --mac --arm64 --publish "$PUBLISH" )
 
 echo "==> x86_64 (Intel): engine binary + signed app"
 VENV=.venv-intel ./packaging/build_engine.sh
-( cd app && npx electron-builder --mac --x64 )
+( cd app && npx electron-builder --mac --x64 --publish "$PUBLISH" )
 
 echo ""
 echo "Done. Distributables in app/dist/:"
