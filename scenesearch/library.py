@@ -66,7 +66,9 @@ class Library:
         present: set[str] = set()
         for path in iter_candidates(folders, ignore_dirs):
             present.add(str(path.resolve()))
-            self._index_file(path, progress, full=full)
+            self._index_file(path, full=full)
+            if progress:  # report every file examined, not just (re)parsed ones
+                progress(path.name)
         for (stored,) in self._conn.execute("SELECT path FROM scripts").fetchall():
             if stored not in present:
                 self._delete_script(stored)
@@ -74,7 +76,7 @@ class Library:
         self._stored_version = INDEX_VERSION
         self._conn.commit()
 
-    def _index_file(self, path, progress, full=False) -> None:
+    def _index_file(self, path, full=False) -> None:
         rp = str(path.resolve())
         try:
             mtime = path.stat().st_mtime
@@ -104,8 +106,6 @@ class Library:
                  json.dumps(s.characters), scene_pairing(s.characters),
                  json.dumps(s.lines), estimate_seconds(words)),
             )
-        if progress:
-            progress(path.name)
 
     def _delete_script(self, rp: str) -> None:
         self._conn.execute("DELETE FROM scenes WHERE script_path=?", (rp,))

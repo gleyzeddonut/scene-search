@@ -48,6 +48,7 @@ export function LibraryView() {
     if (f && !roots.includes(f)) {
       const next = [...roots, f]
       setRoots(next)
+      setStatus('')
       await api.setFolders(next, [])
     }
   }
@@ -57,6 +58,10 @@ export function LibraryView() {
     await api.setFolders(next, [])
   }
   const reindex = async () => {
+    if (roots.length === 0) {
+      setStatus('Add a folder first')
+      return
+    }
     setBusy(true)
     setStatus('Indexing…')
     await api.reindex()

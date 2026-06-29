@@ -162,7 +162,9 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 .sides-h{font:700 13px/1 'Courier Prime',monospace;margin-bottom:26px;letter-spacing:.04em}
 .sides .cue{font:400 14px/1.3 'Courier Prime',monospace;margin-left:34%;letter-spacing:.04em;color:var(--text-2);margin-top:14px}
 .sides .cue.mine{color:var(--accent-text);font-weight:700}
-.sides .sline{font:400 14px/1.7 'Courier Prime',monospace;margin-left:14%;width:74%;margin-bottom:8px;color:var(--text)}
-.sides .sline.mine{background:var(--accent-soft);border-radius:6px;padding:4px 10px}
+/* every line carries the same box so switching role only swaps the background
+   colour — no padding/size change, no reflow */
+.sides .sline{font:400 14px/1.7 'Courier Prime',monospace;margin-left:14%;width:74%;margin-bottom:8px;color:var(--text);padding:4px 10px;border-radius:6px;background:transparent}
+.sides .sline.mine{background:var(--accent-soft)}
 .prep-foot{display:flex;align-items:center;gap:14px;padding:14px 30px;border-top:1px solid var(--border);background:var(--panel)}
 .prep-foot .muted{flex:1;text-align:right}
