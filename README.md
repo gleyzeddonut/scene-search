@@ -37,17 +37,26 @@ npm run dev                         # launches Electron + the engine sidecar
 **Library** (point it at folders, Re-index) and **Browse** (filter scenes by
 size / gender pairing) views. Light/dark themes via the toolbar toggle.
 
-## Package a signed release
+## Package a signed release (both architectures)
 
 ```bash
-./packaging/build_engine.sh                  # PyInstaller engine binary
-cd app && npm install && npm run dist         # electron-builder: bundle + sign + notarize
-# -> app/dist/Scripty-<version>-arm64.dmg  (Developer-ID signed, notarized)
+cd app && npm install && cd ..      # one-time: install the JS toolchain
+./packaging/build_app.sh             # builds, signs + notarizes arm64 AND Intel
+# -> app/dist/Scripty-<version>-arm64.dmg  and  Scripty-<version>.dmg (x64)
 ```
 
-The engine binary is bundled as an app resource and the renderer ships its fonts
-locally, so the packaged app is fully offline. Notarization uses the
+`build_app.sh` builds the renderer once, then for each arch builds the matching
+PyInstaller engine binary (arm64 from `.venv`, Intel from `.venv-intel` via
+Rosetta) and packages + signs + notarizes the app. Each app bundles its own
+engine binary and fonts, so it's fully offline. Notarization uses the
 `scene-search-notary` keychain profile.
+
+For a single arch: build the engine (`./packaging/build_engine.sh` or
+`VENV=.venv-intel ./packaging/build_engine.sh`) then `cd app && npm run pack:arm`
+(or `pack:intel`).
+
+The Intel venv needs the engine deps once:
+`uv pip install --python .venv-intel/bin/python -r requirements.txt pyinstaller`.
 
 ## Status
 
