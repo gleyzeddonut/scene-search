@@ -1,6 +1,13 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 contextBridge.exposeInMainWorld('scripty', {
+  pathForFile: (file: File) => {
+    try {
+      return webUtils.getPathForFile(file)
+    } catch {
+      return ''
+    }
+  },
   engineInfo: () => ipcRenderer.invoke('engine-info'),
   pickFolder: () => ipcRenderer.invoke('pick-folder') as Promise<string | null>,
   onOpenSettings: (cb: () => void) => ipcRenderer.on('open-settings', cb),

@@ -46,30 +46,36 @@ export default function App() {
       e.preventDefault()
       if (!readyRef.current) return
       const files = Array.from(e.dataTransfer?.files || [])
-      const paths = files.map((f) => (f as File & { path?: string }).path).filter(Boolean) as string[]
-      if (!paths.length) return
-      const counts = { added: 0, exists: 0, bad: 0 }
+      const items = files
+        .map((f) => ({ path: window.scripty.pathForFile(f) || (f as File & { path?: string }).path || '', name: f.name }))
+        .filter((it) => it.path)
+      if (!items.length) {
+        showToast('Couldn’t read the dropped file’s location')
+        return
+      }
+      const counts = { added: 0, exists: 0, notScript: 0, err: 0 }
       let last = ''
-      for (const p of paths) {
+      for (const it of items) {
+        last = it.name // File.name is always the basename, so never empty
         try {
-          const r = await api.addScript(p)
-          last = r.name
+          const r = await api.addScript(it.path)
           if (r.result === 'added') counts.added++
           else if (r.result === 'exists') counts.exists++
-          else counts.bad++
+          else counts.notScript++
         } catch {
-          counts.bad++
+          counts.err++
         }
       }
-      if (paths.length === 1) {
+      if (items.length === 1) {
         if (counts.added) showToast(`Added “${last}”`)
         else if (counts.exists) showToast(`“${last}” has already been added`)
+        else if (counts.err) showToast(`Couldn’t add “${last}” — try reopening Scripty`)
         else showToast(`“${last}” isn’t a readable script`)
       } else {
-        const parts = []
+        const parts: string[] = []
         if (counts.added) parts.push(`${counts.added} added`)
         if (counts.exists) parts.push(`${counts.exists} already added`)
-        if (counts.bad) parts.push(`${counts.bad} skipped`)
+        if (counts.notScript + counts.err) parts.push(`${counts.notScript + counts.err} skipped`)
         showToast(parts.join(' · '))
       }
       if (counts.added) setRefreshKey((k) => k + 1)

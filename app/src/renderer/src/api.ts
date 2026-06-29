@@ -41,6 +41,7 @@ declare global {
   interface Window {
     scripty: {
       engineInfo: () => Promise<{ port: number; token: string }>
+      pathForFile: (file: File) => string
       pickFolder: () => Promise<string | null>
       onOpenSettings: (cb: () => void) => void
       exportSides: (html: string, name: string) => Promise<boolean>
