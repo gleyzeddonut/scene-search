@@ -4,6 +4,7 @@ publish:
   provider: github
   owner: gleyzeddonut
   repo: scene-search
+  releaseType: release
 directories:
   buildResources: build
 files:

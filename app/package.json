@@ -10,6 +10,7 @@
     "dist": "electron-vite build && electron-builder --mac --arm64",
     "pack:arm": "electron-builder --mac --arm64",
     "pack:intel": "electron-builder --mac --x64",
+    "publish:arm": "electron-vite build && electron-builder --mac --arm64 --publish always",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
