@@ -141,6 +141,15 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
                 "scripts": state["scripts"], "scenes": state["scenes"],
                 "errors": state["errors"]}
 
+    @app.post("/add")
+    def add(body: PathBody, _=Depends(auth)):
+        library = lib()
+        try:
+            result = library.add_file(body.path)
+        finally:
+            library.close()
+        return {"result": result, "name": Path(body.path).name}
+
     @app.post("/open")
     def open_file(body: PathBody, _=Depends(auth)):
         fileops.open_external(body.path)

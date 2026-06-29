@@ -49,6 +49,7 @@ export function BrowseView({
   setSize,
   pair,
   setPair,
+  refreshKey,
   onPrepare
 }: {
   search: string
@@ -56,6 +57,7 @@ export function BrowseView({
   setSize: (n: number) => void
   pair: number
   setPair: (n: number) => void
+  refreshKey: number
   onPrepare: (s: Scene) => void
 }) {
   const [openSize, setOpenSize] = useState(false)
@@ -81,7 +83,7 @@ export function BrowseView({
         setScenes(r.scenes)
         setSel(r.scenes[0] || null)
       })
-  }, [size, pair, search])
+  }, [size, pair, search, refreshKey])
 
   // pull the selected scene's dialogue so the preview shows the full scene
   useEffect(() => {

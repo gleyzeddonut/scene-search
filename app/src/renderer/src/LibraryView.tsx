@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from './api'
 import { IconFolder } from './icons'
 
-export function LibraryView() {
+export function LibraryView({ refreshKey }: { refreshKey: number }) {
   const [roots, setRoots] = useState<string[]>([])
   const [stats, setStats] = useState({ scripts: 0, scenes: 0 })
   const [status, setStatus] = useState('')
@@ -48,7 +48,9 @@ export function LibraryView() {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)
     }
-  }, [])
+    // reload stats when a script is dropped in
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey])
 
   const add = async () => {
     const f = await api.pickFolder()

@@ -55,6 +55,10 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 .nav-spacer{flex:1}
 .navItem.gear{width:38px;height:38px;padding:0;justify-content:center}
 
+/* ---- toast ---- */
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:60;background:var(--text);color:var(--window);font:600 13px/1.3 'Space Grotesk';padding:12px 18px;border-radius:10px;box-shadow:0 14px 34px -10px rgba(20,22,40,.45);max-width:72%;text-align:center;animation:toastin .18s ease}
+@keyframes toastin{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+
 /* ---- settings modal ---- */
 .modal-backdrop{position:fixed;inset:0;background:rgba(20,22,40,.32);display:flex;align-items:center;justify-content:center;z-index:50}
 .modal{width:420px;background:var(--window);border:1px solid var(--border);border-radius:14px;box-shadow:0 30px 70px -24px rgba(20,22,40,.4);padding:22px}

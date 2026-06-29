@@ -44,6 +44,7 @@ class Library:
     def __init__(self, db_path):
         self.db_path = Path(db_path)
         self._conn = sqlite3.connect(str(self.db_path))
+        self._conn.execute("PRAGMA busy_timeout=10000")  # wait, don't fail, on lock
         self._conn.executescript(_SCHEMA)
         # migrate older dbs that predate the dialogue/runtime columns
         for col, typ in (("dialogue_json", "TEXT"), ("est_seconds", "INTEGER"),
@@ -52,6 +53,10 @@ class Library:
                 self._conn.execute(f"ALTER TABLE scenes ADD COLUMN {col} {typ}")
             except sqlite3.OperationalError:
                 pass
+        try:  # drag-and-dropped files are pinned so a re-index won't prune them
+            self._conn.execute("ALTER TABLE scripts ADD COLUMN pinned INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
         self._stored_version = self._conn.execute("PRAGMA user_version").fetchone()[0]
 
     def close(self) -> None:
@@ -66,6 +71,7 @@ class Library:
         # every file once (ignoring mtime) so old entries get refreshed.
         full = self._stored_version < INDEX_VERSION
         present: set[str] = set()
+        n = 0
         for path in iter_candidates(folders, ignore_dirs, should_cancel=should_cancel,
                                     on_error=on_error):
             if should_cancel and should_cancel():
@@ -74,13 +80,17 @@ class Library:
             self._index_file(path, full=full)
             if progress:  # report every file examined, not just (re)parsed ones
                 progress(path.name)
+            n += 1
+            if n % 200 == 0:  # commit periodically: durable progress + releases the lock
+                self._conn.commit()
         if should_cancel and should_cancel():
             # cancelled (possibly during the walk, before any file was yielded):
             # keep what we indexed so far; don't prune or bump version
             self._conn.commit()
             return
-        for (stored,) in self._conn.execute("SELECT path FROM scripts").fetchall():
-            if stored not in present:
+        for stored, pinned in self._conn.execute(
+                "SELECT path, COALESCE(pinned, 0) FROM scripts").fetchall():
+            if stored not in present and not pinned:
                 self._delete_script(stored)
         self._conn.execute(f"PRAGMA user_version = {INDEX_VERSION}")
         self._stored_version = INDEX_VERSION
@@ -161,6 +171,28 @@ class Library:
             out.append(SceneMatch(path, name, heading, page, cc, json.loads(cj), pr,
                                   sidx, est or 0))
         return out
+
+    def add_file(self, path) -> str:
+        """Index a single dropped file. Returns added / exists / not_script / unreadable."""
+        from .scanner import SCRIPT_EXTENSIONS
+        p = Path(path)
+        if p.suffix.lower() not in SCRIPT_EXTENSIONS:
+            return "not_script"
+        rp = str(p.resolve())
+        if self._conn.execute("SELECT 1 FROM scripts WHERE path=?", (rp,)).fetchone():
+            return "exists"
+        self._index_file(p, full=True)
+        row = self._conn.execute("SELECT scene_count FROM scripts WHERE path=?", (rp,)).fetchone()
+        if row is None:
+            self._conn.commit()
+            return "unreadable"
+        if row[0] == 0:  # parsed but not a screenplay — don't keep it
+            self._delete_script(rp)
+            self._conn.commit()
+            return "not_script"
+        self._conn.execute("UPDATE scripts SET pinned=1 WHERE path=?", (rp,))
+        self._conn.commit()
+        return "added"
 
     def get_scene(self, path, scene_index):
         row = self._conn.execute(

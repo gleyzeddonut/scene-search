@@ -97,6 +97,37 @@ def test_cancelled_reindex_keeps_existing_entries(tmp_path):
     assert lib.script_count() == 1
 
 
+def test_add_file_adds_and_detects_duplicate(tmp_path):
+    f = tmp_path / "a.fountain"
+    f.write_text(SCRIPT)
+    lib = Library(tmp_path / "index.db")
+    assert lib.add_file(f) == "added"
+    assert lib.script_count() == 1
+    assert lib.add_file(f) == "exists"
+
+
+def test_add_file_rejects_non_script(tmp_path):
+    f = tmp_path / "note.md"
+    f.write_text("just a note")
+    lib = Library(tmp_path / "index.db")
+    assert lib.add_file(f) == "not_script"
+    assert lib.script_count() == 0
+
+
+def test_dropped_file_survives_reindex_of_other_folder(tmp_path):
+    a = tmp_path / "a"
+    a.mkdir()
+    fa = a / "drop.fountain"
+    fa.write_text(SCRIPT)
+    b = tmp_path / "b"
+    b.mkdir()
+    (b / "x.fountain").write_text(SCRIPT)
+    lib = Library(tmp_path / "index.db")
+    lib.add_file(fa)  # dropped file in folder A
+    lib.reindex([b])  # later re-index of a DIFFERENT folder
+    assert lib.script_count() == 2  # the pinned drop is not pruned
+
+
 def test_get_scene_returns_lines(tmp_path):
     (tmp_path / "a.fountain").write_text(
         "INT. OFFICE - DAY\n\nMICHAEL\nSit.\n\nJENNIFER\nNo.\n")

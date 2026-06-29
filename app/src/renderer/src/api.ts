@@ -92,6 +92,11 @@ export const api = {
     if (p.search) q.set('search', p.search)
     return call('/scenes?' + q.toString()) as Promise<{ scenes: Scene[] }>
   },
+  addScript: (path: string) =>
+    call('/add', { method: 'POST', body: JSON.stringify({ path }) }) as Promise<{
+      result: 'added' | 'exists' | 'not_script' | 'unreadable'
+      name: string
+    }>,
   openFile: (path: string) => call('/open', { method: 'POST', body: JSON.stringify({ path }) }),
   revealFile: (path: string) => call('/reveal', { method: 'POST', body: JSON.stringify({ path }) }),
   pickFolder: () => window.scripty.pickFolder(),

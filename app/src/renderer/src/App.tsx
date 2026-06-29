@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './styles.css'
-import { init, Scene } from './api'
+import { init, api, Scene } from './api'
 import { AppShell } from './AppShell'
 import { BrowseView } from './BrowseView'
 import { LibraryView } from './LibraryView'
@@ -18,12 +18,68 @@ export default function App() {
   // Browse filters live here so they persist across tab switches (this session).
   const [browseSize, setBrowseSize] = useState(0) // 0 = Any
   const [browsePair, setBrowsePair] = useState(0)
+  const [toast, setToast] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
+  const readyRef = useRef(false)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(''), 3800)
+  }
 
   useEffect(() => {
     init()
-      .then(() => setReady(true))
+      .then(() => {
+        readyRef.current = true
+        setReady(true)
+      })
       .catch(() => setFailed(true))
     window.scripty.onOpenSettings(() => setSettingsOpen(true))
+  }, [])
+
+  // drag-and-drop a script file onto the window to add it
+  useEffect(() => {
+    const onDragOver = (e: DragEvent) => e.preventDefault()
+    const onDrop = async (e: DragEvent) => {
+      e.preventDefault()
+      if (!readyRef.current) return
+      const files = Array.from(e.dataTransfer?.files || [])
+      const paths = files.map((f) => (f as File & { path?: string }).path).filter(Boolean) as string[]
+      if (!paths.length) return
+      const counts = { added: 0, exists: 0, bad: 0 }
+      let last = ''
+      for (const p of paths) {
+        try {
+          const r = await api.addScript(p)
+          last = r.name
+          if (r.result === 'added') counts.added++
+          else if (r.result === 'exists') counts.exists++
+          else counts.bad++
+        } catch {
+          counts.bad++
+        }
+      }
+      if (paths.length === 1) {
+        if (counts.added) showToast(`Added “${last}”`)
+        else if (counts.exists) showToast(`“${last}” has already been added`)
+        else showToast(`“${last}” isn’t a readable script`)
+      } else {
+        const parts = []
+        if (counts.added) parts.push(`${counts.added} added`)
+        if (counts.exists) parts.push(`${counts.exists} already added`)
+        if (counts.bad) parts.push(`${counts.bad} skipped`)
+        showToast(parts.join(' · '))
+      }
+      if (counts.added) setRefreshKey((k) => k + 1)
+    }
+    window.addEventListener('dragover', onDragOver)
+    window.addEventListener('drop', onDrop)
+    return () => {
+      window.removeEventListener('dragover', onDragOver)
+      window.removeEventListener('drop', onDrop)
+    }
   }, [])
   useEffect(() => {
     localStorage.setItem('theme', theme)
@@ -62,13 +118,14 @@ export default function App() {
           setSize={setBrowseSize}
           pair={browsePair}
           setPair={setBrowsePair}
+          refreshKey={refreshKey}
           onPrepare={(s) => {
             setPrepScene(s)
             setSection('prepare')
           }}
         />
       )}
-      {section === 'library' && <LibraryView />}
+      {section === 'library' && <LibraryView refreshKey={refreshKey} />}
       {section === 'prepare' && prepScene && (
         <PrepareView scene={prepScene} onBack={() => setSection('browse')} />
       )}
@@ -81,6 +138,7 @@ export default function App() {
     {settingsOpen && (
       <SettingsModal theme={theme} onTheme={setTheme} onClose={() => setSettingsOpen(false)} />
     )}
+    {toast && <div className="toast">{toast}</div>}
     </>
   )
 }
