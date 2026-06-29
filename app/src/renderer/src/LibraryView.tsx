@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from './api'
 import { IconFolder } from './icons'
 
@@ -7,6 +7,7 @@ export function LibraryView() {
   const [stats, setStats] = useState({ scripts: 0, scenes: 0 })
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const load = async () => {
     setRoots((await api.getFolders()).roots)
@@ -14,6 +15,9 @@ export function LibraryView() {
   }
   useEffect(() => {
     load()
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
   }, [])
 
   const add = async () => {
@@ -33,11 +37,13 @@ export function LibraryView() {
     setBusy(true)
     setStatus('Indexing…')
     await api.reindex()
-    const poll = setInterval(async () => {
+    if (pollRef.current) clearInterval(pollRef.current)
+    pollRef.current = setInterval(async () => {
       const st = await api.reindexStatus()
-      setStatus(`Indexing… ${st.scenes} scenes parsed`)
+      setStatus(`Indexing… ${st.scanned} files scanned`)
       if (!st.running) {
-        clearInterval(poll)
+        if (pollRef.current) clearInterval(pollRef.current)
+        pollRef.current = null
         setBusy(false)
         setStatus('')
         setStats(st)

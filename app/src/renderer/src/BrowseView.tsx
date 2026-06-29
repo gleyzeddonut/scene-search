@@ -29,8 +29,8 @@ function sizeTag(n: number) {
 export function BrowseView({ search }: { search: string }) {
   const [size, setSize] = useState(DUET)
   const [pair, setPair] = useState(0)
-  const [openSize, setOpenSize] = useState(true)
-  const [openPair, setOpenPair] = useState(true)
+  const [openSize, setOpenSize] = useState(false)
+  const [openPair, setOpenPair] = useState(false)
   const [scenes, setScenes] = useState<Scene[]>([])
   const [sel, setSel] = useState<Scene | null>(null)
 

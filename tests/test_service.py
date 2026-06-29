@@ -60,6 +60,37 @@ def test_reindex_then_scenes(tmp_path):
     assert {ch["name"] for ch in scenes[0]["characters"]} == {"MICHAEL", "JENNIFER"}
 
 
+def test_reindex_respects_explicitly_empty_roots(tmp_path, monkeypatch):
+    decoy = tmp_path / "decoy"
+    decoy.mkdir()
+    (decoy / "a.fountain").write_text(SCRIPT)
+    monkeypatch.setattr("scenesearch.service.default_roots", lambda: [decoy])
+    c = _client(tmp_path)
+    c.put("/folders", headers=_auth(), json={"roots": [], "ignored": []})
+    c.post("/reindex", headers=_auth())
+    for _ in range(100):
+        if not c.get("/reindex/status", headers=_auth()).json()["running"]:
+            break
+        time.sleep(0.02)
+    # empty roots => index nothing, even though default_roots() has a script
+    assert c.get("/stats", headers=_auth()).json()["scenes"] == 0
+
+
+def test_reindex_reports_scanned_progress(tmp_path):
+    lib_dir = tmp_path / "lib"
+    lib_dir.mkdir()
+    for i in range(3):
+        (lib_dir / f"s{i}.fountain").write_text(SCRIPT)
+    c = _client(tmp_path)
+    c.put("/folders", headers=_auth(), json={"roots": [str(lib_dir)], "ignored": []})
+    c.post("/reindex", headers=_auth())
+    for _ in range(100):
+        if not c.get("/reindex/status", headers=_auth()).json()["running"]:
+            break
+        time.sleep(0.02)
+    assert c.get("/reindex/status", headers=_auth()).json()["scanned"] == 3
+
+
 def test_open_and_reveal(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr("scenesearch.service.fileops.open_external", lambda p: calls.append(("open", p)))

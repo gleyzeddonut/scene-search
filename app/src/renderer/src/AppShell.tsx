@@ -38,9 +38,9 @@ export function AppShell(props: {
             <span className="kbd">⌘K</span>
           </div>
         </div>
-        <div className="seg" onClick={() => props.onTheme(props.theme === 'dark' ? 'light' : 'dark')}>
-          <span className={props.theme === 'light' ? 'on' : ''}>☀</span>
-          <span className={props.theme === 'dark' ? 'on' : ''}>☾</span>
+        <div className="seg">
+          <span className={props.theme === 'light' ? 'on' : ''} onClick={() => props.onTheme('light')}>☀</span>
+          <span className={props.theme === 'dark' ? 'on' : ''} onClick={() => props.onTheme('dark')}>☾</span>
         </div>
       </div>
       <div className="body">

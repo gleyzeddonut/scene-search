@@ -88,7 +88,9 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
             if roots:
                 worker = lib()
                 try:
-                    worker.reindex(roots[0])
+                    def _progress(_name):
+                        state["scanned"] += 1
+                    worker.reindex(roots[0], progress=_progress)
                     state["scripts"] = worker.script_count()
                     state["scenes"] = worker.scene_count()
                 finally:
@@ -98,7 +100,9 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
 
     @app.post("/reindex")
     def reindex(_=Depends(auth)):
-        roots = settings.get_roots() or [str(r) for r in default_roots()]
+        roots = settings.get_roots()
+        if roots is None:  # never set -> defaults; explicitly empty -> index nothing
+            roots = [str(r) for r in default_roots()]
         if not state["running"]:
             threading.Thread(target=_do_reindex, args=(roots,), daemon=True).start()
         return {"started": True}
