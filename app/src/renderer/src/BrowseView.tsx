@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, Scene, SceneDetail, sceneBlocks } from './api'
+import { api, Scene, SceneDetail, sceneBlocks, isPdf, pdfUrl } from './api'
 
 // Semantic size labels (matches the Cue handoff). Values map to char-count range.
 const SIZE: [string, [number, number]][] = [
@@ -63,10 +63,10 @@ export function BrowseView({
   const [scenes, setScenes] = useState<Scene[]>([])
   const [sel, setSel] = useState<Scene | null>(null)
   const [detail, setDetail] = useState<SceneDetail | null>(null)
-  const [dialogueOnly, setDialogueOnly] = useState(localStorage.getItem('sceneView') === 'dialogue')
-  const setView = (v: boolean) => {
-    setDialogueOnly(v)
-    localStorage.setItem('sceneView', v ? 'dialogue' : 'full')
+  const [view, setViewState] = useState(localStorage.getItem('sceneView') || 'pdf')
+  const setView = (v: string) => {
+    setViewState(v)
+    localStorage.setItem('sceneView', v)
   }
 
   // pairing only applies to two-person scenes; show it for Any + Duet, hide for Solo / 3+
@@ -213,22 +213,37 @@ export function BrowseView({
             <div className="dheading">{sel.heading}</div>
             <div className="dtitle">{sel.script_name.replace(/\.[^.]+$/, '')}</div>
             <div className="dmeta">{sel.characters.map((c) => c.name).join(', ')}</div>
-            <div className="dtags">
-              <span className="tag size">{sizeTag(sel.char_count)}</span>
-              {sel.pairing && <span className="tag">{PAIR_TAG[sel.pairing] || sel.pairing}</span>}
-              <span className="vtoggle">
-                <span className={!dialogueOnly ? 'on' : ''} onClick={() => setView(false)}>Full scene</span>
-                <span className={dialogueOnly ? 'on' : ''} onClick={() => setView(true)}>Dialogue</span>
-              </span>
-            </div>
-            <div className="dcard">
-              <div className="h">{sel.heading}</div>
-              {detail === null ? (
-                <div className="dnote">Loading scene…</div>
-              ) : (
-                renderBlocks(detail, dialogueOnly)
-              )}
-            </div>
+            {(() => {
+              const pdfOk = isPdf(sel.script_path)
+              const eff = view === 'pdf' && !pdfOk ? 'full' : view
+              return (
+                <>
+                  <div className="dtags">
+                    <span className="tag size">{sizeTag(sel.char_count)}</span>
+                    {sel.pairing && <span className="tag">{PAIR_TAG[sel.pairing] || sel.pairing}</span>}
+                    <span className="vtoggle">
+                      {pdfOk && (
+                        <span className={eff === 'pdf' ? 'on' : ''} onClick={() => setView('pdf')}>PDF</span>
+                      )}
+                      <span className={eff === 'full' ? 'on' : ''} onClick={() => setView('full')}>Full scene</span>
+                      <span className={eff === 'dialogue' ? 'on' : ''} onClick={() => setView('dialogue')}>Dialogue</span>
+                    </span>
+                  </div>
+                  {eff === 'pdf' ? (
+                    <iframe className="pdfframe" src={pdfUrl(sel.script_path, sel.page)} title="Script PDF" />
+                  ) : (
+                    <div className="dcard">
+                      <div className="h">{sel.heading}</div>
+                      {detail === null ? (
+                        <div className="dnote">Loading scene…</div>
+                      ) : (
+                        renderBlocks(detail, eff === 'dialogue')
+                      )}
+                    </div>
+                  )}
+                </>
+              )
+            })()}
             <div className="dbtns">
               <button className="prepare" onClick={() => onPrepare(sel)}>Prepare scene →</button>
             </div>

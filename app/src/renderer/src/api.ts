@@ -28,6 +28,15 @@ export function sceneBlocks(d: SceneDetail): SceneBlock[] {
   return d.content.length ? d.content : d.lines.map((l) => ({ type: 'cue', who: l.who, text: l.text }))
 }
 
+export function isPdf(path: string): boolean {
+  return path.toLowerCase().endsWith('.pdf')
+}
+
+// URL for Chromium's PDF viewer, jumped to the scene's page when known
+export function pdfUrl(path: string, page?: number): string {
+  return 'localfile://' + encodeURI(path) + (page ? `#page=${page}` : '')
+}
+
 declare global {
   interface Window {
     scripty: {
