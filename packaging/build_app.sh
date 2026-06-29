@@ -8,6 +8,9 @@ ROOT="$(cd "$(dirname "$0")" && cd .. && pwd)"
 cd "$ROOT/app"
 PUBLISH="${PUBLISH:-never}"
 
+# start from a clean dist/ so old version artifacts (DMGs/zips) don't pile up
+rm -rf dist
+
 # Build the universal macOS OCR helper (Vision + PDFKit) bundled with the app, so
 # scanned/photographed scripts can be read. Optional: the app runs fine without it.
 echo "Building OCR helper (universal)…"
