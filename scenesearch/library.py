@@ -64,16 +64,18 @@ class Library:
         # every file once (ignoring mtime) so old entries get refreshed.
         full = self._stored_version < INDEX_VERSION
         present: set[str] = set()
-        for path in iter_candidates(folders, ignore_dirs):
+        for path in iter_candidates(folders, ignore_dirs, should_cancel=should_cancel):
             if should_cancel and should_cancel():
-                # keep what we indexed so far; don't prune or bump version since
-                # the scan is incomplete
-                self._conn.commit()
-                return
+                break
             present.add(str(path.resolve()))
             self._index_file(path, full=full)
             if progress:  # report every file examined, not just (re)parsed ones
                 progress(path.name)
+        if should_cancel and should_cancel():
+            # cancelled (possibly during the walk, before any file was yielded):
+            # keep what we indexed so far; don't prune or bump version
+            self._conn.commit()
+            return
         for (stored,) in self._conn.execute("SELECT path FROM scripts").fetchall():
             if stored not in present:
                 self._delete_script(stored)

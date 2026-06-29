@@ -19,7 +19,8 @@ def default_roots() -> list[Path]:
     return [c for c in candidates if c.is_dir()]
 
 
-def iter_candidates(roots: Iterable, ignore_dirs: Iterable = None) -> Iterator[Path]:
+def iter_candidates(roots: Iterable, ignore_dirs: Iterable = None,
+                    should_cancel=None) -> Iterator[Path]:
     ignored = {Path(p).resolve() for p in (ignore_dirs or [])}
     seen: set[Path] = set()
     for root in roots:
@@ -29,6 +30,8 @@ def iter_candidates(roots: Iterable, ignore_dirs: Iterable = None) -> Iterator[P
         if root.resolve() in ignored:
             continue
         for dirpath, dirnames, filenames in os.walk(root):
+            if should_cancel and should_cancel():
+                return  # stop the walk promptly when cancelled
             dirnames[:] = [
                 d
                 for d in dirnames

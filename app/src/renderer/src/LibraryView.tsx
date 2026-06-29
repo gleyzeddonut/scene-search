@@ -12,14 +12,19 @@ export function LibraryView() {
   const startPolling = () => {
     if (pollRef.current) clearInterval(pollRef.current)
     pollRef.current = setInterval(async () => {
-      const st = await api.reindexStatus()
-      setStatus(`Indexing… ${st.scanned} files scanned`)
-      if (!st.running) {
-        if (pollRef.current) clearInterval(pollRef.current)
-        pollRef.current = null
-        setBusy(false)
-        setStatus('')
-        setStats(st)
+      try {
+        const st = await api.reindexStatus()
+        if (!st.running) {
+          if (pollRef.current) clearInterval(pollRef.current)
+          pollRef.current = null
+          setBusy(false)
+          setStatus('')
+          setStats(st)
+        } else {
+          setStatus(`Indexing… ${st.scanned} files scanned`)
+        }
+      } catch {
+        // transient engine hiccup — keep polling so we still detect the finish
       }
     }, 300)
   }
@@ -69,7 +74,12 @@ export function LibraryView() {
   }
   const stop = async () => {
     setStatus('Stopping…')
-    await api.reindexStop()
+    try {
+      await api.reindexStop()
+    } catch {
+      // ignore — the poll below will still pick up when it ends
+    }
+    if (!pollRef.current) startPolling() // make sure we detect the finish
   }
 
   return (
