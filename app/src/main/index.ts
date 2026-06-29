@@ -33,6 +33,14 @@ function openQuickLook(p: QlPayload) {
       qlWin = null
       mainWindow?.webContents.send('quicklook-closed') // keep the renderer's toggle state in sync
     })
+    // intercept Space/Esc at the webContents level so they close the pop-out even
+    // when the PDF iframe has focus (otherwise Space scrolls the PDF) — Finder-style
+    qlWin.webContents.on('before-input-event', (event, input) => {
+      if (input.type === 'keyDown' && (input.key === ' ' || input.key === 'Escape')) {
+        event.preventDefault()
+        closeQuickLook()
+      }
+    })
   }
   qlWin.setTitle(p.title)
   const search = '?quicklook=' + encodeURIComponent(JSON.stringify(p))
