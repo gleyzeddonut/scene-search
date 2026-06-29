@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, Scene, SceneDetail } from './api'
+import { api, Scene, SceneDetail, sceneBlocks } from './api'
 
 // Semantic size labels (matches the Cue handoff). Values map to char-count range.
 const SIZE: [string, [number, number]][] = [
@@ -26,6 +26,23 @@ function sizeTag(n: number) {
   return n === 1 ? 'Solo' : n === 2 ? 'Duet' : n >= 3 ? 'Ensemble' : 'No dialogue'
 }
 
+function renderBlocks(detail: SceneDetail, dialogueOnly: boolean) {
+  let blocks = sceneBlocks(detail)
+  if (dialogueOnly) blocks = blocks.filter((b) => b.type === 'cue')
+  if (blocks.length === 0)
+    return <div className="dnote">No text could be read from this scene. Open the file to view it.</div>
+  return blocks.map((b, i) =>
+    b.type === 'cue' ? (
+      <div key={i}>
+        <div className="dcue">{b.who}</div>
+        <div className="dtext">{b.text}</div>
+      </div>
+    ) : (
+      <div key={i} className="daction">{b.text}</div>
+    )
+  )
+}
+
 export function BrowseView({
   search,
   size,
@@ -46,6 +63,11 @@ export function BrowseView({
   const [scenes, setScenes] = useState<Scene[]>([])
   const [sel, setSel] = useState<Scene | null>(null)
   const [detail, setDetail] = useState<SceneDetail | null>(null)
+  const [dialogueOnly, setDialogueOnly] = useState(localStorage.getItem('sceneView') === 'dialogue')
+  const setView = (v: boolean) => {
+    setDialogueOnly(v)
+    localStorage.setItem('sceneView', v ? 'dialogue' : 'full')
+  }
 
   // pairing only applies to two-person scenes; show it for Any + Duet, hide for Solo / 3+
   const showPairing = size === 0 || size === DUET
@@ -66,7 +88,7 @@ export function BrowseView({
     let active = true
     setDetail(null)
     if (sel) {
-      const empty: SceneDetail = { heading: sel.heading, characters: [], est_seconds: 0, lines: [] }
+      const empty: SceneDetail = { heading: sel.heading, characters: [], est_seconds: 0, lines: [], content: [] }
       api
         .getScene(sel.script_path, sel.scene_index)
         .then((d) => active && setDetail(d))
@@ -194,20 +216,17 @@ export function BrowseView({
             <div className="dtags">
               <span className="tag size">{sizeTag(sel.char_count)}</span>
               {sel.pairing && <span className="tag">{PAIR_TAG[sel.pairing] || sel.pairing}</span>}
+              <span className="vtoggle">
+                <span className={!dialogueOnly ? 'on' : ''} onClick={() => setView(false)}>Full scene</span>
+                <span className={dialogueOnly ? 'on' : ''} onClick={() => setView(true)}>Dialogue</span>
+              </span>
             </div>
             <div className="dcard">
               <div className="h">{sel.heading}</div>
               {detail === null ? (
                 <div className="dnote">Loading scene…</div>
-              ) : detail.lines.length === 0 ? (
-                <div className="dnote">No dialogue could be read from this scene. Open the file to view it.</div>
               ) : (
-                detail.lines.map((l, i) => (
-                  <div key={i}>
-                    <div className="dcue">{l.who}</div>
-                    <div className="dtext">{l.text}</div>
-                  </div>
-                ))
+                renderBlocks(detail, dialogueOnly)
               )}
             </div>
             <div className="dbtns">

@@ -11,11 +11,21 @@ export interface Scene {
   est_seconds: number
 }
 
+export type SceneBlock =
+  | { type: 'action'; text: string }
+  | { type: 'cue'; who: string; text: string }
+
 export interface SceneDetail {
   heading: string
   characters: SceneChar[]
   est_seconds: number
   lines: { who: string; text: string }[]
+  content: SceneBlock[]
+}
+
+// full ordered scene; falls back to dialogue for indexes built before content existed
+export function sceneBlocks(d: SceneDetail): SceneBlock[] {
+  return d.content.length ? d.content : d.lines.map((l) => ({ type: 'cue', who: l.who, text: l.text }))
 }
 
 declare global {

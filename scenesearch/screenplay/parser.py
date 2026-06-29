@@ -23,6 +23,8 @@ class Scene:
     page: int
     characters: list[str] = field(default_factory=list)
     lines: list[tuple[str, str]] = field(default_factory=list)
+    # ordered scene content: {"type":"action","text":...} or {"type":"cue","who":...,"text":...}
+    blocks: list[dict] = field(default_factory=list)
 
 
 def _normalize_character(text: str) -> str:
@@ -59,9 +61,23 @@ def parse_scenes(text: str) -> list[Scene]:
     current: Scene | None = None
     seen: set[str] = set()
     page = 1
+    skip_until = 0
+    action: list[str] = []
+
+    def flush_action() -> None:
+        nonlocal action
+        if current is not None:
+            joined = " ".join(action).strip()
+            if joined:
+                current.blocks.append({"type": "action", "text": joined})
+        action = []
+
     for i, raw in enumerate(lines):
         page += raw.count("\f")
+        if i < skip_until:
+            continue
         if _SCENE_RE.match(raw):
+            flush_action()
             current = Scene(
                 heading=" ".join(_SCENE_NUM_PREFIX.sub("", raw).split()),
                 index=len(scenes) + 1,
@@ -72,10 +88,15 @@ def parse_scenes(text: str) -> list[Scene]:
             continue
         if current is None:
             continue
+        if not raw.strip():
+            flush_action()  # blank line ends an action paragraph
+            continue
         if _is_cue(raw):
             nxt = _next_nonempty(lines, i + 1)
             if nxt is None or _SCENE_RE.match(nxt):
+                action.append(raw.strip())  # a cue-shaped line with no dialogue → action
                 continue
+            flush_action()
             name = _normalize_character(raw)
             if name not in seen:
                 seen.add(name)
@@ -91,6 +112,12 @@ def parse_scenes(text: str) -> list[Scene]:
                     break
                 said.append(nxt.strip())
                 j += 1
+            joined = " ".join(said)
             if said:
-                current.lines.append((name, " ".join(said)))
+                current.lines.append((name, joined))
+            current.blocks.append({"type": "cue", "who": name, "text": joined})
+            skip_until = j  # don't re-visit the consumed dialogue lines
+            continue
+        action.append(raw.strip())  # ordinary action / description line
+    flush_action()
     return scenes

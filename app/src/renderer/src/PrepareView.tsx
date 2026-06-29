@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, Scene, SceneDetail } from './api'
+import { api, Scene, SceneDetail, sceneBlocks } from './api'
 
 function mmss(s: number) {
   const m = Math.floor(s / 60)
@@ -10,16 +10,24 @@ export function PrepareView({ scene, onBack }: { scene: Scene; onBack: () => voi
   const [data, setData] = useState<SceneDetail | null>(null)
   const [role, setRole] = useState('')
   const [rehearse, setRehearse] = useState(false)
+  const [dialogueOnly, setDialogueOnly] = useState(localStorage.getItem('sceneView') === 'dialogue')
+  const setView = (v: boolean) => {
+    setDialogueOnly(v)
+    localStorage.setItem('sceneView', v ? 'dialogue' : 'full')
+  }
 
   useEffect(() => {
     api.getScene(scene.script_path, scene.scene_index).then((d) => {
       setData(d)
-      setRole(d.lines[0]?.who || '')
+      const firstCue = sceneBlocks(d).find((b) => b.type === 'cue')
+      setRole(firstCue && firstCue.type === 'cue' ? firstCue.who : '')
     })
   }, [scene])
 
   if (!data) return <div style={{ padding: 40 }}>Loading scene…</div>
-  const roles = Array.from(new Set(data.lines.map((l) => l.who)))
+  const all = sceneBlocks(data)
+  const blocks = dialogueOnly ? all.filter((b) => b.type === 'cue') : all
+  const roles = Array.from(new Set(all.flatMap((b) => (b.type === 'cue' ? [b.who] : []))))
   const name = scene.script_name.replace(/\.[^.]+$/, '')
 
   return (
@@ -41,19 +49,24 @@ export function PrepareView({ scene, onBack }: { scene: Scene; onBack: () => voi
           <button className={'chip' + (rehearse ? ' on' : '')} onClick={() => setRehearse((v) => !v)}>
             {rehearse ? 'Rehearse: on' : 'Rehearse: off'}
           </button>
+          <span className="vtoggle">
+            <span className={!dialogueOnly ? 'on' : ''} onClick={() => setView(false)}>Full scene</span>
+            <span className={dialogueOnly ? 'on' : ''} onClick={() => setView(true)}>Dialogue</span>
+          </span>
         </div>
       </div>
 
       <div className="sides-scroll">
         <div className="sides" id="sides">
           <div className="sides-h">{data.heading}</div>
-          {data.lines.map((l, i) => {
-            const mine = l.who === role
+          {blocks.map((b, i) => {
+            if (b.type === 'action') return <div key={i} className="saction">{b.text}</div>
+            const mine = b.who === role
             return (
               <div key={i}>
-                <div className={'cue' + (mine ? ' mine' : '')}>{l.who}</div>
+                <div className={'cue' + (mine ? ' mine' : '')}>{b.who}</div>
                 <div className={'sline' + (mine ? ' mine' : '')}>
-                  {mine && rehearse ? '— — — — — —' : l.text}
+                  {mine && rehearse ? '— — — — — —' : b.text}
                 </div>
               </div>
             )

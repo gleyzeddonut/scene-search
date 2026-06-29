@@ -13,7 +13,7 @@ from .screenplay.runtime import estimate_seconds, scene_word_count
 
 # bump when the parser or scene schema changes so a re-index re-parses every
 # file (not just changed ones) after an app upgrade
-INDEX_VERSION = 2
+INDEX_VERSION = 3
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS scripts(
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS scenes(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     script_path TEXT, scene_index INTEGER, heading TEXT, page INTEGER,
     char_count INTEGER, characters_json TEXT, pairing TEXT,
-    dialogue_json TEXT, est_seconds INTEGER);
+    dialogue_json TEXT, est_seconds INTEGER, content_json TEXT);
 CREATE INDEX IF NOT EXISTS idx_scenes_script ON scenes(script_path);
 """
 
@@ -46,7 +46,8 @@ class Library:
         self._conn = sqlite3.connect(str(self.db_path))
         self._conn.executescript(_SCHEMA)
         # migrate older dbs that predate the dialogue/runtime columns
-        for col, typ in (("dialogue_json", "TEXT"), ("est_seconds", "INTEGER")):
+        for col, typ in (("dialogue_json", "TEXT"), ("est_seconds", "INTEGER"),
+                         ("content_json", "TEXT")):
             try:
                 self._conn.execute(f"ALTER TABLE scenes ADD COLUMN {col} {typ}")
             except sqlite3.OperationalError:
@@ -109,11 +110,11 @@ class Library:
             words = scene_word_count(s.lines)
             self._conn.execute(
                 "INSERT INTO scenes(script_path, scene_index, heading, page, "
-                "char_count, characters_json, pairing, dialogue_json, est_seconds) "
-                "VALUES(?,?,?,?,?,?,?,?,?)",
+                "char_count, characters_json, pairing, dialogue_json, est_seconds, "
+                "content_json) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (rp, s.index, s.heading, s.page, len(s.characters),
                  json.dumps(s.characters), scene_pairing(s.characters),
-                 json.dumps(s.lines), estimate_seconds(words)),
+                 json.dumps(s.lines), estimate_seconds(words), json.dumps(s.blocks)),
             )
 
     def _delete_script(self, rp: str) -> None:
@@ -163,12 +164,13 @@ class Library:
 
     def get_scene(self, path, scene_index):
         row = self._conn.execute(
-            "SELECT heading, characters_json, dialogue_json, est_seconds "
+            "SELECT heading, characters_json, dialogue_json, est_seconds, content_json "
             "FROM scenes WHERE script_path=? AND scene_index=?",
             (str(path), scene_index)).fetchone()
         if row is None:
             return None
-        heading, chars, dlg, est = row
+        heading, chars, dlg, est, content = row
         return {"heading": heading, "characters": json.loads(chars),
                 "lines": [{"who": w, "text": t} for w, t in json.loads(dlg or "[]")],
+                "content": json.loads(content or "[]"),
                 "est_seconds": est or 0}

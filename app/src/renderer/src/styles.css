@@ -111,7 +111,10 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 .dheading{font:600 12px/1 'Courier Prime',monospace;color:var(--text-3);margin-bottom:9px}
 .dtitle{font:700 23px/1.1 'Space Grotesk';color:var(--text);margin-bottom:7px}
 .dmeta{font:500 12px/1.4 'Space Grotesk';color:var(--text-3);margin-bottom:13px}
-.dtags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:15px}
+.dtags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:15px;align-items:center}
+.vtoggle{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;cursor:pointer;margin-left:auto}
+.vtoggle span{padding:4px 9px;font:600 10.5px/1 'Space Grotesk';color:var(--text-3);user-select:none}
+.vtoggle span.on{background:var(--accent);color:#fff}
 .tag{padding:5px 11px;border-radius:999px;font:600 11px/1 'Space Grotesk';background:var(--chip);color:var(--text-2)}
 .tag.size{background:var(--accent-soft);color:var(--accent-text)}
 .dcard{flex:1;overflow-y:auto;background:var(--window);border:1px solid var(--border);border-radius:11px;padding:20px;min-height:0}
@@ -120,6 +123,7 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 .dnote{margin-top:14px;font:italic 400 11.5px/1.5 'Courier Prime',monospace;color:var(--text-3)}
 .dcard .dcue{font:700 11px/1.3 'Courier Prime',monospace;color:var(--text-2);letter-spacing:.04em;margin-top:14px}
 .dcard .dtext{font:400 12.5px/1.55 'Courier Prime',monospace;color:var(--text);margin-top:3px}
+.dcard .daction{font:400 12px/1.55 'Courier Prime',monospace;color:var(--text-2);margin:11px 0}
 .dbtns{flex:none;display:flex;gap:10px;margin-top:10px}
 .dbtns .prepare{flex:1;display:flex;align-items:center;justify-content:center;padding:11px 0;border-radius:9px;background:var(--accent);color:#fff;font:700 13px/1 'Space Grotesk';cursor:pointer;border:none;transition:filter .12s ease}
 .dbtns .prepare:hover{filter:brightness(1.06)}
@@ -175,5 +179,6 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
    colour — no padding/size change, no reflow */
 .sides .sline{font:400 14px/1.7 'Courier Prime',monospace;margin-left:14%;width:74%;margin-bottom:8px;color:var(--text);padding:4px 10px;border-radius:6px;background:transparent}
 .sides .sline.mine{background:var(--accent-soft)}
+.sides .saction{font:400 14px/1.6 'Courier Prime',monospace;color:var(--text-2);margin:16px 0}
 .prep-foot{display:flex;align-items:center;gap:14px;padding:14px 30px;border-top:1px solid var(--border);background:var(--panel)}
 .prep-foot .muted{flex:1;text-align:right}

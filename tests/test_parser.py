@@ -73,6 +73,16 @@ def test_caps_action_or_sound_line_is_not_a_character():
     assert parse_scenes(text)[0].characters == ["BETTY"]
 
 
+def test_captures_action_and_dialogue_blocks_in_order():
+    text = "INT. ROOM - DAY\n\nA man enters and sits.\n\nJOHN\nHello there.\n\nShe looks away.\n"
+    scene = parse_scenes(text)[0]
+    assert scene.blocks == [
+        {"type": "action", "text": "A man enters and sits."},
+        {"type": "cue", "who": "JOHN", "text": "Hello there."},
+        {"type": "action", "text": "She looks away."},
+    ]
+
+
 def test_captures_dialogue_lines():
     text = "INT. ROOM - DAY\n\nJOHN\nHello there.\n\nMARY\nGo away,\nplease.\n"
     scene = parse_scenes(text)[0]
