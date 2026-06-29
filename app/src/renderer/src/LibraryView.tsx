@@ -10,6 +10,7 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
   const [stopping, setStopping] = useState(false)
   const [idx, setIdx] = useState({ scanned: 0, total: 0, file: '' })
   const [unreadable, setUnreadable] = useState<string[]>([])
+  const [stale, setStale] = useState(false) // index built by an older parser
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const pct = idx.total > 0 ? Math.min(100, Math.round((idx.scanned / idx.total) * 100)) : 0
@@ -27,6 +28,7 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
           setStatus('')
           setStats(st)
           setUnreadable(st.errors || [])
+          setStale(!!st.stale)
         } else {
           setIdx({ scanned: st.scanned, total: st.total, file: st.file })
         }
@@ -43,6 +45,7 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
       // the engine indexes in the background — if it's still running (e.g. we
       // navigated away and came back), show progress and resume polling.
       const st = await api.reindexStatus()
+      setStale(!!st.stale)
       if (st.running) {
         setBusy(true)
         setIdx({ scanned: st.scanned, total: st.total, file: st.file })
@@ -75,7 +78,7 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
     setRoots(next)
     await api.setFolders(next, [])
   }
-  const reindex = async () => {
+  const beginIndex = async (full: boolean) => {
     if (roots.length === 0) {
       setStatus('Add a folder first')
       return
@@ -84,9 +87,12 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
     setStopping(false)
     setIdx({ scanned: 0, total: 0, file: '' })
     setUnreadable([])
-    await api.reindex()
+    // a full rebuild re-parses everything; reindex only re-reads changed files
+    await (full ? api.rebuild() : api.reindex())
     startPolling()
   }
+  const reindex = () => beginIndex(false)
+  const rebuild = () => beginIndex(true)
   const stop = async () => {
     setStopping(true)
     try {
@@ -148,10 +154,20 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
             </div>
           </div>
         ) : (
-          <div className="banner">
+          <div className={'banner' + (stale ? ' stale' : '')}>
             <div style={{ flex: 1 }}>
-              <div className="t">{status || 'Index your library'}</div>
-              <div className="s">Re-indexing only re-reads files that changed.</div>
+              <div className="t">
+                {status || (stale ? 'Improved parsing is available' : 'Index your library')}
+              </div>
+              <div className="s">
+                {stale
+                  ? 'A Scripty update improved how scripts are read — re-index to apply it to everything already in your library.'
+                  : 'Re-indexing only re-reads files that changed.'}
+              </div>
+              <div className="s" style={{ marginTop: 2 }}>
+                Think a script parsed wrong?{' '}
+                <span className="linklike" onClick={rebuild}>Rebuild from scratch</span>.
+              </div>
             </div>
             <button className="go" onClick={reindex}>Re-index now</button>
           </div>

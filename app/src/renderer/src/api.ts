@@ -56,9 +56,10 @@ interface EngineApi {
   scenes: (f: unknown) => Promise<{ scenes: Scene[] }>
   scene: (p: string, i: number) => Promise<SceneDetail>
   reindex: () => Promise<{ started: boolean }>
+  rebuild: () => Promise<{ started: boolean }>
   reindexStatus: () => Promise<{
     running: boolean; scanned: number; total: number; file: string
-    scripts: number; scenes: number; errors: string[]
+    scripts: number; scenes: number; errors: string[]; stale: boolean
   }>
   reindexStop: () => Promise<{ stopped: boolean }>
   add: (p: string) => Promise<{ result: 'added' | 'exists' | 'not_script' | 'unreadable'; name: string }>
@@ -94,6 +95,7 @@ export const api = {
   getFolders: () => eng().getFolders(),
   setFolders: (roots: string[], ignored: string[]) => eng().setFolders(roots, ignored),
   reindex: () => eng().reindex(),
+  rebuild: () => eng().rebuild(),
   reindexStop: () => eng().reindexStop(),
   reindexStatus: () => eng().reindexStatus(),
   stats: () => eng().stats(),

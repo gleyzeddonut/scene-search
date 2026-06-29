@@ -73,6 +73,36 @@ describe('Library', () => {
     expect(canonicalKey('Heat (1).pdf')).toBe('heat.pdf')
     expect(canonicalKey('Heat copy.pdf')).toBe('heat.pdf')
   })
+
+  // bug_003 regression: a forced rebuild must not silently unpin a dragged-in
+  // script, or the later orphan-cleanup pass would delete it
+  it('force rebuild preserves a pinned script through orphan cleanup', async () => {
+    const d = tmp(); const f = join(d, 'kept.fountain'); writeFileSync(f, SCRIPT)
+    const lib = new Library()
+    expect(await lib.addFile(f)).toBe('added') // pins it
+    await lib.reindex([d], { force: true })    // re-parses every file (used to drop the pin)
+    await lib.reindex([])                       // f no longer in any folder → orphan sweep
+    expect(lib.scriptCount()).toBe(1)           // survives only because the pin was kept
+  })
+
+  // a parser upgrade must reach files already indexed by the old parser — those
+  // files' mtimes don't change, so a normal reindex skips them and only force re-parses
+  it('force re-parses unchanged files; a normal reindex skips them', async () => {
+    const d = tmp(); const f = join(d, 'a.txt'); writeFileSync(f, SCRIPT)
+    const lib = new Library()
+    // pretend the "old parser" found one scene
+    ;(lib as any)._extract = async () => 'INT. ONE - DAY\n\nA\nHi.\n'
+    await lib.reindex([d])
+    expect(lib.sceneCount()).toBe(1)
+
+    // "new parser" would find two — but the file on disk is untouched (same mtime)
+    ;(lib as any)._extract = async () => 'INT. ONE - DAY\n\nA\nHi.\n\nINT. TWO - DAY\n\nB\nYo.\n'
+    await lib.reindex([d]) // incremental: mtime unchanged → skipped
+    expect(lib.sceneCount()).toBe(1)
+
+    await lib.reindex([d], { force: true }) // force: re-parse regardless of mtime
+    expect(lib.sceneCount()).toBe(2)
+  })
 })
 
 // Every format indexed together — each routed to the right parser, no interference.

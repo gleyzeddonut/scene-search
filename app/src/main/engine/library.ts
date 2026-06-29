@@ -1,7 +1,7 @@
 import { stat, readFile } from 'node:fs/promises'
 import { basename, resolve, extname } from 'node:path'
 import { extractPaginated as realExtract, extractLayout, layoutToText, isSparsePdf, ocrPdf } from './extract'
-import { parseScenes, parseLayout } from './parser'
+import { parseScenes, parseLayout, parseHeadingless, parseScenesHeadingless } from './parser'
 import { parseFdx, parseFountain } from './formats'
 import { scenePairing, guessGender } from './gender'
 import { sceneWordCount, estimateSeconds } from './runtime'
@@ -35,6 +35,9 @@ interface ReindexOpts {
   progress?: (name: string) => void
   shouldCancel?: () => boolean
   onError?: (path: string, err: unknown) => void
+  // re-parse every file even if its mtime is unchanged (used after a parser
+  // upgrade or an explicit "Rebuild library")
+  force?: boolean
 }
 
 export class Library {
@@ -75,6 +78,15 @@ export class Library {
         const layout = parseLayout(lines)
         const regex = parseScenes(layoutText)
         let best = layout.length >= regex.length ? layout : regex
+        // sides with dialogue but no slug line at all → synthesize one scene so the
+        // content is still searchable (gated to real dialogue, so prose stays empty).
+        // try both engines: the text parser is robust when a title page throws off
+        // the layout parser's margin detection
+        if (best.length === 0) {
+          best = [parseScenesHeadingless(layoutText), parseHeadingless(lines)].reduce(
+            (a, b) => ((b[0]?.characters.length ?? 0) > (a[0]?.characters.length ?? 0) ? b : a)
+          )
+        }
         // only when a PDF parsed to nothing AND has essentially no text layer (a true
         // scan/photo) do we OCR it (macOS Vision). Never runs on normal text PDFs.
         if (best.length === 0 && pageCount <= 60 && isSparsePdf(layoutText, pageCount)) {
@@ -83,13 +95,15 @@ export class Library {
         }
         return best
       }
-      return parseScenes(await this._extract(rp))
+      const flat = await this._extract(rp)
+      const scenes = parseScenes(flat)
+      return scenes.length ? scenes : parseScenesHeadingless(flat)
     } catch {
       return []
     }
   }
 
-  private async indexFile(path: string): Promise<void> {
+  private async indexFile(path: string, force = false): Promise<void> {
     const rp = resolve(path)
     let mtime = 0
     try {
@@ -98,10 +112,13 @@ export class Library {
       return
     }
     const existing = this.scripts.get(rp)
-    if (existing && Math.abs(existing.mtime - mtime) < 1) return
+    if (!force && existing && Math.abs(existing.mtime - mtime) < 1) return
     const parsed = await this.parseFile(rp)
     this.deleteScript(rp)
-    this.scripts.set(rp, { path: rp, name: basename(rp), mtime, sceneCount: parsed.length, pinned: false })
+    // preserve a user's pin across re-parses — a forced rebuild bypasses the
+    // mtime early-return that used to shield it, and the orphan-cleanup pass
+    // deletes unpinned scripts that fall outside the indexed folders
+    this.scripts.set(rp, { path: rp, name: basename(rp), mtime, sceneCount: parsed.length, pinned: existing?.pinned ?? false })
     for (const s of parsed) {
       this.scenes.push({
         path: rp, name: basename(rp), index: s.index, heading: s.heading, page: s.page,
@@ -127,7 +144,7 @@ export class Library {
       if (opts.shouldCancel?.()) { cancelled = true; break }
       present.add(resolve(path))
       try {
-        await this.indexFile(path)
+        await this.indexFile(path, opts.force)
       } catch (e) {
         opts.onError?.(path, e) // never let one bad file abort the index
       }

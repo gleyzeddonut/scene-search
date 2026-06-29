@@ -74,6 +74,7 @@ function registerIpc() {
   ipcMain.handle('eng:scenes', (_e, f) => engine.scenes(f))
   ipcMain.handle('eng:scene', (_e, p: string, i: number) => engine.scene(p, i))
   ipcMain.handle('eng:reindex', () => engine.reindex())
+  ipcMain.handle('eng:rebuild', () => engine.rebuild())
   ipcMain.handle('eng:reindexStatus', () => engine.reindexStatus())
   ipcMain.handle('eng:reindexStop', () => engine.reindexStop())
   ipcMain.handle('eng:add', (_e, p: string) => engine.add(p))

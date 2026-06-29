@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('scripty', {
     scenes: (f: unknown) => ipcRenderer.invoke('eng:scenes', f),
     scene: (p: string, i: number) => ipcRenderer.invoke('eng:scene', p, i),
     reindex: () => ipcRenderer.invoke('eng:reindex'),
+    rebuild: () => ipcRenderer.invoke('eng:rebuild'),
     reindexStatus: () => ipcRenderer.invoke('eng:reindexStatus'),
     reindexStop: () => ipcRenderer.invoke('eng:reindexStop'),
     add: (p: string) => ipcRenderer.invoke('eng:add', p),

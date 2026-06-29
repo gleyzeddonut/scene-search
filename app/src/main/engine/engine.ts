@@ -4,11 +4,16 @@ import { Library } from './library'
 import { Settings, loadIndex, saveIndex, migrateLegacySettings, ensureDir } from './store'
 import { defaultRoots, iterCandidates } from './scanner'
 import { guessGender } from './gender'
+import { PARSER_VERSION } from './parser'
 
 export class Engine {
   private dir = join(app.getPath('userData'), 'scripty')
   private settings: Settings
   private lib = new Library()
+  // true when the persisted index was built by an older parser — the next
+  // reindex re-parses every file (not just changed ones) so the new parsing
+  // reaches scripts that are already in the library
+  private stale = false
   state = { running: false, scanned: 0, total: 0, file: '', scripts: 0, scenes: 0, cancel: false, errors: [] as string[] }
 
   constructor() {
@@ -17,7 +22,11 @@ export class Engine {
     migrateLegacySettings(settingsPath)
     this.settings = new Settings(settingsPath)
     const saved = loadIndex(this.dir)
-    if (saved) this.lib.fromJSON(saved)
+    if (saved) {
+      this.lib.fromJSON(saved)
+      // older indexes have no parserVersion → undefined !== current → stale
+      this.stale = saved.parserVersion !== PARSER_VERSION
+    }
     this.state.scripts = this.lib.scriptCount()
     this.state.scenes = this.lib.sceneCount()
   }
@@ -58,15 +67,19 @@ export class Engine {
       file: this.state.file,
       scripts: this.state.scripts,
       scenes: this.state.scenes,
-      errors: this.state.errors
+      errors: this.state.errors,
+      stale: this.stale // index built by an older parser — a refresh is worthwhile
     }
   }
   reindexStop() {
     this.state.cancel = true
     return { stopped: true }
   }
-  reindex() {
+  // force = re-parse every file regardless of mtime (explicit "Rebuild library").
+  // A stale index (older parser) also forces a full pass on the next reindex.
+  reindex(force = false) {
     if (this.state.running) return { started: true }
+    const full = force || this.stale
     const roots = this.settings.getRoots() ?? defaultRoots()
     const ignored = this.settings.getIgnored() ?? []
     Object.assign(this.state, { running: true, scanned: 0, total: 0, file: '', cancel: false, errors: [] as string[] })
@@ -85,6 +98,7 @@ export class Engine {
         this.state.total = total
         await this.lib.reindex(roots, {
           ignoreDirs: ignored,
+          force: full,
           progress: (name) => {
             this.state.scanned++
             this.state.file = name
@@ -99,7 +113,15 @@ export class Engine {
         })
         this.state.scripts = this.lib.scriptCount()
         this.state.scenes = this.lib.sceneCount()
-        saveIndex(this.dir, this.lib.toJSON())
+        // a completed pass brings the whole index up to the current parser; a
+        // full pass stopped partway leaves it half-upgraded, so keep it stale
+        // (persist version 0) and force the full pass again next time. Capture the
+        // pre-mutation flag so this stays correct regardless of statement order.
+        const completed = !this.state.cancel
+        const leftStale = this.stale && !completed
+        if (completed) this.stale = false
+        const version = leftStale && full ? 0 : PARSER_VERSION
+        saveIndex(this.dir, { parserVersion: version, ...this.lib.toJSON() })
       } finally {
         this.state.running = false
         this.state.file = ''
@@ -107,9 +129,19 @@ export class Engine {
     })()
     return { started: true }
   }
+  // explicit full rebuild — re-parse everything from scratch on demand
+  rebuild() {
+    return this.reindex(true)
+  }
   async add(path: string) {
     const result = await this.lib.addFile(path)
-    if (result === 'added') saveIndex(this.dir, this.lib.toJSON())
+    // stamp the parser version like reindex does — but only claim the index is
+    // current when it actually is. If the library is still stale (old parser,
+    // pending a full re-parse), adding one file must NOT mark the whole index
+    // current, or the pending upgrade is silently cancelled on the next launch.
+    if (result === 'added') {
+      saveIndex(this.dir, { parserVersion: this.stale ? 0 : PARSER_VERSION, ...this.lib.toJSON() })
+    }
     return { result, name: basename(path) }
   }
 }
