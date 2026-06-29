@@ -2,34 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { api, Scene, SceneDetail, sceneBlocks, isPdf } from './api'
 import { PdfFrame } from './PdfFrame'
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
-
-// standalone HTML for the Quick Look pop-out when the scene isn't a PDF
-function sceneHtml(scene: Scene, detail: SceneDetail | null): string {
-  const blocks = detail ? sceneBlocks(detail) : []
-  const body = blocks.length
-    ? blocks
-        .map((b) =>
-          b.type === 'cue'
-            ? `<div class="cue">${esc(b.who)}</div><div class="text">${esc(b.text)}</div>`
-            : `<div class="action">${esc(b.text)}</div>`
-        )
-        .join('')
-    : '<div class="note">No text could be read from this scene.</div>'
-  return (
-    `<!doctype html><html><head><meta charset="utf-8"><title>${esc(scene.script_name)}</title><style>` +
-    `body{margin:0;font-family:'Courier Prime','Courier New',monospace;background:#fdfdfe;color:#1a1a1f}` +
-    `@media(prefers-color-scheme:dark){body{background:#1d1e23;color:#e8e8ea}}` +
-    `.wrap{max-width:680px;margin:0 auto;padding:48px 56px}` +
-    `.h{font-weight:700;font-size:13px;letter-spacing:.04em;margin-bottom:24px;opacity:.7}` +
-    `.cue{font-weight:700;font-size:12px;letter-spacing:.04em;margin-top:18px}` +
-    `.text{font-size:14px;line-height:1.5;margin-top:3px}` +
-    `.action{font-size:14px;line-height:1.6;margin:14px 0;opacity:.85}` +
-    `.note{opacity:.6;font-size:13px}` +
-    `</style></head><body><div class="wrap"><div class="h">${esc(scene.heading)}</div>${body}</div></body></html>`
-  )
-}
-
 // Semantic size labels (matches the Cue handoff). Values map to char-count range.
 const SIZE: [string, [number, number]][] = [
   ['Any', [0, 50]],
@@ -141,12 +113,13 @@ export function BrowseView({
 
   // open the selected scene in a real, separate Quick Look window (movable anywhere)
   const openQL = (s: Scene) => {
-    const title = s.script_name.replace(/\.[^.]+$/, '')
-    if (isPdf(s.script_path)) {
-      window.scripty.quickLook({ title, pdfPath: s.script_path, page: s.page })
-    } else {
-      window.scripty.quickLook({ title, html: sceneHtml(s, detail) })
-    }
+    window.scripty.quickLook({
+      title: s.script_name.replace(/\.[^.]+$/, ''),
+      path: s.script_path,
+      sceneIndex: s.scene_index,
+      page: s.page,
+      isPdf: isPdf(s.script_path)
+    })
   }
 
   // keyboard: ↑/↓ move the selection, Space pops the preview out into its own window
@@ -172,7 +145,7 @@ export function BrowseView({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenes, sel, detail])
+  }, [scenes, sel])
 
   // keep the keyboard-selected row visible
   useEffect(() => {

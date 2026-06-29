@@ -1,6 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell, nativeTheme } from 'electron'
 import { join } from 'path'
-import { pathToFileURL } from 'node:url'
 import { Engine } from './engine/engine'
 import { setupUpdater, checkForUpdatesManual, quitAndInstall } from './updater'
 
@@ -10,27 +9,33 @@ let mainWindow: BrowserWindow | null = null
 let qlWin: BrowserWindow | null = null // the Quick Look pop-out (a real OS window)
 
 // Open (or update) a single Quick Look window — a genuine separate window the user
-// can move anywhere, even onto another display.
-function openQuickLook(p: { title: string; pdfPath?: string; page?: number; html?: string }) {
+// can move anywhere, even onto another display. It loads our renderer (with the
+// preload) and renders the preview through the same byte-read→blob path the main
+// window uses, so the PDF reliably shows.
+function openQuickLook(p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) {
   if (!qlWin || qlWin.isDestroyed()) {
     qlWin = new BrowserWindow({
       width: 760,
       height: 900,
       title: p.title,
       backgroundColor: nativeTheme.shouldUseDarkColors ? '#1d1e23' : '#fdfdfe',
-      webPreferences: { plugins: true, contextIsolation: true, nodeIntegration: false }
+      webPreferences: {
+        preload: join(__dirname, '../preload/index.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        plugins: true // Chromium's PDF viewer for the blob iframe
+      }
     })
     qlWin.on('closed', () => {
       qlWin = null
     })
   }
   qlWin.setTitle(p.title)
-  if (p.pdfPath) {
-    // load the real file so Chromium's PDF viewer renders it; hide its toolbar
-    const url = pathToFileURL(p.pdfPath).toString() + `#page=${p.page || 1}&toolbar=0&navpanes=0`
-    qlWin.loadURL(url)
+  const search = '?quicklook=' + encodeURIComponent(JSON.stringify(p))
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    qlWin.loadURL(process.env['ELECTRON_RENDERER_URL'] + search)
   } else {
-    qlWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(p.html || ''))
+    qlWin.loadFile(join(__dirname, '../renderer/index.html'), { search })
   }
   if (!qlWin.isVisible()) qlWin.show()
   qlWin.focus()

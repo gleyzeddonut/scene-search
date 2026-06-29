@@ -28,7 +28,7 @@ contextBridge.exposeInMainWorld('scripty', {
   readFile: (path: string) => ipcRenderer.invoke('read-file', path) as Promise<Uint8Array>,
   checkUpdates: () => ipcRenderer.invoke('check-updates'),
   quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
-  quickLook: (p: { title: string; pdfPath?: string; page?: number; html?: string }) =>
+  quickLook: (p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) =>
     ipcRenderer.invoke('quicklook', p),
   onUpdateStatus: (cb: (m: unknown) => void) => {
     const listener = (_e: unknown, m: unknown) => cb(m)
