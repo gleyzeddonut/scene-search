@@ -91,6 +91,20 @@ def test_reindex_reports_scanned_progress(tmp_path):
     assert c.get("/reindex/status", headers=_auth()).json()["scanned"] == 3
 
 
+def test_cors_preflight_allowed(tmp_path):
+    c = _client(tmp_path)
+    r = c.options(
+        "/add",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "x-scripty-token, content-type",
+        },
+    )
+    assert r.status_code == 200
+    assert r.headers.get("access-control-allow-origin") == "*"
+
+
 def test_reindex_stop_endpoint(tmp_path):
     c = _client(tmp_path)
     assert c.post("/reindex/stop", headers=_auth()).json() == {"stopped": True}

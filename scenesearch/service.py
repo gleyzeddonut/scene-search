@@ -4,6 +4,7 @@ import threading
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from . import fileops
@@ -26,6 +27,15 @@ class PathBody(BaseModel):
 
 def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
     app = FastAPI()
+    # the renderer is a different origin (dev: localhost:5173; prod: file://) so
+    # it needs CORS to reach this localhost service. Safe: bound to 127.0.0.1 and
+    # every request must carry the per-launch token.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     settings = Settings(settings_path or Path.home() / ".scripty_settings.json")
     index_path = Path(index_path or Path.home() / ".scripty_index.db")
     state = {"running": False, "scanned": 0, "scripts": 0, "scenes": 0,
