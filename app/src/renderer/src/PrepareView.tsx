@@ -64,7 +64,7 @@ export function PrepareView({ scene, onBack }: { scene: Scene; onBack: () => voi
       <div className="prep-foot">
         <button className="ghost" onClick={onBack}>← Back to results</button>
         <span className="muted">Est. {mmss(data.est_seconds)} at performance pace</span>
-        <button className="btn primary" onClick={() => api.exportSides('sides', name)}>
+        <button className="btn-accent" onClick={() => api.exportSides('sides', name)}>
           Export sides PDF
         </button>
       </div>
