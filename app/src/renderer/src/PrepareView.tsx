@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { api, Scene, SceneDetail, sceneBlocks, isPdf, pdfUrl } from './api'
+import { api, Scene, SceneDetail, sceneBlocks, isPdf } from './api'
+import { PdfFrame } from './PdfFrame'
 
 function mmss(s: number) {
   const m = Math.floor(s / 60)
@@ -78,7 +79,7 @@ export function PrepareView({ scene, onBack }: { scene: Scene; onBack: () => voi
 
       <div className="sides-scroll">
         {eff === 'pdf' ? (
-          <iframe className="pdfframe" src={pdfUrl(scene.script_path, scene.page)} title="Script PDF" />
+          <PdfFrame path={scene.script_path} page={scene.page} />
         ) : (
           <div className="sides" id="sides">
             <div className="sides-h">{data.heading}</div>

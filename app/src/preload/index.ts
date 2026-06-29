@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('scripty', {
   onOpenSettings: (cb: () => void) => ipcRenderer.on('open-settings', cb),
   exportSides: (html: string, name: string) => ipcRenderer.invoke('export-sides', html, name),
   appVersion: () => ipcRenderer.invoke('app-version') as Promise<string>,
+  readFile: (path: string) => ipcRenderer.invoke('read-file', path) as Promise<Uint8Array>,
   checkUpdates: () => ipcRenderer.invoke('check-updates'),
   onUpdateStatus: (cb: (s: string) => void) => {
     const listener = (_e: unknown, s: string) => cb(s)

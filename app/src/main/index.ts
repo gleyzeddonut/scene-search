@@ -1,28 +1,9 @@
-import { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell, protocol } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell } from 'electron'
 import { join } from 'path'
 import { startEngine, EngineHandle } from './engine'
 import { setupUpdater, checkForUpdatesManual } from './updater'
 
 const HELP_URL = 'https://github.com/gleyzeddonut/scene-search'
-
-// lets the renderer load a local script file (e.g. a PDF) in Chromium's viewer
-protocol.registerSchemesAsPrivileged([
-  { scheme: 'localfile', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
-])
-
-async function serveLocalFile(req: Request): Promise<Response> {
-  try {
-    const p = decodeURIComponent(new URL(req.url).pathname)
-    const { readFile } = await import('fs/promises')
-    const data = await readFile(p)
-    const ext = p.toLowerCase().split('.').pop()
-    const type =
-      ext === 'pdf' ? 'application/pdf' : ext === 'txt' ? 'text/plain; charset=utf-8' : 'application/octet-stream'
-    return new Response(new Uint8Array(data), { headers: { 'content-type': type } })
-  } catch {
-    return new Response('not found', { status: 404 })
-  }
-}
 let engine: EngineHandle | null = null
 let enginePromise: Promise<EngineHandle> | null = null
 let mainWindow: BrowserWindow | null = null
@@ -40,6 +21,10 @@ function registerIpc() {
   })
   ipcMain.handle('app-version', () => app.getVersion())
   ipcMain.handle('check-updates', () => checkForUpdatesManual())
+  ipcMain.handle('read-file', async (_e, p: string) => {
+    const { readFile } = await import('fs/promises')
+    return readFile(p) // Buffer → Uint8Array in the renderer
+  })
   ipcMain.handle('export-sides', async (_e, html: string, name: string) => {
     const r = await dialog.showSaveDialog({ defaultPath: `${name} - sides.pdf` })
     if (r.canceled || !r.filePath) return false
@@ -111,7 +96,6 @@ function createWindow() {
     })
 
   registerIpc()
-  protocol.handle('localfile', serveLocalFile)
   buildMenu()
 
   mainWindow = new BrowserWindow({

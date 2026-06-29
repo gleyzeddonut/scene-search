@@ -32,11 +32,6 @@ export function isPdf(path: string): boolean {
   return path.toLowerCase().endsWith('.pdf')
 }
 
-// URL for Chromium's PDF viewer, jumped to the scene's page when known
-export function pdfUrl(path: string, page?: number): string {
-  return 'localfile://' + encodeURI(path) + (page ? `#page=${page}` : '')
-}
-
 declare global {
   interface Window {
     scripty: {
@@ -46,6 +41,7 @@ declare global {
       onOpenSettings: (cb: () => void) => void
       exportSides: (html: string, name: string) => Promise<boolean>
       appVersion: () => Promise<string>
+      readFile: (path: string) => Promise<Uint8Array>
       checkUpdates: () => Promise<void>
       onUpdateStatus: (cb: (s: string) => void) => () => void
     }

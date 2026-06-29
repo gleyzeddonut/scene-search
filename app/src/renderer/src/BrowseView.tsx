@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { api, Scene, SceneDetail, sceneBlocks, isPdf, pdfUrl } from './api'
+import { api, Scene, SceneDetail, sceneBlocks, isPdf } from './api'
+import { PdfFrame } from './PdfFrame'
 
 // Semantic size labels (matches the Cue handoff). Values map to char-count range.
 const SIZE: [string, [number, number]][] = [
@@ -187,7 +188,7 @@ export function BrowseView({
           {scenes.length === 0 && <div className="empty">No scenes match these filters.</div>}
           {scenes.map((s) => (
             <div
-              key={s.script_path + s.heading}
+              key={s.script_path + ':' + s.scene_index}
               className={'row' + (sel === s ? ' on' : '')}
               onClick={() => setSel(s)}
               onDoubleClick={() => api.openFile(s.script_path)}
@@ -232,7 +233,7 @@ export function BrowseView({
                     </span>
                   </div>
                   {eff === 'pdf' ? (
-                    <iframe className="pdfframe" src={pdfUrl(sel.script_path, sel.page)} title="Script PDF" />
+                    <PdfFrame path={sel.script_path} page={sel.page} />
                   ) : (
                     <div className="dcard">
                       <div className="h">{sel.heading}</div>
