@@ -37,12 +37,24 @@ npm run dev                         # launches Electron + the engine sidecar
 **Library** (point it at folders, Re-index) and **Browse** (filter scenes by
 size / gender pairing) views. Light/dark themes via the toolbar toggle.
 
+## Package a signed release
+
+```bash
+./packaging/build_engine.sh                  # PyInstaller engine binary
+cd app && npm install && npm run dist         # electron-builder: bundle + sign + notarize
+# -> app/dist/Scripty-<version>-arm64.dmg  (Developer-ID signed, notarized)
+```
+
+The engine binary is bundled as an app resource and the renderer ships its fonts
+locally, so the packaged app is fully offline. Notarization uses the
+`scene-search-notary` keychain profile.
+
 ## Status
 
 - **Phase 1 (done):** working dev app — Electron/React shell + Python engine
   sidecar; Browse + Library.
-- **Phase 2 (next):** package the engine with PyInstaller + the app with
-  electron-builder; Developer-ID sign + notarize.
+- **Phase 2 (done):** PyInstaller engine binary + electron-builder packaging;
+  Developer-ID sign + notarize.
 - **Phase 3:** auto-update (electron-updater) and the Prepare/Sides feature.
 
 ## Notes
