@@ -1,7 +1,7 @@
 import { stat, readFile } from 'node:fs/promises'
 import { basename, resolve, extname } from 'node:path'
-import { extractPaginated as realExtract } from './extract'
-import { parseScenes } from './parser'
+import { extractPaginated as realExtract, extractLayout, layoutToText } from './extract'
+import { parseScenes, parseLayout } from './parser'
 import { parseFdx, parseFountain } from './formats'
 import { scenePairing, guessGender } from './gender'
 import { sceneWordCount, estimateSeconds } from './runtime'
@@ -67,6 +67,14 @@ export class Library {
     try {
       if (ext === '.fdx') return parseFdx(await readFile(rp, 'utf-8'))
       if (ext === '.fountain') return parseFountain(await readFile(rp, 'utf-8'))
+      if (ext === '.pdf') {
+        // one extraction, two parses: prefer the layout parser, but never let it
+        // find fewer scenes than the regex parser (no detection regression)
+        const lines = await extractLayout(rp)
+        const layout = parseLayout(lines)
+        const regex = parseScenes(layoutToText(lines))
+        return layout.length >= regex.length ? layout : regex
+      }
       return parseScenes(await this._extract(rp))
     } catch {
       return []

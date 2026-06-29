@@ -1,4 +1,4 @@
-import type { Scene, SceneBlock } from './types'
+import type { Scene, SceneBlock, LayoutLine } from './types'
 
 // optional leading scene-number column (incl. "SC. 5.A5" from gutter numbers
 // some PDF extractors place at the start of the heading line)
@@ -27,6 +27,116 @@ function isCue(line: string): boolean {
   if (name && '.!?'.includes(name[name.length - 1])) return false
   const words = name.split(/\s+/).filter(Boolean)
   return words.length >= 1 && words.length <= 4 && /[A-Za-z]/.test(name)
+}
+
+// A line is "cue-shaped" if it reads like a character name: uppercase, short, no
+// sentence-ending punctuation (parentheticals like (V.O.) are stripped first).
+function isCueShaped(t: string): boolean {
+  const base = t.replace(PAREN_RE, '').trim()
+  if (!base || /[a-z]/.test(base) || !/[A-Z]/.test(base)) return false
+  if ('.!?'.includes(base[base.length - 1])) return false
+  const words = base.split(/\s+/).filter(Boolean)
+  return words.length >= 1 && words.length <= 5
+}
+
+// Layout-aware parser for PDFs: classify each line by its left indentation rather
+// than guessing from ALL-CAPS regex. Margins are derived per-document so it adapts
+// to different page geometry. Headings flush-left, dialogue indented, character
+// cues indented furthest, transitions/parentheticals handled by content.
+export function parseLayout(rawLines: LayoutLine[]): Scene[] {
+  const lines = rawLines.filter((l) => l.text.trim())
+  if (!lines.length) return []
+
+  // base margin = the smallest left-x that occurs often (ignores stray gutter text)
+  const bucket = (x: number) => Math.round(x / 3) * 3
+  const counts = new Map<number, number>()
+  for (const l of lines) counts.set(bucket(l.x), (counts.get(bucket(l.x)) || 0) + 1)
+  const maxC = Math.max(...counts.values())
+  const base = Math.min(...[...counts].filter(([, c]) => c >= maxC * 0.12).map(([b]) => b))
+
+  // cue margin = median left-x of indented cue-shaped lines → sets the indent scale
+  const cueXs = lines.filter((l) => l.x - base > 24 && isCueShaped(l.text)).map((l) => l.x).sort((a, b) => a - b)
+  const cueIndent = Math.max((cueXs.length ? cueXs[cueXs.length >> 1] : base + 144) - base, 48)
+  const dialogueMin = cueIndent * 0.2
+  const cueMin = cueIndent * 0.6
+
+  type Role = 'HEADING' | 'CUE' | 'DIALOGUE' | 'PAREN' | 'ACTION'
+  const classify = (l: LayoutLine): Role => {
+    const t = l.text.trim()
+    const indent = l.x - base
+    if (SCENE_RE.test(l.text) && indent < cueIndent * 0.5) return 'HEADING'
+    if (t.startsWith('(')) return 'PAREN'
+    if (indent >= cueMin && isCueShaped(t)) return 'CUE'
+    if (indent >= dialogueMin) return 'DIALOGUE'
+    return 'ACTION'
+  }
+
+  const scenes: Scene[] = []
+  let current: Scene | null = null
+  let seen = new Set<string>()
+  let action: string[] = []
+  let pending: { name: string; said: string[] } | null = null
+
+  const flushAction = () => {
+    if (current && action.length) {
+      const t = action.join(' ').trim()
+      if (t) current.blocks.push({ type: 'action', text: t } as SceneBlock)
+    }
+    action = []
+  }
+  const flushDialogue = () => {
+    if (!current || !pending) {
+      pending = null
+      return
+    }
+    const text = pending.said.join(' ').trim()
+    if (text) {
+      if (!seen.has(pending.name)) {
+        seen.add(pending.name)
+        current.characters.push(pending.name)
+      }
+      current.lines.push([pending.name, text])
+      current.blocks.push({ type: 'cue', who: pending.name, text } as SceneBlock)
+    } else {
+      action.push(pending.name) // a cue with no dialogue is really action
+    }
+    pending = null
+  }
+
+  for (const l of lines) {
+    const role = classify(l)
+    if (role === 'HEADING') {
+      flushDialogue()
+      flushAction()
+      current = {
+        heading: squish(l.text.replace(SCENE_NUM_PREFIX, '')),
+        index: scenes.length + 1,
+        page: l.page,
+        characters: [],
+        lines: [],
+        blocks: []
+      }
+      scenes.push(current)
+      seen = new Set()
+      continue
+    }
+    if (!current) continue
+    if (role === 'CUE') {
+      flushDialogue()
+      flushAction()
+      pending = { name: normalizeCharacter(l.text), said: [] }
+    } else if (role === 'DIALOGUE') {
+      if (pending) pending.said.push(l.text.trim())
+      else action.push(l.text.trim())
+    } else if (role === 'ACTION') {
+      flushDialogue()
+      action.push(l.text.trim())
+    }
+    // PAREN: ignored (not spoken text, not action)
+  }
+  flushDialogue()
+  flushAction()
+  return scenes
 }
 
 export function parseScenes(text: string): Scene[] {

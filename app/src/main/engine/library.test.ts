@@ -42,10 +42,10 @@ describe('Library', () => {
   it('survives one bad file', async () => {
     const d = tmp()
     writeFileSync(join(d, 'good.fountain'), SCRIPT)
-    writeFileSync(join(d, 'bad.pdf'), 'x') // pdf routes through _extract, which we make throw
+    writeFileSync(join(d, 'bad.txt'), SCRIPT) // .txt routes through _extract, which we make throw
     const lib = new Library()
     ;(lib as any)._extract = async (p: string) => {
-      if (p.endsWith('bad.pdf')) throw new Error('boom')
+      if (p.endsWith('bad.txt')) throw new Error('boom')
       return SCRIPT
     }
     await lib.reindex([d])
