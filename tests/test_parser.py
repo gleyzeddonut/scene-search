@@ -73,5 +73,11 @@ def test_caps_action_or_sound_line_is_not_a_character():
     assert parse_scenes(text)[0].characters == ["BETTY"]
 
 
+def test_captures_dialogue_lines():
+    text = "INT. ROOM - DAY\n\nJOHN\nHello there.\n\nMARY\nGo away,\nplease.\n"
+    scene = parse_scenes(text)[0]
+    assert scene.lines == [("JOHN", "Hello there."), ("MARY", "Go away, please.")]
+
+
 def test_empty_text():
     assert parse_scenes("") == []

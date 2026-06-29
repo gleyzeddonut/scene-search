@@ -42,6 +42,19 @@ def test_query_by_char_count(tmp_path):
     assert two[0].script_name == "a.fountain"
 
 
+def test_get_scene_returns_lines(tmp_path):
+    (tmp_path / "a.fountain").write_text(
+        "INT. OFFICE - DAY\n\nMICHAEL\nSit.\n\nJENNIFER\nNo.\n")
+    lib = Library(tmp_path / "index.db")
+    lib.reindex(tmp_path)
+    m = lib.query(min_chars=2)[0]
+    scene = lib.get_scene(m.script_path, m.scene_index)
+    assert scene["heading"] == "INT. OFFICE - DAY"
+    assert scene["lines"] == [{"who": "MICHAEL", "text": "Sit."},
+                              {"who": "JENNIFER", "text": "No."}]
+    assert scene["est_seconds"] >= 0
+
+
 def test_non_script_files_are_not_counted(tmp_path):
     (tmp_path / "a.fountain").write_text(SCRIPT)
     (tmp_path / "notes.txt").write_text("grocery list: milk, eggs, bread")

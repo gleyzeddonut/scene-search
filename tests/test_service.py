@@ -91,6 +91,22 @@ def test_reindex_reports_scanned_progress(tmp_path):
     assert c.get("/reindex/status", headers=_auth()).json()["scanned"] == 3
 
 
+def test_scene_endpoint_returns_lines(tmp_path):
+    lib_dir = tmp_path / "lib"
+    lib_dir.mkdir()
+    (lib_dir / "x.fountain").write_text("INT. OFFICE - DAY\n\nMICHAEL\nSit.\n\nJENNIFER\nNo.\n")
+    c = _client(tmp_path)
+    c.put("/folders", headers=_auth(), json={"roots": [str(lib_dir)], "ignored": []})
+    c.post("/reindex", headers=_auth())
+    for _ in range(100):
+        if not c.get("/reindex/status", headers=_auth()).json()["running"]:
+            break
+        time.sleep(0.02)
+    m = c.get("/scenes", headers=_auth()).json()["scenes"][0]
+    s = c.get("/scene", headers=_auth(), params={"path": m["script_path"], "index": m["scene_index"]}).json()
+    assert s["lines"][0] == {"who": "MICHAEL", "text": "Sit."}
+
+
 def test_open_and_reveal(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr("scenesearch.service.fileops.open_external", lambda p: calls.append(("open", p)))

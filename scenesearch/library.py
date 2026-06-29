@@ -9,6 +9,7 @@ from .extractors import ExtractionError, extract_paginated
 from .scanner import iter_candidates
 from .screenplay.gender import scene_pairing
 from .screenplay.parser import parse_scenes
+from .screenplay.runtime import estimate_seconds, scene_word_count
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS scripts(
@@ -16,7 +17,8 @@ CREATE TABLE IF NOT EXISTS scripts(
 CREATE TABLE IF NOT EXISTS scenes(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     script_path TEXT, scene_index INTEGER, heading TEXT, page INTEGER,
-    char_count INTEGER, characters_json TEXT, pairing TEXT);
+    char_count INTEGER, characters_json TEXT, pairing TEXT,
+    dialogue_json TEXT, est_seconds INTEGER);
 CREATE INDEX IF NOT EXISTS idx_scenes_script ON scenes(script_path);
 """
 
@@ -30,6 +32,8 @@ class SceneMatch:
     char_count: int
     characters: list[str] = field(default_factory=list)
     pairing: str | None = None
+    scene_index: int = 0
+    est_seconds: int = 0
 
 
 class Library:
@@ -37,6 +41,12 @@ class Library:
         self.db_path = Path(db_path)
         self._conn = sqlite3.connect(str(self.db_path))
         self._conn.executescript(_SCHEMA)
+        # migrate older dbs that predate the dialogue/runtime columns
+        for col, typ in (("dialogue_json", "TEXT"), ("est_seconds", "INTEGER")):
+            try:
+                self._conn.execute(f"ALTER TABLE scenes ADD COLUMN {col} {typ}")
+            except sqlite3.OperationalError:
+                pass
 
     def close(self) -> None:
         self._conn.close()
@@ -71,11 +81,14 @@ class Library:
             (rp, path.name, mtime, len(scenes)),
         )
         for s in scenes:
+            words = scene_word_count(s.lines)
             self._conn.execute(
                 "INSERT INTO scenes(script_path, scene_index, heading, page, "
-                "char_count, characters_json, pairing) VALUES(?,?,?,?,?,?,?)",
+                "char_count, characters_json, pairing, dialogue_json, est_seconds) "
+                "VALUES(?,?,?,?,?,?,?,?,?)",
                 (rp, s.index, s.heading, s.page, len(s.characters),
-                 json.dumps(s.characters), scene_pairing(s.characters)),
+                 json.dumps(s.characters), scene_pairing(s.characters),
+                 json.dumps(s.lines), estimate_seconds(words)),
             )
         if progress:
             progress(path.name)
@@ -105,7 +118,7 @@ class Library:
     def query(self, min_chars=None, max_chars=None, pairing=None) -> list[SceneMatch]:
         sql = (
             "SELECT sc.path, sc.name, s.heading, s.page, s.char_count, "
-            "s.characters_json, s.pairing FROM scenes s "
+            "s.characters_json, s.pairing, s.scene_index, s.est_seconds FROM scenes s "
             "JOIN scripts sc ON sc.path = s.script_path WHERE 1=1"
         )
         args: list = []
@@ -120,6 +133,19 @@ class Library:
             args.append(pairing)
         sql += " ORDER BY sc.name, s.scene_index"
         out: list[SceneMatch] = []
-        for path, name, heading, page, cc, cj, pr in self._conn.execute(sql, args):
-            out.append(SceneMatch(path, name, heading, page, cc, json.loads(cj), pr))
+        for path, name, heading, page, cc, cj, pr, sidx, est in self._conn.execute(sql, args):
+            out.append(SceneMatch(path, name, heading, page, cc, json.loads(cj), pr,
+                                  sidx, est or 0))
         return out
+
+    def get_scene(self, path, scene_index):
+        row = self._conn.execute(
+            "SELECT heading, characters_json, dialogue_json, est_seconds "
+            "FROM scenes WHERE script_path=? AND scene_index=?",
+            (str(path), scene_index)).fetchone()
+        if row is None:
+            return None
+        heading, chars, dlg, est = row
+        return {"heading": heading, "characters": json.loads(chars),
+                "lines": [{"who": w, "text": t} for w, t in json.loads(dlg or "[]")],
+                "est_seconds": est or 0}

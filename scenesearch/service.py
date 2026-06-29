@@ -76,11 +76,23 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
                     "script_path": m.script_path, "script_name": m.script_name,
                     "heading": m.heading, "page": m.page, "char_count": m.char_count,
                     "characters": [{"name": n, "gender": guess_gender(n)} for n in m.characters],
-                    "pairing": m.pairing,
+                    "pairing": m.pairing, "scene_index": m.scene_index,
+                    "est_seconds": m.est_seconds,
                 })
             return {"scenes": out}
         finally:
             library.close()
+
+    @app.get("/scene")
+    def scene(path: str, index: int, _=Depends(auth)):
+        library = lib()
+        try:
+            s = library.get_scene(path, index)
+        finally:
+            library.close()
+        if s is None:
+            raise HTTPException(status_code=404, detail="no such scene")
+        return s
 
     def _do_reindex(roots):
         state.update(running=True, scanned=0)

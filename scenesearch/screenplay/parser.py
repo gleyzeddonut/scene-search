@@ -22,6 +22,7 @@ class Scene:
     index: int
     page: int
     characters: list[str] = field(default_factory=list)
+    lines: list[tuple[str, str]] = field(default_factory=list)
 
 
 def _normalize_character(text: str) -> str:
@@ -79,4 +80,17 @@ def parse_scenes(text: str) -> list[Scene]:
             if name not in seen:
                 seen.add(name)
                 current.characters.append(name)
+            # capture the dialogue block (until blank line / next cue / heading)
+            said: list[str] = []
+            j = i + 1
+            while j < len(lines):
+                nxt = lines[j]
+                if not nxt.strip():
+                    break
+                if _SCENE_RE.match(nxt) or _is_cue(nxt):
+                    break
+                said.append(nxt.strip())
+                j += 1
+            if said:
+                current.lines.append((name, " ".join(said)))
     return scenes
