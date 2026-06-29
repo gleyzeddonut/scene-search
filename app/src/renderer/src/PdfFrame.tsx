@@ -17,7 +17,9 @@ export function PdfFrame({ path, page }: { path: string; page?: number }) {
         if (!active) return
         const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' })
         made = URL.createObjectURL(blob)
-        setUrl(made + (page ? `#page=${page}` : ''))
+        // #toolbar=0&navpanes=0 hides Chromium's PDF toolbar (print/download) and side panel
+        const frag = `#toolbar=0&navpanes=0${page ? `&page=${page}` : ''}`
+        setUrl(made + frag)
       })
       .catch(() => active && setErr(true))
     return () => {
