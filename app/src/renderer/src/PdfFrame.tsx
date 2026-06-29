@@ -1,33 +1,33 @@
 import { useEffect, useRef, useState } from 'react'
 
-// Loads the PDF bytes via IPC and shows them in a blob URL so Chromium's
-// built-in PDF viewer renders it. The blob is reused across page changes within
-// the same file, and the current preview stays visible while the next file loads,
-// so moving between rows doesn't flash a "Loading…" state.
+// Loads PDF bytes via IPC into a blob URL for Chromium's PDF viewer. To avoid a
+// flicker when the selection changes, it double-buffers: the visible iframe stays
+// up until the next page/file has fully loaded in a second iframe, then swaps.
 export function PdfFrame({ path, page }: { path: string; page?: number }) {
-  const [url, setUrl] = useState('') // blob URL (no fragment); empty only before the first load
+  const [url, setUrl] = useState('') // blob URL; reused across page changes within a file
   const [err, setErr] = useState(false)
   const blob = useRef<{ path: string; url: string } | null>(null)
+  const [srcs, setSrcs] = useState(['', '']) // two iframe buffers
+  const [active, setActive] = useState(0) // which buffer is shown
 
   useEffect(() => {
-    let active = true
+    let alive = true
     setErr(false)
     window.scripty
       .readFile(path)
       .then((bytes) => {
-        if (!active) return // a newer selection arrived — ignore this stale read
+        if (!alive) return
         const u = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }))
-        if (blob.current) URL.revokeObjectURL(blob.current.url) // free the previous file
+        if (blob.current) URL.revokeObjectURL(blob.current.url)
         blob.current = { path, url: u }
         setUrl(u)
       })
-      .catch(() => active && setErr(true))
+      .catch(() => alive && setErr(true))
     return () => {
-      active = false
+      alive = false
     }
-  }, [path]) // re-read only when the file changes — page changes reuse the blob
+  }, [path]) // re-read only when the file changes
 
-  // revoke the last blob on unmount
   useEffect(
     () => () => {
       if (blob.current) URL.revokeObjectURL(blob.current.url)
@@ -35,9 +35,43 @@ export function PdfFrame({ path, page }: { path: string; page?: number }) {
     []
   )
 
+  // #toolbar=0&navpanes=0 hides Chromium's PDF toolbar + side panel
+  const target = url ? url + `#toolbar=0&navpanes=0${page ? `&page=${page}` : ''}` : ''
+
+  // load the next target into the hidden buffer; it becomes visible on its onLoad
+  useEffect(() => {
+    if (!target || srcs[active] === target) return
+    const back = 1 - active
+    if (srcs[back] === target) {
+      setActive(back)
+      return
+    }
+    setSrcs((s) => {
+      const n = [...s]
+      n[back] = target
+      return n
+    })
+  }, [target, active, srcs])
+
   if (err) return <div className="dnote">Couldn’t open this PDF.</div>
   if (!url) return <div className="dnote">Loading PDF…</div>
-  // #toolbar=0&navpanes=0 hides Chromium's PDF toolbar (print/download) and side panel
-  const src = url + `#toolbar=0&navpanes=0${page ? `&page=${page}` : ''}`
-  return <iframe className="pdfframe" src={src} title="Script PDF" />
+
+  return (
+    <div className="pdfwrap">
+      {[0, 1].map((i) =>
+        srcs[i] ? (
+          <iframe
+            key={i}
+            src={srcs[i]}
+            title="Script PDF"
+            className="pdfframe"
+            onLoad={() => {
+              if (i !== active && srcs[i] === target) setActive(i)
+            }}
+            style={{ opacity: i === active ? 1 : 0, zIndex: i === active ? 2 : 1, pointerEvents: i === active ? 'auto' : 'none' }}
+          />
+        ) : null
+      )}
+    </div>
+  )
 }
