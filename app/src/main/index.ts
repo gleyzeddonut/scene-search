@@ -1,11 +1,40 @@
 import { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell, nativeTheme } from 'electron'
 import { join } from 'path'
+import { pathToFileURL } from 'node:url'
 import { Engine } from './engine/engine'
 import { setupUpdater, checkForUpdatesManual, quitAndInstall } from './updater'
 
 const HELP_URL = 'https://github.com/gleyzeddonut/scene-search'
 let engine: Engine
 let mainWindow: BrowserWindow | null = null
+let qlWin: BrowserWindow | null = null // the Quick Look pop-out (a real OS window)
+
+// Open (or update) a single Quick Look window — a genuine separate window the user
+// can move anywhere, even onto another display.
+function openQuickLook(p: { title: string; pdfPath?: string; page?: number; html?: string }) {
+  if (!qlWin || qlWin.isDestroyed()) {
+    qlWin = new BrowserWindow({
+      width: 760,
+      height: 900,
+      title: p.title,
+      backgroundColor: nativeTheme.shouldUseDarkColors ? '#1d1e23' : '#fdfdfe',
+      webPreferences: { plugins: true, contextIsolation: true, nodeIntegration: false }
+    })
+    qlWin.on('closed', () => {
+      qlWin = null
+    })
+  }
+  qlWin.setTitle(p.title)
+  if (p.pdfPath) {
+    // load the real file so Chromium's PDF viewer renders it; hide its toolbar
+    const url = pathToFileURL(p.pdfPath).toString() + `#page=${p.page || 1}&toolbar=0&navpanes=0`
+    qlWin.loadURL(url)
+  } else {
+    qlWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(p.html || ''))
+  }
+  if (!qlWin.isVisible()) qlWin.show()
+  qlWin.focus()
+}
 
 function registerIpc() {
   // in-process engine (no sidecar): the renderer calls these over IPC
@@ -25,6 +54,7 @@ function registerIpc() {
     return r.canceled ? null : r.filePaths[0]
   })
   ipcMain.handle('app-version', () => app.getVersion())
+  ipcMain.handle('quicklook', (_e, p) => openQuickLook(p))
   ipcMain.handle('check-updates', () => checkForUpdatesManual())
   ipcMain.handle('quit-and-install', () => quitAndInstall())
   ipcMain.handle('read-file', async (_e, p: string) => {
@@ -119,6 +149,9 @@ function createWindow() {
   }
   mainWindow.once('ready-to-show', reveal)
   setTimeout(reveal, 1500)
+  mainWindow.on('close', () => {
+    if (qlWin && !qlWin.isDestroyed()) qlWin.close() // don't leave the pop-out orphaned
+  })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])

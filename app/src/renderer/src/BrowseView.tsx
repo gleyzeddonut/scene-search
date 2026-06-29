@@ -1,7 +1,34 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, Scene, SceneDetail, sceneBlocks, isPdf } from './api'
 import { PdfFrame } from './PdfFrame'
-import { QuickLook } from './QuickLook'
+
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+
+// standalone HTML for the Quick Look pop-out when the scene isn't a PDF
+function sceneHtml(scene: Scene, detail: SceneDetail | null): string {
+  const blocks = detail ? sceneBlocks(detail) : []
+  const body = blocks.length
+    ? blocks
+        .map((b) =>
+          b.type === 'cue'
+            ? `<div class="cue">${esc(b.who)}</div><div class="text">${esc(b.text)}</div>`
+            : `<div class="action">${esc(b.text)}</div>`
+        )
+        .join('')
+    : '<div class="note">No text could be read from this scene.</div>'
+  return (
+    `<!doctype html><html><head><meta charset="utf-8"><title>${esc(scene.script_name)}</title><style>` +
+    `body{margin:0;font-family:'Courier Prime','Courier New',monospace;background:#fdfdfe;color:#1a1a1f}` +
+    `@media(prefers-color-scheme:dark){body{background:#1d1e23;color:#e8e8ea}}` +
+    `.wrap{max-width:680px;margin:0 auto;padding:48px 56px}` +
+    `.h{font-weight:700;font-size:13px;letter-spacing:.04em;margin-bottom:24px;opacity:.7}` +
+    `.cue{font-weight:700;font-size:12px;letter-spacing:.04em;margin-top:18px}` +
+    `.text{font-size:14px;line-height:1.5;margin-top:3px}` +
+    `.action{font-size:14px;line-height:1.6;margin:14px 0;opacity:.85}` +
+    `.note{opacity:.6;font-size:13px}` +
+    `</style></head><body><div class="wrap"><div class="h">${esc(scene.heading)}</div>${body}</div></body></html>`
+  )
+}
 
 // Semantic size labels (matches the Cue handoff). Values map to char-count range.
 const SIZE: [string, [number, number]][] = [
@@ -72,7 +99,6 @@ export function BrowseView({
     setViewState(v)
     localStorage.setItem('sceneView', v)
   }
-  const [quickLook, setQuickLook] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
 
   // pairing only applies to two-person scenes; show it for Any + Duet, hide for Solo / 3+
@@ -113,37 +139,40 @@ export function BrowseView({
     }
   }, [sel])
 
-  // keyboard: ↑/↓ move the selection, Space opens a Finder-style Quick Look
+  // open the selected scene in a real, separate Quick Look window (movable anywhere)
+  const openQL = (s: Scene) => {
+    const title = s.script_name.replace(/\.[^.]+$/, '')
+    if (isPdf(s.script_path)) {
+      window.scripty.quickLook({ title, pdfPath: s.script_path, page: s.page })
+    } else {
+      window.scripty.quickLook({ title, html: sceneHtml(s, detail) })
+    }
+  }
+
+  // keyboard: ↑/↓ move the selection, Space pops the preview out into its own window
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = document.activeElement as HTMLElement | null
       const typing =
         !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
       if (typing) return
-      if (quickLook) {
-        if (e.key === ' ' || e.key === 'Escape') {
-          e.preventDefault()
-          setQuickLook(false)
-        }
-        return
-      }
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         if (!scenes.length) return
         e.preventDefault()
         const i = sel ? scenes.indexOf(sel) : -1
-        const ni =
-          e.key === 'ArrowDown' ? Math.min(scenes.length - 1, i + 1) : Math.max(0, i - 1)
+        const ni = e.key === 'ArrowDown' ? Math.min(scenes.length - 1, i + 1) : Math.max(0, i - 1)
         setSel(scenes[ni] || null)
       } else if (e.key === ' ' && el?.tagName !== 'BUTTON') {
         if (sel) {
           e.preventDefault()
-          setQuickLook(true)
+          openQL(sel)
         }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [scenes, sel, quickLook])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenes, sel, detail])
 
   // keep the keyboard-selected row visible
   useEffect(() => {
@@ -299,6 +328,7 @@ export function BrowseView({
               <button className="prepare" onClick={() => onPrepare(sel)}>Prepare scene →</button>
             </div>
             <div className="dbtns">
+              <button className="ghost" onClick={() => openQL(sel)} title="Pop out (Space)">⤢ Pop out</button>
               <button className="ghost" onClick={() => api.openFile(sel.script_path)}>Open file</button>
               <button className="ghost" onClick={() => api.revealFile(sel.script_path)}>Reveal</button>
             </div>
@@ -306,7 +336,6 @@ export function BrowseView({
         )}
       </div>
 
-      {quickLook && sel && <QuickLook scene={sel} detail={detail} onClose={() => setQuickLook(false)} />}
     </>
   )
 }

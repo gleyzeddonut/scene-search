@@ -78,6 +78,7 @@ declare global {
       readFile: (path: string) => Promise<Uint8Array>
       checkUpdates: () => Promise<void>
       quitAndInstall: () => Promise<void>
+      quickLook: (p: { title: string; pdfPath?: string; page?: number; html?: string }) => Promise<void>
       onUpdateStatus: (cb: (m: UpdateMsg) => void) => () => void
     }
   }
