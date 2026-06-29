@@ -14,6 +14,9 @@ export default function App() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [prepScene, setPrepScene] = useState<Scene | null>(null)
+  // Browse filters live here so they persist across tab switches (this session).
+  const [browseSize, setBrowseSize] = useState(0) // 0 = Any
+  const [browsePair, setBrowsePair] = useState(0)
 
   useEffect(() => {
     init().then(() => setReady(true))
@@ -39,6 +42,10 @@ export default function App() {
       {section === 'browse' && (
         <BrowseView
           search={search}
+          size={browseSize}
+          setSize={setBrowseSize}
+          pair={browsePair}
+          setPair={setBrowsePair}
           onPrepare={(s) => {
             setPrepScene(s)
             setSection('prepare')

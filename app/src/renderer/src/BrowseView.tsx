@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, Scene } from './api'
+import { api, Scene, SceneDetail } from './api'
 
 // Semantic size labels (matches the Cue handoff). Values map to char-count range.
 const SIZE: [string, [number, number]][] = [
@@ -26,13 +26,26 @@ function sizeTag(n: number) {
   return n === 1 ? 'Solo' : n === 2 ? 'Duet' : n >= 3 ? 'Ensemble' : 'No dialogue'
 }
 
-export function BrowseView({ search, onPrepare }: { search: string; onPrepare: (s: Scene) => void }) {
-  const [size, setSize] = useState(DUET)
-  const [pair, setPair] = useState(0)
+export function BrowseView({
+  search,
+  size,
+  setSize,
+  pair,
+  setPair,
+  onPrepare
+}: {
+  search: string
+  size: number
+  setSize: (n: number) => void
+  pair: number
+  setPair: (n: number) => void
+  onPrepare: (s: Scene) => void
+}) {
   const [openSize, setOpenSize] = useState(false)
   const [openPair, setOpenPair] = useState(false)
   const [scenes, setScenes] = useState<Scene[]>([])
   const [sel, setSel] = useState<Scene | null>(null)
+  const [detail, setDetail] = useState<SceneDetail | null>(null)
 
   const showPairing = size === DUET
   const pairValue = showPairing ? PAIR[pair][1] : null
@@ -46,6 +59,12 @@ export function BrowseView({ search, onPrepare }: { search: string; onPrepare: (
         setSel(r.scenes[0] || null)
       })
   }, [size, pair, search])
+
+  // pull the selected scene's dialogue so the preview shows the full scene
+  useEffect(() => {
+    setDetail(null)
+    if (sel) api.getScene(sel.script_path, sel.scene_index).then(setDetail)
+  }, [sel])
 
   const chooseSize = (i: number) => {
     setSize(i)
@@ -167,10 +186,18 @@ export function BrowseView({ search, onPrepare }: { search: string; onPrepare: (
             </div>
             <div className="dcard">
               <div className="h">{sel.heading}</div>
-              {sel.characters.map((c) => (
-                <div key={c.name} className="cue">{c.name}</div>
-              ))}
-              <div className="dnote">“Open the file or Prepare the scene to read the full sides.”</div>
+              {detail === null ? (
+                <div className="dnote">Loading scene…</div>
+              ) : detail.lines.length === 0 ? (
+                <div className="dnote">No dialogue could be read from this scene. Open the file to view it.</div>
+              ) : (
+                detail.lines.map((l, i) => (
+                  <div key={i}>
+                    <div className="dcue">{l.who}</div>
+                    <div className="dtext">{l.text}</div>
+                  </div>
+                ))
+              )}
             </div>
             <div className="dbtns">
               <button className="prepare" onClick={() => onPrepare(sel)}>Prepare scene →</button>

@@ -9,9 +9,32 @@ export function LibraryView() {
   const [busy, setBusy] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  const startPolling = () => {
+    if (pollRef.current) clearInterval(pollRef.current)
+    pollRef.current = setInterval(async () => {
+      const st = await api.reindexStatus()
+      setStatus(`Indexing… ${st.scanned} files scanned`)
+      if (!st.running) {
+        if (pollRef.current) clearInterval(pollRef.current)
+        pollRef.current = null
+        setBusy(false)
+        setStatus('')
+        setStats(st)
+      }
+    }, 300)
+  }
+
   const load = async () => {
     setRoots((await api.getFolders()).roots)
     setStats(await api.stats())
+    // the engine indexes in the background — if it's still running (e.g. we
+    // navigated away and came back), show progress and resume polling.
+    const st = await api.reindexStatus()
+    if (st.running) {
+      setBusy(true)
+      setStatus(`Indexing… ${st.scanned} files scanned`)
+      startPolling()
+    }
   }
   useEffect(() => {
     load()
@@ -37,18 +60,7 @@ export function LibraryView() {
     setBusy(true)
     setStatus('Indexing…')
     await api.reindex()
-    if (pollRef.current) clearInterval(pollRef.current)
-    pollRef.current = setInterval(async () => {
-      const st = await api.reindexStatus()
-      setStatus(`Indexing… ${st.scanned} files scanned`)
-      if (!st.running) {
-        if (pollRef.current) clearInterval(pollRef.current)
-        pollRef.current = null
-        setBusy(false)
-        setStatus('')
-        setStats(st)
-      }
-    }, 300)
+    startPolling()
   }
 
   return (

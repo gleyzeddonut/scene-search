@@ -114,6 +114,8 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 .dcard .h{font:600 11px/1 'Courier Prime',monospace;color:var(--text-3);margin-bottom:16px}
 .cue{font:400 12.5px/1.3 'Courier Prime',monospace;color:var(--text-2);margin-left:32%;letter-spacing:.04em;margin-top:14px}
 .dnote{margin-top:14px;font:italic 400 11.5px/1.5 'Courier Prime',monospace;color:var(--text-3)}
+.dcard .dcue{font:700 11px/1.3 'Courier Prime',monospace;color:var(--text-2);letter-spacing:.04em;margin-top:14px}
+.dcard .dtext{font:400 12.5px/1.55 'Courier Prime',monospace;color:var(--text);margin-top:3px}
 .dbtns{flex:none;display:flex;gap:10px;margin-top:14px}
 .dbtns .prepare{flex:1;text-align:center;padding:11px 0;border-radius:9px;background:var(--accent);color:#fff;font:700 13px/1 'Space Grotesk';cursor:pointer;border:none}
 .dbtns .ghost{padding:11px 16px;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--text-2);font:600 13px/1 'Space Grotesk';cursor:pointer}
