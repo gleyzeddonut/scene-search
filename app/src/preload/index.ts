@@ -27,8 +27,9 @@ contextBridge.exposeInMainWorld('scripty', {
   appVersion: () => ipcRenderer.invoke('app-version') as Promise<string>,
   readFile: (path: string) => ipcRenderer.invoke('read-file', path) as Promise<Uint8Array>,
   checkUpdates: () => ipcRenderer.invoke('check-updates'),
-  onUpdateStatus: (cb: (s: string) => void) => {
-    const listener = (_e: unknown, s: string) => cb(s)
+  quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
+  onUpdateStatus: (cb: (m: unknown) => void) => {
+    const listener = (_e: unknown, m: unknown) => cb(m)
     ipcRenderer.on('update-status', listener)
     return () => ipcRenderer.removeListener('update-status', listener)
   }

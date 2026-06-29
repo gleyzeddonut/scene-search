@@ -33,6 +33,22 @@ export function isPdf(path: string): boolean {
   return path.toLowerCase().endsWith('.pdf')
 }
 
+export type UpdatePhase =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'downloading'
+  | 'ready'
+  | 'none'
+  | 'error'
+  | 'dev'
+
+export interface UpdateMsg {
+  phase: UpdatePhase
+  pct?: number
+  version?: string
+}
+
 interface EngineApi {
   getFolders: () => Promise<{ roots: string[]; ignored: string[] }>
   setFolders: (r: string[], ig: string[]) => Promise<unknown>
@@ -41,7 +57,8 @@ interface EngineApi {
   scene: (p: string, i: number) => Promise<SceneDetail>
   reindex: () => Promise<{ started: boolean }>
   reindexStatus: () => Promise<{
-    running: boolean; scanned: number; scripts: number; scenes: number; errors: string[]
+    running: boolean; scanned: number; total: number; file: string
+    scripts: number; scenes: number; errors: string[]
   }>
   reindexStop: () => Promise<{ stopped: boolean }>
   add: (p: string) => Promise<{ result: 'added' | 'exists' | 'not_script' | 'unreadable'; name: string }>
@@ -60,7 +77,8 @@ declare global {
       appVersion: () => Promise<string>
       readFile: (path: string) => Promise<Uint8Array>
       checkUpdates: () => Promise<void>
-      onUpdateStatus: (cb: (s: string) => void) => () => void
+      quitAndInstall: () => Promise<void>
+      onUpdateStatus: (cb: (m: UpdateMsg) => void) => () => void
     }
   }
 }

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell } from 'electron'
 import { join } from 'path'
 import { Engine } from './engine/engine'
-import { setupUpdater, checkForUpdatesManual } from './updater'
+import { setupUpdater, checkForUpdatesManual, quitAndInstall } from './updater'
 
 const HELP_URL = 'https://github.com/gleyzeddonut/scene-search'
 let engine: Engine
@@ -26,6 +26,7 @@ function registerIpc() {
   })
   ipcMain.handle('app-version', () => app.getVersion())
   ipcMain.handle('check-updates', () => checkForUpdatesManual())
+  ipcMain.handle('quit-and-install', () => quitAndInstall())
   ipcMain.handle('read-file', async (_e, p: string) => {
     const { readFile } = await import('fs/promises')
     return readFile(p) // Buffer → Uint8Array in the renderer

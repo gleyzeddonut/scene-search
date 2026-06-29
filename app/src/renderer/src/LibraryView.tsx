@@ -7,8 +7,12 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
   const [stats, setStats] = useState({ scripts: 0, scenes: 0 })
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
+  const [stopping, setStopping] = useState(false)
+  const [idx, setIdx] = useState({ scanned: 0, total: 0, file: '' })
   const [unreadable, setUnreadable] = useState<string[]>([])
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const pct = idx.total > 0 ? Math.min(100, Math.round((idx.scanned / idx.total) * 100)) : 0
 
   const startPolling = () => {
     if (pollRef.current) clearInterval(pollRef.current)
@@ -19,16 +23,17 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
           if (pollRef.current) clearInterval(pollRef.current)
           pollRef.current = null
           setBusy(false)
+          setStopping(false)
           setStatus('')
           setStats(st)
           setUnreadable(st.errors || [])
         } else {
-          setStatus(`Indexing… ${st.scanned} files scanned`)
+          setIdx({ scanned: st.scanned, total: st.total, file: st.file })
         }
       } catch {
         // transient engine hiccup — keep polling so we still detect the finish
       }
-    }, 300)
+    }, 250)
   }
 
   const load = async () => {
@@ -40,7 +45,7 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
       const st = await api.reindexStatus()
       if (st.running) {
         setBusy(true)
-        setStatus(`Indexing… ${st.scanned} files scanned`)
+        setIdx({ scanned: st.scanned, total: st.total, file: st.file })
         startPolling()
       }
     } catch {
@@ -76,13 +81,14 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
       return
     }
     setBusy(true)
-    setStatus('Indexing…')
+    setStopping(false)
+    setIdx({ scanned: 0, total: 0, file: '' })
     setUnreadable([])
     await api.reindex()
     startPolling()
   }
   const stop = async () => {
-    setStatus('Stopping…')
+    setStopping(true)
     try {
       await api.reindexStop()
     } catch {
@@ -123,13 +129,33 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
           ))}
         </div>
 
-        <div className="banner">
-          <div style={{ flex: 1 }}>
-            <div className="t">{status || (busy ? 'Indexing…' : 'Index your library')}</div>
-            <div className="s">Re-indexing only re-reads files that changed.</div>
+        {busy ? (
+          <div className="idxcard">
+            <div className="idx-head">
+              <div className="sc-spinner" />
+              <div className="idx-htext">
+                <div className="t">{stopping ? 'Stopping…' : 'Indexing your library…'}</div>
+                <div className="s">Reading scripts and parsing every scene.</div>
+              </div>
+              {idx.total > 0 && <div className="idx-pct">{pct}%</div>}
+            </div>
+            <div className="sc-track idx-bar">
+              <div className="sc-fill" style={{ width: (idx.total > 0 ? pct : 8) + '%' }} />
+            </div>
+            <div className="idx-foot">
+              <div className="idx-file">{idx.file || 'Scanning folders…'}</div>
+              {!stopping && <span className="idx-stop" onClick={stop}>Stop</span>}
+            </div>
           </div>
-          <button className="go" onClick={busy ? stop : reindex}>{busy ? 'Stop indexing' : 'Re-index now'}</button>
-        </div>
+        ) : (
+          <div className="banner">
+            <div style={{ flex: 1 }}>
+              <div className="t">{status || 'Index your library'}</div>
+              <div className="s">Re-indexing only re-reads files that changed.</div>
+            </div>
+            <button className="go" onClick={reindex}>Re-index now</button>
+          </div>
+        )}
 
         {unreadable.length > 0 && (
           <div className="warnbox">
