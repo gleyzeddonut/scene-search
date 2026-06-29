@@ -91,6 +91,23 @@ def test_reindex_reports_scanned_progress(tmp_path):
     assert c.get("/reindex/status", headers=_auth()).json()["scanned"] == 3
 
 
+def test_reindex_scans_every_configured_folder(tmp_path):
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    (a / "one.fountain").write_text("INT. OFFICE - DAY\n\nMICHAEL\nSit.\n\nJENNIFER\nNo.\n")
+    (b / "two.fountain").write_text("INT. CAR - NIGHT\n\nSAM\nDrive.\n\nRUDY\nWhere?\n")
+    c = _client(tmp_path)
+    c.put("/folders", headers=_auth(), json={"roots": [str(a), str(b)], "ignored": []})
+    c.post("/reindex", headers=_auth())
+    for _ in range(100):
+        if not c.get("/reindex/status", headers=_auth()).json()["running"]:
+            break
+        time.sleep(0.02)
+    assert c.get("/stats", headers=_auth()).json()["scripts"] == 2
+
+
 def test_scene_endpoint_returns_lines(tmp_path):
     lib_dir = tmp_path / "lib"
     lib_dir.mkdir()

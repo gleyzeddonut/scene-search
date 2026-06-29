@@ -42,6 +42,43 @@ def test_query_by_char_count(tmp_path):
     assert two[0].script_name == "a.fountain"
 
 
+def test_reindex_scans_all_folders(tmp_path):
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    (a / "one.fountain").write_text(SCRIPT)
+    (b / "two.fountain").write_text(SCRIPT)
+    lib = Library(tmp_path / "index.db")
+    lib.reindex([a, b])
+    assert lib.script_count() == 2
+
+
+def test_reindex_respects_ignored_dirs(tmp_path):
+    sub = tmp_path / "skipme"
+    sub.mkdir()
+    (tmp_path / "keep.fountain").write_text(SCRIPT)
+    (sub / "drop.fountain").write_text(SCRIPT)
+    lib = Library(tmp_path / "index.db")
+    lib.reindex([tmp_path], ignore_dirs=[sub])
+    assert lib.script_count() == 1
+
+
+def test_reindex_full_reparse_after_version_bump(tmp_path):
+    (tmp_path / "s.fountain").write_text(SCRIPT)
+    lib = Library(tmp_path / "index.db")
+    lib.reindex(tmp_path)
+    # simulate an index written by an older app version with no dialogue
+    lib._conn.execute("UPDATE scenes SET dialogue_json='[]'")
+    lib._conn.execute("PRAGMA user_version = 0")
+    lib._conn.commit()
+    lib2 = Library(tmp_path / "index.db")
+    lib2.reindex(tmp_path)  # mtime unchanged, but version is stale -> full re-parse
+    m = lib2.query(min_chars=1)[0]
+    scene = lib2.get_scene(m.script_path, m.scene_index)
+    assert len(scene["lines"]) > 0
+
+
 def test_get_scene_returns_lines(tmp_path):
     (tmp_path / "a.fountain").write_text(
         "INT. OFFICE - DAY\n\nMICHAEL\nSit.\n\nJENNIFER\nNo.\n")

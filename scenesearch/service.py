@@ -94,7 +94,7 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
             raise HTTPException(status_code=404, detail="no such scene")
         return s
 
-    def _do_reindex(roots):
+    def _do_reindex(roots, ignored):
         state.update(running=True, scanned=0)
         try:
             if roots:
@@ -102,7 +102,7 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
                 try:
                     def _progress(_name):
                         state["scanned"] += 1
-                    worker.reindex(roots[0], progress=_progress)
+                    worker.reindex(roots, ignore_dirs=ignored, progress=_progress)
                     state["scripts"] = worker.script_count()
                     state["scenes"] = worker.scene_count()
                 finally:
@@ -115,8 +115,9 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
         roots = settings.get_roots()
         if roots is None:  # never set -> defaults; explicitly empty -> index nothing
             roots = [str(r) for r in default_roots()]
+        ignored = settings.get_ignored() or []
         if not state["running"]:
-            threading.Thread(target=_do_reindex, args=(roots,), daemon=True).start()
+            threading.Thread(target=_do_reindex, args=(roots, ignored), daemon=True).start()
         return {"started": True}
 
     @app.get("/reindex/status")

@@ -11,6 +11,10 @@ from .screenplay.gender import scene_pairing
 from .screenplay.parser import parse_scenes
 from .screenplay.runtime import estimate_seconds, scene_word_count
 
+# bump when the parser or scene schema changes so a re-index re-parses every
+# file (not just changed ones) after an app upgrade
+INDEX_VERSION = 2
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS scripts(
     path TEXT PRIMARY KEY, name TEXT, mtime REAL, scene_count INTEGER);
@@ -47,29 +51,39 @@ class Library:
                 self._conn.execute(f"ALTER TABLE scenes ADD COLUMN {col} {typ}")
             except sqlite3.OperationalError:
                 pass
+        self._stored_version = self._conn.execute("PRAGMA user_version").fetchone()[0]
 
     def close(self) -> None:
         self._conn.close()
 
-    def reindex(self, folder, progress=None) -> None:
+    def reindex(self, folders, ignore_dirs=None, progress=None) -> None:
+        # accept a single folder or a list; scan ALL of them
+        if isinstance(folders, (str, Path)):
+            folders = [folders]
+        # after an app upgrade the parser/schema may have changed — re-parse
+        # every file once (ignoring mtime) so old entries get refreshed.
+        full = self._stored_version < INDEX_VERSION
         present: set[str] = set()
-        for path in iter_candidates([folder]):
+        for path in iter_candidates(folders, ignore_dirs):
             present.add(str(path.resolve()))
-            self._index_file(path, progress)
+            self._index_file(path, progress, full=full)
         for (stored,) in self._conn.execute("SELECT path FROM scripts").fetchall():
             if stored not in present:
                 self._delete_script(stored)
+        self._conn.execute(f"PRAGMA user_version = {INDEX_VERSION}")
+        self._stored_version = INDEX_VERSION
         self._conn.commit()
 
-    def _index_file(self, path, progress) -> None:
+    def _index_file(self, path, progress, full=False) -> None:
         rp = str(path.resolve())
         try:
             mtime = path.stat().st_mtime
         except OSError:
             return
-        row = self._conn.execute("SELECT mtime FROM scripts WHERE path=?", (rp,)).fetchone()
-        if row and abs(row[0] - mtime) < 1e-6:
-            return
+        if not full:
+            row = self._conn.execute("SELECT mtime FROM scripts WHERE path=?", (rp,)).fetchone()
+            if row and abs(row[0] - mtime) < 1e-6:
+                return
         try:
             text = extract_paginated(path)
         except ExtractionError:
