@@ -36,9 +36,6 @@ export function AppShell(props: {
             <span className="kbd">⌘K</span>
           </div>
         </div>
-        <button className="iconbtn" title="Settings" onClick={props.onSettings}>
-          <IconGear />
-        </button>
       </div>
       <div className="body">
         <div className="nav">
@@ -52,6 +49,10 @@ export function AppShell(props: {
               <span>{label}</span>
             </button>
           ))}
+          <div className="nav-spacer" />
+          <button className="navItem gear" title="Settings" onClick={props.onSettings}>
+            <IconGear />
+          </button>
         </div>
         {props.children}
       </div>

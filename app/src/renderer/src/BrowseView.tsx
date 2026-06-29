@@ -211,6 +211,8 @@ export function BrowseView({
             </div>
             <div className="dbtns">
               <button className="prepare" onClick={() => onPrepare(sel)}>Prepare scene →</button>
+            </div>
+            <div className="dbtns">
               <button className="ghost" onClick={() => api.openFile(sel.script_path)}>Open file</button>
               <button className="ghost" onClick={() => api.revealFile(sel.script_path)}>Reveal</button>
             </div>
