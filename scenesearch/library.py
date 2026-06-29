@@ -82,7 +82,11 @@ class Library:
             if should_cancel and should_cancel():
                 break
             present.add(str(path.resolve()))
-            self._index_file(path, full=full)
+            try:
+                self._index_file(path, full=full)
+            except Exception:  # never let one bad file abort the whole index
+                if on_error:
+                    on_error(str(path), None)
             if progress:  # report every file examined, not just (re)parsed ones
                 progress(path.name)
             n += 1

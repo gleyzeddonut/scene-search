@@ -36,6 +36,18 @@ def test_scene_rows_all(tmp_path):
     assert [r.heading for r in rows] == ["INT. DINER - DAY", "EXT. STREET - NIGHT"]
 
 
+def test_scene_rows_folds_redownload_copies(tmp_path):
+    (tmp_path / "Wedding.fountain").write_text(SCRIPT)
+    (tmp_path / "Wedding (1).fountain").write_text(SCRIPT)
+    lib = Library(tmp_path / "index.db")
+    lib.reindex(tmp_path)
+    assert lib.script_count() == 2  # both indexed
+    rows = scene_rows(lib, FilterSpec(min_chars=1))
+    # scenes show once, from the original copy only
+    assert len(rows) == 2
+    assert all("(1)" not in r.script_name for r in rows)
+
+
 def test_scene_rows_two_handers(tmp_path):
     rows = scene_rows(_lib(tmp_path), FilterSpec(min_chars=2, max_chars=2))
     assert [r.heading for r in rows] == ["INT. DINER - DAY"]

@@ -65,7 +65,17 @@ def group_duplicates(rows: list[ScriptMatch]) -> list[ScriptGroup]:
 
 
 def scene_rows(library: Library, spec: FilterSpec) -> list[SceneMatch]:
-    return library.query(spec.min_chars, spec.max_chars, spec.pairing)
+    rows = library.query(spec.min_chars, spec.max_chars, spec.pairing)
+    # fold re-download copies: keep scenes from one representative per canonical
+    # name (the shortest filename — i.e. the original, not "… (1)")
+    rep: dict[str, str] = {}
+    rep_name: dict[str, str] = {}
+    for m in rows:
+        key = canonical_key(m.script_name)
+        if key not in rep_name or len(m.script_name) < len(rep_name[key]):
+            rep[key] = m.script_path
+            rep_name[key] = m.script_name
+    return [m for m in rows if rep[canonical_key(m.script_name)] == m.script_path]
 
 
 def script_rows(library: Library, spec: FilterSpec) -> list[ScriptMatch]:

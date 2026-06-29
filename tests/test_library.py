@@ -1,3 +1,4 @@
+import pathlib
 from scenesearch.library import Library
 from scenesearch.extractors import extract_paginated
 
@@ -95,6 +96,23 @@ def test_cancelled_reindex_keeps_existing_entries(tmp_path):
     # a cancelled re-scan must not prune what was already indexed
     lib.reindex(tmp_path, should_cancel=lambda: True)
     assert lib.script_count() == 1
+
+
+def test_reindex_survives_one_bad_file(tmp_path, monkeypatch):
+    (tmp_path / "good.fountain").write_text(SCRIPT)
+    (tmp_path / "bad.fountain").write_text(SCRIPT)
+    import scenesearch.library as lib_mod
+    real = lib_mod.extract_paginated
+
+    def flaky(path, *a, **k):
+        if pathlib.Path(path).name == "bad.fountain":
+            raise RuntimeError("boom")  # a non-ExtractionError
+        return real(path, *a, **k)
+
+    monkeypatch.setattr(lib_mod, "extract_paginated", flaky)
+    lib = Library(tmp_path / "index.db")
+    lib.reindex(tmp_path)  # must not abort on the bad file
+    assert lib.script_count() == 1  # the good one still indexed
 
 
 def test_add_file_adds_and_detects_duplicate(tmp_path):

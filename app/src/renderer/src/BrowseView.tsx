@@ -77,13 +77,19 @@ export function BrowseView({
   const pairValue = showPairing ? PAIR[pair][1] : null
 
   useEffect(() => {
+    let active = true
     const [mn, mx] = SIZE[size][1]
     api
       .scenes({ min_chars: mn, max_chars: mx, pairing: pairValue || undefined, search })
       .then((r) => {
+        if (!active) return // ignore a stale response when filters/search changed
         setScenes(r.scenes)
         setSel(r.scenes[0] || null)
       })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
   }, [size, pair, search, refreshKey])
 
   // pull the selected scene's dialogue so the preview shows the full scene

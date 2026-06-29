@@ -32,15 +32,19 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
   }
 
   const load = async () => {
-    setRoots((await api.getFolders()).roots)
-    setStats(await api.stats())
-    // the engine indexes in the background — if it's still running (e.g. we
-    // navigated away and came back), show progress and resume polling.
-    const st = await api.reindexStatus()
-    if (st.running) {
-      setBusy(true)
-      setStatus(`Indexing… ${st.scanned} files scanned`)
-      startPolling()
+    try {
+      setRoots((await api.getFolders()).roots)
+      setStats(await api.stats())
+      // the engine indexes in the background — if it's still running (e.g. we
+      // navigated away and came back), show progress and resume polling.
+      const st = await api.reindexStatus()
+      if (st.running) {
+        setBusy(true)
+        setStatus(`Indexing… ${st.scanned} files scanned`)
+        startPolling()
+      }
+    } catch {
+      // engine briefly unreachable — leave the view as-is
     }
   }
   useEffect(() => {
