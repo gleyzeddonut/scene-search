@@ -21,8 +21,14 @@ function freePort(): Promise<number> {
   })
 }
 
-async function waitForHealth(port: number, token: string, tries = 200): Promise<void> {
+async function waitForHealth(
+  port: number,
+  token: string,
+  exitedCode: () => number | null,
+  tries = 600 // up to ~60s for a slow first launch (Gatekeeper scan + cold start)
+): Promise<void> {
   for (let i = 0; i < tries; i++) {
+    if (exitedCode() !== null) throw new Error(`engine process exited (code ${exitedCode()})`)
     try {
       const r = await fetch(`http://127.0.0.1:${port}/health`, {
         headers: { 'X-Scripty-Token': token }
@@ -56,7 +62,16 @@ export async function startEngine(): Promise<EngineHandle> {
     cwd = repoRoot
   }
   const proc = spawn(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+  let exitCode: number | null = null
+  proc.on('exit', (code) => {
+    exitCode = code ?? -1
+    console.error('[engine] exited with code', exitCode)
+  })
+  proc.on('error', (e) => {
+    exitCode = -1
+    console.error('[engine] spawn error', e)
+  })
   proc.stderr?.on('data', (d) => console.error('[engine]', d.toString()))
-  await waitForHealth(port, token)
+  await waitForHealth(port, token, () => exitCode)
   return { port, token, proc }
 }

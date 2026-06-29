@@ -5,7 +5,34 @@ import { setupUpdater, checkForUpdatesManual } from './updater'
 
 const HELP_URL = 'https://github.com/gleyzeddonut/scene-search'
 let engine: EngineHandle | null = null
+let enginePromise: Promise<EngineHandle> | null = null
 let mainWindow: BrowserWindow | null = null
+
+function registerIpc() {
+  // resolves once the engine is healthy; rejects if it fails to start, so the
+  // renderer can show an error instead of hanging on a blank screen
+  ipcMain.handle('engine-info', async () => {
+    const e = await enginePromise!
+    return { port: e.port, token: e.token }
+  })
+  ipcMain.handle('pick-folder', async () => {
+    const r = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    return r.canceled ? null : r.filePaths[0]
+  })
+  ipcMain.handle('app-version', () => app.getVersion())
+  ipcMain.handle('check-updates', () => checkForUpdatesManual())
+  ipcMain.handle('export-sides', async (_e, html: string, name: string) => {
+    const r = await dialog.showSaveDialog({ defaultPath: `${name} - sides.pdf` })
+    if (r.canceled || !r.filePath) return false
+    const pdfWin = new BrowserWindow({ show: false, webPreferences: { offscreen: true } })
+    await pdfWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
+    const data = await pdfWin.webContents.printToPDF({ printBackground: true })
+    const { writeFile } = await import('fs/promises')
+    await writeFile(r.filePath, data)
+    pdfWin.destroy()
+    return true
+  })
+}
 
 function buildMenu() {
   app.setAboutPanelOptions({
@@ -48,32 +75,23 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
-async function createWindow() {
+function createWindow() {
   const iconPath = join(app.getAppPath(), 'resources', 'icon.png')
   if (process.platform === 'darwin' && app.dock) {
     app.dock.setIcon(nativeImage.createFromPath(iconPath))
   }
 
-  engine = await startEngine()
-  ipcMain.handle('engine-info', () => ({ port: engine!.port, token: engine!.token }))
-  ipcMain.handle('pick-folder', async () => {
-    const r = await dialog.showOpenDialog({ properties: ['openDirectory'] })
-    return r.canceled ? null : r.filePaths[0]
-  })
-  ipcMain.handle('app-version', () => app.getVersion())
-  ipcMain.handle('check-updates', () => checkForUpdatesManual())
-  ipcMain.handle('export-sides', async (_e, html: string, name: string) => {
-    const r = await dialog.showSaveDialog({ defaultPath: `${name} - sides.pdf` })
-    if (r.canceled || !r.filePath) return false
-    const pdfWin = new BrowserWindow({ show: false, webPreferences: { offscreen: true } })
-    await pdfWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
-    const data = await pdfWin.webContents.printToPDF({ printBackground: true })
-    const { writeFile } = await import('fs/promises')
-    await writeFile(r.filePath, data)
-    pdfWin.destroy()
-    return true
-  })
+  // boot the engine in the background so the window can show "Starting engine…"
+  enginePromise = startEngine()
+  enginePromise
+    .then((e) => {
+      engine = e
+    })
+    .catch((err) => {
+      console.error('engine failed to start:', err)
+    })
 
+  registerIpc()
   buildMenu()
 
   mainWindow = new BrowserWindow({
@@ -96,4 +114,7 @@ async function createWindow() {
 
 app.whenReady().then(createWindow)
 app.on('window-all-closed', () => app.quit())
-app.on('before-quit', () => engine?.proc.kill())
+app.on('before-quit', () => {
+  engine?.proc.kill()
+  enginePromise?.then((e) => e.proc.kill()).catch(() => {})
+})

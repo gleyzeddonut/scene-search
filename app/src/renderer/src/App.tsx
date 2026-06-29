@@ -9,6 +9,7 @@ import { SettingsModal } from './SettingsModal'
 
 export default function App() {
   const [ready, setReady] = useState(false)
+  const [failed, setFailed] = useState(false)
   const [section, setSection] = useState('library')
   const [search, setSearch] = useState('')
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system')
@@ -19,7 +20,9 @@ export default function App() {
   const [browsePair, setBrowsePair] = useState(0)
 
   useEffect(() => {
-    init().then(() => setReady(true))
+    init()
+      .then(() => setReady(true))
+      .catch(() => setFailed(true))
     window.scripty.onOpenSettings(() => setSettingsOpen(true))
   }, [])
   useEffect(() => {
@@ -36,6 +39,12 @@ export default function App() {
     }
   }, [theme])
 
+  if (failed)
+    return (
+      <div style={{ padding: 40, lineHeight: 1.5 }}>
+        Couldn’t start the Scripty engine. Please quit and reopen Scripty.
+      </div>
+    )
   if (!ready) return <div style={{ padding: 40 }}>Starting engine…</div>
   return (
     <>
