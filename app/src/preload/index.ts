@@ -8,7 +8,19 @@ contextBridge.exposeInMainWorld('scripty', {
       return ''
     }
   },
-  engineInfo: () => ipcRenderer.invoke('engine-info'),
+  engine: {
+    getFolders: () => ipcRenderer.invoke('eng:getFolders'),
+    setFolders: (r: string[], ig: string[]) => ipcRenderer.invoke('eng:setFolders', r, ig),
+    stats: () => ipcRenderer.invoke('eng:stats'),
+    scenes: (f: unknown) => ipcRenderer.invoke('eng:scenes', f),
+    scene: (p: string, i: number) => ipcRenderer.invoke('eng:scene', p, i),
+    reindex: () => ipcRenderer.invoke('eng:reindex'),
+    reindexStatus: () => ipcRenderer.invoke('eng:reindexStatus'),
+    reindexStop: () => ipcRenderer.invoke('eng:reindexStop'),
+    add: (p: string) => ipcRenderer.invoke('eng:add', p),
+    open: (p: string) => ipcRenderer.invoke('eng:open', p),
+    reveal: (p: string) => ipcRenderer.invoke('eng:reveal', p)
+  },
   pickFolder: () => ipcRenderer.invoke('pick-folder') as Promise<string | null>,
   onOpenSettings: (cb: () => void) => ipcRenderer.on('open-settings', cb),
   exportSides: (html: string, name: string) => ipcRenderer.invoke('export-sides', html, name),

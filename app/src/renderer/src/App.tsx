@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import './styles.css'
-import { init, api, Scene } from './api'
+import { api, Scene } from './api'
 import { AppShell } from './AppShell'
 import { BrowseView } from './BrowseView'
 import { LibraryView } from './LibraryView'
@@ -9,7 +9,6 @@ import { SettingsModal } from './SettingsModal'
 
 export default function App() {
   const [ready, setReady] = useState(false)
-  const [failed, setFailed] = useState(false)
   const [section, setSection] = useState('library')
   const [search, setSearch] = useState('')
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system')
@@ -30,12 +29,8 @@ export default function App() {
   }
 
   useEffect(() => {
-    init()
-      .then(() => {
-        readyRef.current = true
-        setReady(true)
-      })
-      .catch(() => setFailed(true))
+    readyRef.current = true // engine is in-process; always available
+    setReady(true)
     window.scripty.onOpenSettings(() => setSettingsOpen(true))
   }, [])
 
@@ -101,13 +96,7 @@ export default function App() {
     }
   }, [theme])
 
-  if (failed)
-    return (
-      <div style={{ padding: 40, lineHeight: 1.5 }}>
-        Couldn’t start the Scripty engine. Please quit and reopen Scripty.
-      </div>
-    )
-  if (!ready) return <div style={{ padding: 40 }}>Starting engine…</div>
+  if (!ready) return <div style={{ padding: 40 }}>Loading…</div>
   return (
     <>
     <AppShell

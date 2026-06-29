@@ -1,20 +1,25 @@
 import { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell } from 'electron'
 import { join } from 'path'
-import { startEngine, EngineHandle } from './engine'
+import { Engine } from './engine/engine'
 import { setupUpdater, checkForUpdatesManual } from './updater'
 
 const HELP_URL = 'https://github.com/gleyzeddonut/scene-search'
-let engine: EngineHandle | null = null
-let enginePromise: Promise<EngineHandle> | null = null
+let engine: Engine
 let mainWindow: BrowserWindow | null = null
 
 function registerIpc() {
-  // resolves once the engine is healthy; rejects if it fails to start, so the
-  // renderer can show an error instead of hanging on a blank screen
-  ipcMain.handle('engine-info', async () => {
-    const e = await enginePromise!
-    return { port: e.port, token: e.token }
-  })
+  // in-process engine (no sidecar): the renderer calls these over IPC
+  ipcMain.handle('eng:getFolders', () => engine.getFolders())
+  ipcMain.handle('eng:setFolders', (_e, r: string[], ig: string[]) => engine.setFolders(r, ig))
+  ipcMain.handle('eng:stats', () => engine.stats())
+  ipcMain.handle('eng:scenes', (_e, f) => engine.scenes(f))
+  ipcMain.handle('eng:scene', (_e, p: string, i: number) => engine.scene(p, i))
+  ipcMain.handle('eng:reindex', () => engine.reindex())
+  ipcMain.handle('eng:reindexStatus', () => engine.reindexStatus())
+  ipcMain.handle('eng:reindexStop', () => engine.reindexStop())
+  ipcMain.handle('eng:add', (_e, p: string) => engine.add(p))
+  ipcMain.handle('eng:open', (_e, p: string) => { shell.openPath(p); return { ok: true } })
+  ipcMain.handle('eng:reveal', (_e, p: string) => { shell.showItemInFolder(p); return { ok: true } })
   ipcMain.handle('pick-folder', async () => {
     const r = await dialog.showOpenDialog({ properties: ['openDirectory'] })
     return r.canceled ? null : r.filePaths[0]
@@ -90,16 +95,7 @@ function createWindow() {
     app.dock.setIcon(nativeImage.createFromPath(iconPath))
   }
 
-  // boot the engine in the background so the window can show "Starting engine…"
-  enginePromise = startEngine()
-  enginePromise
-    .then((e) => {
-      engine = e
-    })
-    .catch((err) => {
-      console.error('engine failed to start:', err)
-    })
-
+  engine = new Engine() // in-process; loads the persisted index instantly
   registerIpc()
   buildMenu()
 
@@ -124,7 +120,3 @@ function createWindow() {
 
 app.whenReady().then(createWindow)
 app.on('window-all-closed', () => app.quit())
-app.on('before-quit', () => {
-  engine?.proc.kill()
-  enginePromise?.then((e) => e.proc.kill()).catch(() => {})
-})
