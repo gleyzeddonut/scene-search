@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
-# Build signed, notarized Scripty .dmgs for BOTH architectures.
-# Each app bundles its matching-arch PyInstaller engine binary.
-# Run from the repo root: ./packaging/build_app.sh
+# Build signed, notarized Scripty for BOTH architectures in one electron-builder
+# pass, so a single correct latest-mac.yml is produced (required for auto-update
+# to serve the right arch). Both engine binaries are bundled; the app picks the
+# matching one at runtime.
+#
+#   ./packaging/build_app.sh                 # build only (dist/)
+#   PUBLISH=always ./packaging/build_app.sh  # build + publish to GitHub releases
+#                                            # (needs: export GH_TOKEN=$(gh auth token))
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && cd .. && pwd)"
 cd "$ROOT"
-# PUBLISH=always uploads signed artifacts + latest-mac.yml to a GitHub release
 PUBLISH="${PUBLISH:-never}"
 
-echo "==> Building the renderer (arch-independent)"
-( cd app && npx electron-vite build )
+echo "==> Engine binaries (both arches)"
+VENV=.venv ./packaging/build_engine.sh        # -> dist-engine/arm64
+VENV=.venv-intel ./packaging/build_engine.sh  # -> dist-engine/x64
 
-echo "==> arm64: engine binary + signed app"
-VENV=.venv ./packaging/build_engine.sh
-( cd app && npx electron-builder --mac --arm64 --publish "$PUBLISH" )
-
-echo "==> x86_64 (Intel): engine binary + signed app"
-VENV=.venv-intel ./packaging/build_engine.sh
-( cd app && npx electron-builder --mac --x64 --publish "$PUBLISH" )
+echo "==> Renderer + packaged apps (arm64 + x64, signed + notarized)"
+( cd app && npx electron-vite build && npx electron-builder --mac --arm64 --x64 --publish "$PUBLISH" )
 
 echo ""
 echo "Done. Distributables in app/dist/:"

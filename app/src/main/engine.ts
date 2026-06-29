@@ -43,8 +43,9 @@ export async function startEngine(): Promise<EngineHandle> {
   let args: string[]
   let cwd: string
   if (app.isPackaged) {
-    // bundled PyInstaller engine binary
-    cmd = join(process.resourcesPath, 'engine', 'scripty-engine')
+    // bundled PyInstaller engine binary — pick the matching arch
+    const dir = process.arch === 'arm64' ? 'engine-arm64' : 'engine-x64'
+    cmd = join(process.resourcesPath, dir, 'scripty-engine')
     args = ['--port', String(port), '--token', token]
     cwd = process.resourcesPath
   } else {

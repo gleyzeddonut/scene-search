@@ -11,8 +11,10 @@ files:
   - out/**/*
   - package.json
 extraResources:
-  - from: ../dist-engine/scripty-engine
-    to: engine
+  - from: ../dist-engine/arm64/scripty-engine
+    to: engine-arm64
+  - from: ../dist-engine/x64/scripty-engine
+    to: engine-x64
 mac:
   category: public.app-category.productivity
   icon: build/icon.icns
