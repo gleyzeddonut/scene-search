@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell, nativeTheme } from 'electron'
 import { join } from 'path'
 import { Engine } from './engine/engine'
 import { setupUpdater, checkForUpdatesManual, quitAndInstall } from './updater'
@@ -103,6 +103,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 840,
+    show: false, // stay hidden until the first paint so there's no blank white flash
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1d1e23' : '#fdfdfe', // matches --window
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -110,6 +112,14 @@ function createWindow() {
       plugins: true // enable Chromium's built-in PDF viewer
     }
   })
+  // show only once the renderer has painted (the splash), so the window appears
+  // already branded instead of blank; fall back after 1.5s in case the event lags
+  const reveal = () => {
+    if (mainWindow && !mainWindow.isVisible()) mainWindow.show()
+  }
+  mainWindow.once('ready-to-show', reveal)
+  setTimeout(reveal, 1500)
+
   if (process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
