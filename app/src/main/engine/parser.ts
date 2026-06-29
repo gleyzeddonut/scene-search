@@ -2,15 +2,15 @@ import type { Scene, SceneBlock } from './types'
 
 // optional leading scene-number column (incl. "SC. 5.A5" from gutter numbers
 // some PDF extractors place at the start of the heading line)
-const SCENE_RE = /^\s*(?:SC\.?\s*)?(?:\d+[\dA-Za-z.]*[.)]?[\s*]+)?(INT\.?\/EXT\.?|EXT\.?\/INT\.?|INT|EXT|I\/E|E\/I)[.\s]/i
+export const SCENE_RE = /^\s*(?:SC\.?\s*)?(?:\d+[\dA-Za-z.]*[.)]?[\s*]+)?(INT\.?\/EXT\.?|EXT\.?\/INT\.?|INT|EXT|I\/E|E\/I)[.\s]/i
 const SCENE_NUM_PREFIX = /^\s*(?:SC\.?\s*)?\d+[\dA-Za-z.]*[.)]?[\s*]+/
 const TRANSITION_RE = /\b(FADE IN|FADE OUT|FADE TO BLACK|CUT TO|SMASH CUT|MATCH CUT|DISSOLVE TO)\b/
 const CUE_RE = /^[ \t]*[A-Z][A-Z0-9 .'\-]{0,30}(\([^)]*\))?[ \t]*$/
 const PAREN_RE = /\([^)]*\)/g
 
-const squish = (s: string) => s.split(/\s+/).filter(Boolean).join(' ')
+export const squish = (s: string) => s.split(/\s+/).filter(Boolean).join(' ')
 
-function normalizeCharacter(text: string): string {
+export function normalizeCharacter(text: string): string {
   return squish(text.replace(PAREN_RE, '')).toUpperCase()
 }
 

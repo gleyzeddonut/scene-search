@@ -1,11 +1,12 @@
-import { stat } from 'node:fs/promises'
-import { basename, resolve } from 'node:path'
+import { stat, readFile } from 'node:fs/promises'
+import { basename, resolve, extname } from 'node:path'
 import { extractPaginated as realExtract } from './extract'
 import { parseScenes } from './parser'
+import { parseFdx, parseFountain } from './formats'
 import { scenePairing, guessGender } from './gender'
 import { sceneWordCount, estimateSeconds } from './runtime'
 import { iterCandidates, SCRIPT_EXTENSIONS } from './scanner'
-import type { SceneMatch, SceneBlock } from './types'
+import type { Scene, SceneMatch, SceneBlock } from './types'
 
 const PAREN_NUM = /\s*\(\d+\)$/
 const COPY = /\s+copy(\s+\d+)?$/i
@@ -59,6 +60,19 @@ export class Library {
     this.scenes = data.scenes
   }
 
+  // dispatch by format: structured markup (fdx/fountain) parses natively; everything
+  // else goes through text extraction. Any read/parse failure yields 0 scenes.
+  private async parseFile(rp: string): Promise<Scene[]> {
+    const ext = extname(rp).toLowerCase()
+    try {
+      if (ext === '.fdx') return parseFdx(await readFile(rp, 'utf-8'))
+      if (ext === '.fountain') return parseFountain(await readFile(rp, 'utf-8'))
+      return parseScenes(await this._extract(rp))
+    } catch {
+      return []
+    }
+  }
+
   private async indexFile(path: string): Promise<void> {
     const rp = resolve(path)
     let mtime = 0
@@ -69,13 +83,7 @@ export class Library {
     }
     const existing = this.scripts.get(rp)
     if (existing && Math.abs(existing.mtime - mtime) < 1) return
-    let text = ''
-    try {
-      text = await this._extract(rp)
-    } catch {
-      text = '' // unreadable → 0 scenes
-    }
-    const parsed = parseScenes(text)
+    const parsed = await this.parseFile(rp)
     this.deleteScript(rp)
     this.scripts.set(rp, { path: rp, name: basename(rp), mtime, sceneCount: parsed.length, pinned: false })
     for (const s of parsed) {
