@@ -189,10 +189,10 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 .prep-foot{display:flex;align-items:center;gap:14px;padding:14px 30px;border-top:1px solid var(--border);background:var(--panel)}
 .prep-foot .muted{flex:1;text-align:right}
 
-/* ---- Quick Look (Space on a Browse row) ---- */
-.ql-backdrop{position:fixed;inset:0;background:rgba(20,22,40,.42);display:flex;align-items:center;justify-content:center;z-index:70;animation:toastin .12s ease}
-.ql-panel{width:min(900px,86vw);height:86vh;background:var(--window);border:1px solid var(--border);border-radius:16px;box-shadow:0 40px 90px -30px rgba(20,22,40,.5);display:flex;flex-direction:column;overflow:hidden;animation:sc-pop .18s ease-out}
-.ql-head{display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--border)}
+/* ---- Quick Look (Space on a Browse row) — floating, draggable, resizable ---- */
+.ql-backdrop{position:fixed;inset:0;background:rgba(20,22,40,.42);z-index:70;animation:toastin .12s ease}
+.ql-panel{position:fixed;background:var(--window);border:1px solid var(--border);border-radius:16px;box-shadow:0 40px 90px -30px rgba(20,22,40,.5);display:flex;flex-direction:column;overflow:hidden;animation:sc-pop .18s ease-out}
+.ql-head{display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--border);cursor:move;user-select:none}
 .ql-title{font:700 16px/1.15 'Space Grotesk';white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ql-sub{font:500 11.5px/1.2 'Courier Prime',monospace;color:var(--text-3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ql-close{width:30px;height:30px;flex:none;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-2);cursor:pointer;font-size:13px}
@@ -200,6 +200,9 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 .ql-body{flex:1;min-height:0;display:flex;padding:16px;background:var(--panel)}
 .ql-body .pdfframe{flex:1}
 .ql-scene{flex:1;overflow:auto}
+.ql-resize{position:absolute;right:0;bottom:0;width:20px;height:20px;cursor:nwse-resize}
+.ql-resize::after{content:"";position:absolute;right:4px;bottom:4px;width:8px;height:8px;border-right:2px solid var(--text-3);border-bottom:2px solid var(--text-3);opacity:.55;border-bottom-right-radius:3px}
+.ql-shield{position:fixed;inset:0;z-index:90}
 
 /* ---- motion: splash, indexing, update (design handoff) ---- */
 @keyframes sc-shimmer{from{background-position:0% 0}to{background-position:-220% 0}}

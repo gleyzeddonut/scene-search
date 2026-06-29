@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, Scene, SceneDetail, sceneBlocks, isPdf } from './api'
 import { PdfFrame } from './PdfFrame'
+import { QuickLook } from './QuickLook'
 
 // Semantic size labels (matches the Cue handoff). Values map to char-count range.
 const SIZE: [string, [number, number]][] = [
@@ -305,29 +306,7 @@ export function BrowseView({
         )}
       </div>
 
-      {quickLook && sel && (
-        <div className="ql-backdrop" onClick={() => setQuickLook(false)}>
-          <div className="ql-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="ql-head">
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="ql-title">{sel.script_name.replace(/\.[^.]+$/, '')}</div>
-                <div className="ql-sub">{sel.heading}{sel.page ? ` · p.${sel.page}` : ''}</div>
-              </div>
-              <button className="ql-close" onClick={() => setQuickLook(false)} title="Close (Space / Esc)">✕</button>
-            </div>
-            <div className="ql-body">
-              {isPdf(sel.script_path) ? (
-                <PdfFrame path={sel.script_path} page={sel.page} />
-              ) : (
-                <div className="dcard ql-scene">
-                  <div className="h">{sel.heading}</div>
-                  {detail === null ? <div className="dnote">Loading scene…</div> : renderBlocks(detail, false)}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {quickLook && sel && <QuickLook scene={sel} detail={detail} onClose={() => setQuickLook(false)} />}
     </>
   )
 }
