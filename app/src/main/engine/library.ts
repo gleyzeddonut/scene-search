@@ -1,6 +1,6 @@
 import { stat, readFile } from 'node:fs/promises'
 import { basename, resolve, extname } from 'node:path'
-import { extractPaginated as realExtract, extractLayout, layoutToText } from './extract'
+import { extractPaginated as realExtract, extractLayout, layoutToText, isSparsePdf, ocrPdf } from './extract'
 import { parseScenes, parseLayout } from './parser'
 import { parseFdx, parseFountain } from './formats'
 import { scenePairing, guessGender } from './gender'
@@ -68,12 +68,20 @@ export class Library {
       if (ext === '.fdx') return parseFdx(await readFile(rp, 'utf-8'))
       if (ext === '.fountain') return parseFountain(await readFile(rp, 'utf-8'))
       if (ext === '.pdf') {
-        // one extraction, two parses: prefer the layout parser, but never let it
-        // find fewer scenes than the regex parser (no detection regression)
-        const lines = await extractLayout(rp)
+        const { lines, pageCount } = await extractLayout(rp)
+        const layoutText = layoutToText(lines)
+        // one extraction, two parses: prefer layout, but never find fewer scenes
+        // than the regex parser (no detection regression)
         const layout = parseLayout(lines)
-        const regex = parseScenes(layoutToText(lines))
-        return layout.length >= regex.length ? layout : regex
+        const regex = parseScenes(layoutText)
+        let best = layout.length >= regex.length ? layout : regex
+        // only when a PDF parsed to nothing AND has essentially no text layer (a true
+        // scan/photo) do we OCR it (macOS Vision). Never runs on normal text PDFs.
+        if (best.length === 0 && pageCount <= 60 && isSparsePdf(layoutText, pageCount)) {
+          const ocr = parseScenes(await ocrPdf(rp))
+          if (ocr.length > best.length) best = ocr
+        }
+        return best
       }
       return parseScenes(await this._extract(rp))
     } catch {

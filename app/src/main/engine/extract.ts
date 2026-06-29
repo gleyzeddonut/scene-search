@@ -1,5 +1,8 @@
 import { readFile } from 'node:fs/promises'
-import { extname } from 'node:path'
+import { extname, join } from 'node:path'
+import { existsSync } from 'node:fs'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { createRequire } from 'node:module'
 import type { LayoutLine } from './types'
 
@@ -7,6 +10,35 @@ export class ExtractionError extends Error {}
 
 const MAX_PAGES = 400
 const MAX_CHARS = 400_000
+const pExecFile = promisify(execFile)
+
+// Almost no text layer for the page count → the PDF is scanned/photographed images
+// (e.g. photographed audition sides), so OCR is worth trying.
+export function isSparsePdf(text: string, pageCount: number): boolean {
+  return text.length / Math.max(pageCount, 1) < 100
+}
+
+// locate the bundled macOS OCR helper without importing electron (engine stays testable)
+function ocrBinary(): string | null {
+  const cands = [
+    process.resourcesPath ? join(process.resourcesPath, 'scripty-ocr') : '',
+    join(process.cwd(), 'resources', 'scripty-ocr'),
+    join(process.cwd(), 'app', 'resources', 'scripty-ocr')
+  ].filter(Boolean)
+  return cands.find((p) => existsSync(p)) || null
+}
+
+// OCR a scanned PDF via the macOS Vision helper; returns '' if the helper is absent.
+export async function ocrPdf(path: string): Promise<string> {
+  const bin = ocrBinary()
+  if (!bin) return ''
+  try {
+    const { stdout } = await pExecFile(bin, [path], { maxBuffer: 64 * 1024 * 1024, timeout: 180_000 })
+    return stdout.slice(0, MAX_CHARS)
+  } catch {
+    return ''
+  }
+}
 
 async function loadPdf(path: string) {
   // legacy build runs in Node; point the fake worker at the resolved worker file
@@ -33,21 +65,23 @@ function pageLines(content: any): { text: string; x: number }[] {
   })
 }
 
-// Layout-aware extraction: lines with their left-x position, for indentation-based parsing.
-export async function extractLayout(path: string): Promise<LayoutLine[]> {
+// Layout-aware extraction: lines with their left-x position (for indentation-based
+// parsing) plus the PDF's real page count (for scanned-PDF detection).
+export async function extractLayout(path: string): Promise<{ lines: LayoutLine[]; pageCount: number }> {
   const doc = await loadPdf(path)
   const out: LayoutLine[] = []
-  const pages = Math.min(doc.numPages, MAX_PAGES)
+  const pageCount = doc.numPages
+  const pages = Math.min(pageCount, MAX_PAGES)
   let chars = 0
   for (let i = 1; i <= pages; i++) {
     const page = await doc.getPage(i)
     for (const ln of pageLines(await page.getTextContent())) {
       out.push({ text: ln.text, x: ln.x, page: i })
       chars += ln.text.length
-      if (chars >= MAX_CHARS) return out
+      if (chars >= MAX_CHARS) return { lines: out, pageCount }
     }
   }
-  return out
+  return { lines: out, pageCount }
 }
 
 // Reconstruct the flat paginated text from layout lines (matches extractPaginated),

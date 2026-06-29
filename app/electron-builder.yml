@@ -10,6 +10,9 @@ directories:
 files:
   - out/**/*
   - package.json
+extraResources:
+  - from: resources/scripty-ocr # universal macOS OCR helper (built by build_app.sh)
+    to: scripty-ocr
 mac:
   category: public.app-category.productivity
   icon: build/icon.icns
