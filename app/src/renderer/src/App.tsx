@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import './styles.css'
-import { init } from './api'
+import { init, Scene } from './api'
 import { AppShell } from './AppShell'
 import { BrowseView } from './BrowseView'
 import { LibraryView } from './LibraryView'
+import { PrepareView } from './PrepareView'
 import { SettingsModal } from './SettingsModal'
 
 export default function App() {
@@ -12,6 +13,7 @@ export default function App() {
   const [search, setSearch] = useState('')
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [prepScene, setPrepScene] = useState<Scene | null>(null)
 
   useEffect(() => {
     init().then(() => setReady(true))
@@ -34,9 +36,24 @@ export default function App() {
       onTheme={setTheme}
       onSettings={() => setSettingsOpen(true)}
     >
-      {section === 'browse' && <BrowseView search={search} />}
+      {section === 'browse' && (
+        <BrowseView
+          search={search}
+          onPrepare={(s) => {
+            setPrepScene(s)
+            setSection('prepare')
+          }}
+        />
+      )}
       {section === 'library' && <LibraryView />}
-      {section === 'prepare' && <div style={{ padding: 40, color: 'var(--text-3)' }}>Prepare — coming soon.</div>}
+      {section === 'prepare' && prepScene && (
+        <PrepareView scene={prepScene} onBack={() => setSection('browse')} />
+      )}
+      {section === 'prepare' && !prepScene && (
+        <div style={{ padding: 40, color: 'var(--text-3)' }}>
+          Select a scene in Browse, then “Prepare scene →”.
+        </div>
+      )}
     </AppShell>
     {settingsOpen && (
       <SettingsModal theme={theme} onTheme={setTheme} onClose={() => setSettingsOpen(false)} />

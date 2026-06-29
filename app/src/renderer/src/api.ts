@@ -7,6 +7,15 @@ export interface Scene {
   char_count: number
   characters: SceneChar[]
   pairing: string | null
+  scene_index: number
+  est_seconds: number
+}
+
+export interface SceneDetail {
+  heading: string
+  characters: SceneChar[]
+  est_seconds: number
+  lines: { who: string; text: string }[]
 }
 
 declare global {
@@ -15,6 +24,7 @@ declare global {
       engineInfo: () => Promise<{ port: number; token: string }>
       pickFolder: () => Promise<string | null>
       onOpenSettings: (cb: () => void) => void
+      exportSides: (html: string, name: string) => Promise<boolean>
     }
   }
 }
@@ -55,5 +65,16 @@ export const api = {
   },
   openFile: (path: string) => call('/open', { method: 'POST', body: JSON.stringify({ path }) }),
   revealFile: (path: string) => call('/reveal', { method: 'POST', body: JSON.stringify({ path }) }),
-  pickFolder: () => window.scripty.pickFolder()
+  pickFolder: () => window.scripty.pickFolder(),
+  getScene: (path: string, index: number) =>
+    call(`/scene?path=${encodeURIComponent(path)}&index=${index}`) as Promise<SceneDetail>,
+  exportSides: (elementId: string, name: string) => {
+    const el = document.getElementById(elementId)
+    const css =
+      '<style>body{font-family:"Courier Prime",monospace;color:#111;margin:48px}' +
+      '.cue{margin-left:34%}.sline{margin-left:14%;width:74%;margin-bottom:10px}' +
+      '.sline.mine{background:#eee;border-radius:6px;padding:4px 10px}</style>'
+    const html = '<html><head>' + css + '</head><body>' + (el?.outerHTML || '') + '</body></html>'
+    return window.scripty.exportSides(html, name)
+  }
 }

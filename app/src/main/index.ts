@@ -60,6 +60,17 @@ async function createWindow() {
     const r = await dialog.showOpenDialog({ properties: ['openDirectory'] })
     return r.canceled ? null : r.filePaths[0]
   })
+  ipcMain.handle('export-sides', async (_e, html: string, name: string) => {
+    const r = await dialog.showSaveDialog({ defaultPath: `${name} - sides.pdf` })
+    if (r.canceled || !r.filePath) return false
+    const pdfWin = new BrowserWindow({ show: false, webPreferences: { offscreen: true } })
+    await pdfWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
+    const data = await pdfWin.webContents.printToPDF({ printBackground: true })
+    const { writeFile } = await import('fs/promises')
+    await writeFile(r.filePath, data)
+    pdfWin.destroy()
+    return true
+  })
 
   buildMenu()
 

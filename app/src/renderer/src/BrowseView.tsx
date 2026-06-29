@@ -26,7 +26,7 @@ function sizeTag(n: number) {
   return n === 1 ? 'Solo' : n === 2 ? 'Duet' : n >= 3 ? 'Ensemble' : 'No dialogue'
 }
 
-export function BrowseView({ search }: { search: string }) {
+export function BrowseView({ search, onPrepare }: { search: string; onPrepare: (s: Scene) => void }) {
   const [size, setSize] = useState(DUET)
   const [pair, setPair] = useState(0)
   const [openSize, setOpenSize] = useState(false)
@@ -173,7 +173,7 @@ export function BrowseView({ search }: { search: string }) {
               <div className="dnote">“Open the file or Prepare the scene to read the full sides.”</div>
             </div>
             <div className="dbtns">
-              <button className="prepare">Prepare scene →</button>
+              <button className="prepare" onClick={() => onPrepare(sel)}>Prepare scene →</button>
               <button className="ghost" onClick={() => api.openFile(sel.script_path)}>Open file</button>
               <button className="ghost" onClick={() => api.revealFile(sel.script_path)}>Reveal</button>
             </div>
