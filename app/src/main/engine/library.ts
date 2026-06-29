@@ -3,7 +3,7 @@ import { basename, resolve, extname } from 'node:path'
 import { extractPaginated as realExtract, extractLayout, layoutToText, isSparsePdf, ocrPdf } from './extract'
 import { parseScenes, parseLayout, parseHeadingless, parseScenesHeadingless } from './parser'
 import { parseFdx, parseFountain } from './formats'
-import { scenePairing, guessGender } from './gender'
+import { scenePairing, guessGender, pairingFromGenders } from './gender'
 import { sceneWordCount, estimateSeconds } from './runtime'
 import { iterCandidates, SCRIPT_EXTENSIONS } from './scanner'
 import type { Scene, SceneMatch, SceneBlock } from './types'
@@ -133,6 +133,21 @@ export class Library {
     this.scenes = this.scenes.filter((s) => s.path !== rp)
   }
 
+  // a file was renamed on disk — move its row + scenes to the new path in place,
+  // keeping the parsed data and pin (no re-parse, content is unchanged)
+  renamePath(oldPath: string, newPath: string) {
+    const row = this.scripts.get(oldPath)
+    if (!row) return
+    const name = basename(newPath)
+    this.scripts.delete(oldPath)
+    this.scripts.set(newPath, { ...row, path: newPath, name })
+    for (const s of this.scenes)
+      if (s.path === oldPath) {
+        s.path = newPath
+        s.name = name
+      }
+  }
+
   async reindex(folders: string[], opts: ReindexOpts = {}): Promise<void> {
     const present = new Set<string>()
     let cancelled = false
@@ -156,11 +171,29 @@ export class Library {
     }
   }
 
-  query(f: { minChars?: number; maxChars?: number; pairing?: string | null }): SceneMatch[] {
+  // every indexed script's path (for bulk operations like move-all)
+  allPaths(): string[] {
+    return [...this.scripts.keys()]
+  }
+
+  // distinct character names across a script's scenes (for the Edit-details modal)
+  scriptCharacters(path: string): string[] {
+    const seen = new Set<string>()
+    for (const s of this.scenes) if (s.path === path) for (const c of s.characters) seen.add(c)
+    return [...seen]
+  }
+
+  // genderOf(path, name) resolves a character's gender (lets manual overrides drive
+  // the W/M chips and the W+M/W+W/M+M pairing); defaults to the name-based guess
+  query(
+    f: { minChars?: number; maxChars?: number; pairing?: string | null },
+    genderOf: (path: string, name: string) => string = (_p, n) => guessGender(n)
+  ): SceneMatch[] {
+    const pairingOf = (s: SceneRow) => pairingFromGenders(s.characters.map((n) => genderOf(s.path, n)))
     let rows = this.scenes.filter((s) => {
       if (f.minChars != null && s.charCount < f.minChars) return false
       if (f.maxChars != null && s.charCount > f.maxChars) return false
-      if (f.pairing != null && s.pairing !== f.pairing) return false
+      if (f.pairing != null && pairingOf(s) !== f.pairing) return false
       return true
     })
     // fold re-download copies: keep the representative (shortest name) per canonical key
@@ -177,17 +210,17 @@ export class Library {
     rows.sort((a, b) => (a.name === b.name ? a.index - b.index : a.name < b.name ? -1 : 1))
     return rows.map((s) => ({
       script_path: s.path, script_name: s.name, heading: s.heading, page: s.page,
-      char_count: s.charCount, characters: s.characters, pairing: s.pairing,
+      char_count: s.charCount, characters: s.characters, pairing: pairingOf(s),
       scene_index: s.index, est_seconds: s.est
     }))
   }
 
-  getScene(path: string, index: number) {
+  getScene(path: string, index: number, genderOf: (path: string, name: string) => string = (_p, n) => guessGender(n)) {
     const s = this.scenes.find((x) => x.path === path && x.index === index)
     if (!s) return null
     return {
       heading: s.heading,
-      characters: s.characters.map((n) => ({ name: n, gender: guessGender(n) })),
+      characters: s.characters.map((n) => ({ name: n, gender: genderOf(path, n) })),
       lines: s.dialogue.map(([who, text]) => ({ who, text })),
       content: s.content,
       est_seconds: s.est

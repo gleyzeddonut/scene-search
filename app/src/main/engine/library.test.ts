@@ -69,6 +69,31 @@ describe('Library', () => {
     const n = join(d, 'note.md'); writeFileSync(n, 'hi')
     expect(await lib.addFile(n)).toBe('not_script')
   })
+  it('query uses the gender resolver so manual overrides drive pairing', async () => {
+    const d = tmp(); writeFileSync(join(d, 'a.fountain'), 'INT. ROOM - DAY\n\nALEX\nHi.\n\nSAM\nYo.\n')
+    const lib = new Library(); await lib.reindex([d])
+    // force ALEX→female, SAM→male, so the (ambiguous) scene becomes a W+M duet
+    const genderOf = (_p: string, n: string) => (n === 'ALEX' ? 'female' : 'male')
+    const mw = lib.query({ pairing: 'MW' }, genderOf)
+    expect(mw.length).toBe(1)
+    expect(mw[0].pairing).toBe('MW')
+    expect(lib.query({ pairing: 'WW' }, genderOf).length).toBe(0) // not two women
+  })
+
+  it('renamePath moves a script and its scenes to the new path in place', async () => {
+    const d = tmp(); const f = join(d, 'old.fountain'); writeFileSync(f, SCRIPT)
+    const lib = new Library(); await lib.reindex([d])
+    const oldPath = lib.query({})[0].script_path
+    const idx = lib.query({})[0].scene_index
+    const newPath = join(d, 'new.fountain')
+    lib.renamePath(oldPath, newPath)
+    const rows = lib.query({})
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows.every((r) => r.script_name === 'new.fountain' && r.script_path === newPath)).toBe(true)
+    expect(lib.getScene(newPath, idx)).not.toBeNull() // scene data preserved at the new path
+    expect(lib.getScene(oldPath, idx)).toBeNull() // and gone from the old one
+  })
+
   it('canonicalKey strips copy suffixes', () => {
     expect(canonicalKey('Heat (1).pdf')).toBe('heat.pdf')
     expect(canonicalKey('Heat copy.pdf')).toBe('heat.pdf')

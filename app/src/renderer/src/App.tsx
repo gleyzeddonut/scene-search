@@ -6,6 +6,8 @@ import { BrowseView } from './BrowseView'
 import { LibraryView } from './LibraryView'
 import { PrepareView } from './PrepareView'
 import { SettingsModal } from './SettingsModal'
+import { RenameModal } from './RenameModal'
+import { EditDetailsModal } from './EditDetailsModal'
 import { Splash } from './Splash'
 
 export default function App() {
@@ -13,13 +15,18 @@ export default function App() {
   const [splashOut, setSplashOut] = useState(false)
   const [splashDone, setSplashDone] = useState(false)
   const [section, setSection] = useState('library')
+  const sectionRef = useRef('library') // latest section for the long-lived focus reporter
   const [search, setSearch] = useState('')
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [renaming, setRenaming] = useState<{ path: string; name: string } | null>(null)
+  const [editing, setEditing] = useState<{ path: string; name: string } | null>(null)
   const [prepScene, setPrepScene] = useState<Scene | null>(null)
+  const [prepScenes, setPrepScenes] = useState<Scene[]>([]) // the script's matching scenes, for the Prepare switcher
   // Browse filters live here so they persist across tab switches (this session).
   const [browseSize, setBrowseSize] = useState(0) // 0 = Any
   const [browsePair, setBrowsePair] = useState(0)
+  const [browseGenres, setBrowseGenres] = useState<string[]>([])
   const [toast, setToast] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
   const readyRef = useRef(false)
@@ -35,6 +42,53 @@ export default function App() {
     readyRef.current = true // engine is in-process; always available
     setReady(true)
     window.scripty.onOpenSettings(() => setSettingsOpen(true))
+    // from a row's right-click menu
+    const offRename = window.scripty.onRenameRequest?.((p) => setRenaming(p))
+    const offEdit = window.scripty.onEditDetails?.((p) => setEditing(p))
+    return () => {
+      offRename?.()
+      offEdit?.()
+    }
+  }, [])
+
+  useEffect(() => {
+    sectionRef.current = section
+  }, [section])
+
+  // tell main what has keyboard focus so it knows when to reclaim Space from the
+  // embedded PDF preview (which otherwise scrolls instead of toggling Quick Look).
+  // Only the Browse preview counts as 'pdf' — in Prepare, Space should scroll the
+  // sides as usual, so its PDF reports 'other'.
+  useEffect(() => {
+    let last = ''
+    const report = () => {
+      const a = document.activeElement as HTMLElement | null
+      const cat = !a
+        ? 'other'
+        : a.tagName === 'IFRAME'
+          ? sectionRef.current === 'browse'
+            ? 'pdf'
+            : 'other'
+          : a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable
+            ? 'text'
+            : 'other'
+      if (cat !== last) {
+        last = cat
+        window.scripty.setFocusCat?.(cat as 'pdf' | 'text' | 'other')
+      }
+    }
+    report()
+    const onBlur = () => setTimeout(report, 0) // the PDF iframe stealing focus blurs the window
+    window.addEventListener('focusin', report)
+    window.addEventListener('focus', report)
+    window.addEventListener('blur', onBlur)
+    const id = setInterval(report, 250) // safety net for the PDF plugin's focus quirks
+    return () => {
+      window.removeEventListener('focusin', report)
+      window.removeEventListener('focus', report)
+      window.removeEventListener('blur', onBlur)
+      clearInterval(id)
+    }
   }, [])
 
   // splash: once ready, keep it briefly so it's seen, then fade out (.5s) + unmount
@@ -128,16 +182,19 @@ export default function App() {
               setSize={setBrowseSize}
               pair={browsePair}
               setPair={setBrowsePair}
+              genres={browseGenres}
+              setGenres={setBrowseGenres}
               refreshKey={refreshKey}
-              onPrepare={(s) => {
+              onPrepare={(s, list) => {
                 setPrepScene(s)
+                setPrepScenes(list)
                 setSection('prepare')
               }}
             />
           )}
           {section === 'library' && <LibraryView refreshKey={refreshKey} />}
           {section === 'prepare' && prepScene && (
-            <PrepareView scene={prepScene} onBack={() => setSection('browse')} />
+            <PrepareView scene={prepScene} scenes={prepScenes} onBack={() => setSection('browse')} />
           )}
           {section === 'prepare' && !prepScene && (
             <div style={{ padding: 40, color: 'var(--text-3)' }}>
@@ -147,6 +204,30 @@ export default function App() {
         </AppShell>
         {settingsOpen && (
           <SettingsModal theme={theme} onTheme={setTheme} onClose={() => setSettingsOpen(false)} />
+        )}
+        {renaming && (
+          <RenameModal
+            path={renaming.path}
+            name={renaming.name}
+            onClose={() => setRenaming(null)}
+            onDone={(msg) => {
+              setRenaming(null)
+              showToast(msg)
+              setRefreshKey((k) => k + 1) // re-read the library so the new name shows
+            }}
+          />
+        )}
+        {editing && (
+          <EditDetailsModal
+            path={editing.path}
+            name={editing.name}
+            onClose={() => setEditing(null)}
+            onDone={(msg) => {
+              setEditing(null)
+              showToast(msg)
+              setRefreshKey((k) => k + 1) // re-read scenes + genre list with the new metadata
+            }}
+          />
         )}
         {toast && <div className="toast">{toast}</div>}
       </>

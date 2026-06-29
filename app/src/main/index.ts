@@ -5,8 +5,24 @@ import { setupUpdater, checkForUpdatesManual, quitAndInstall } from './updater'
 
 const HELP_URL = 'https://github.com/gleyzeddonut/scene-search'
 let engine: Engine
+// The engine loads + JSON-parses the whole saved index, which can take a beat on a
+// large library. We build it AFTER the launch splash is on screen (see createWindow)
+// so it doesn't block the window from appearing; engine IPC handlers await this.
+let resolveEngineReady!: () => void
+const engineReady = new Promise<void>((r) => { resolveEngineReady = r })
+// wrap an engine-backed IPC handler so it waits for the deferred engine load
+function onEngine<A extends unknown[], R>(fn: (...a: A) => R) {
+  return async (_e: unknown, ...args: A) => {
+    await engineReady
+    return fn(...args)
+  }
+}
 let mainWindow: BrowserWindow | null = null
 let qlWin: BrowserWindow | null = null // the Quick Look pop-out (a real OS window)
+// what currently has keyboard focus in the main window, reported by the renderer:
+// 'pdf' = the embedded PDF preview (which otherwise eats Space to scroll), 'text' =
+// a search/input field, 'other' = normal DOM. Lets us reclaim Space only over the PDF.
+let spaceTarget: 'pdf' | 'text' | 'other' = 'other'
 
 // Open (or update) a single Quick Look window — a genuine separate window the user
 // can move anywhere, even onto another display. It loads our renderer (with the
@@ -67,19 +83,40 @@ function closeQuickLook() {
 }
 
 function registerIpc() {
-  // in-process engine (no sidecar): the renderer calls these over IPC
-  ipcMain.handle('eng:getFolders', () => engine.getFolders())
-  ipcMain.handle('eng:setFolders', (_e, r: string[], ig: string[]) => engine.setFolders(r, ig))
-  ipcMain.handle('eng:stats', () => engine.stats())
-  ipcMain.handle('eng:scenes', (_e, f) => engine.scenes(f))
-  ipcMain.handle('eng:scene', (_e, p: string, i: number) => engine.scene(p, i))
-  ipcMain.handle('eng:reindex', () => engine.reindex())
-  ipcMain.handle('eng:rebuild', () => engine.rebuild())
-  ipcMain.handle('eng:reindexStatus', () => engine.reindexStatus())
-  ipcMain.handle('eng:reindexStop', () => engine.reindexStop())
-  ipcMain.handle('eng:add', (_e, p: string) => engine.add(p))
+  // in-process engine (no sidecar): the renderer calls these over IPC. Each waits for
+  // the engine to finish its (deferred) index load via onEngine.
+  ipcMain.handle('eng:getFolders', onEngine(() => engine.getFolders()))
+  ipcMain.handle('eng:setFolders', onEngine((r: string[], ig: string[]) => engine.setFolders(r, ig)))
+  ipcMain.handle('eng:stats', onEngine(() => engine.stats()))
+  ipcMain.handle('eng:scenes', onEngine((f: unknown) => engine.scenes(f as Parameters<Engine['scenes']>[0])))
+  ipcMain.handle('eng:scene', onEngine((p: string, i: number) => engine.scene(p, i)))
+  ipcMain.handle('eng:reindex', onEngine(() => engine.reindex()))
+  ipcMain.handle('eng:rebuild', onEngine(() => engine.rebuild()))
+  ipcMain.handle('eng:reindexStatus', onEngine(() => engine.reindexStatus()))
+  ipcMain.handle('eng:reindexStop', onEngine(() => engine.reindexStop()))
+  ipcMain.handle('eng:add', onEngine((p: string) => engine.add(p)))
+  ipcMain.handle('eng:rename', onEngine((p: string, name: string) => engine.rename(p, name)))
+  ipcMain.handle('eng:moveAll', onEngine((dir: string) => engine.moveAll(dir)))
+  ipcMain.handle('eng:genres', onEngine(() => engine.allGenres()))
+  ipcMain.handle('eng:getMeta', onEngine((p: string) => engine.getMeta(p)))
+  ipcMain.handle(
+    'eng:setMeta',
+    onEngine((p: string, m: { genres: string[]; genders: Record<string, 'female' | 'male' | 'unknown'> }) =>
+      engine.setMeta(p, m)
+    )
+  )
   ipcMain.handle('eng:open', (_e, p: string) => { shell.openPath(p); return { ok: true } })
   ipcMain.handle('eng:reveal', (_e, p: string) => { shell.showItemInFolder(p); return { ok: true } })
+  // native right-click menu for a script row
+  ipcMain.handle('row-menu', (e, p: { path: string; name: string }) => {
+    const menu = Menu.buildFromTemplate([
+      { label: 'Edit details…', click: () => e.sender.send('edit-details-request', p) },
+      { label: 'Rename…', click: () => e.sender.send('rename-request', p) },
+      { type: 'separator' },
+      { label: 'Show in Finder', click: () => shell.showItemInFolder(p.path) }
+    ])
+    menu.popup({ window: BrowserWindow.fromWebContents(e.sender) ?? undefined })
+  })
   ipcMain.handle('pick-folder', async () => {
     const r = await dialog.showOpenDialog({ properties: ['openDirectory'] })
     return r.canceled ? null : r.filePaths[0]
@@ -88,6 +125,7 @@ function registerIpc() {
   ipcMain.handle('quicklook', (_e, p) => openQuickLook(p))
   ipcMain.handle('quicklook-update', (_e, p) => updateQuickLook(p))
   ipcMain.handle('quicklook-close', () => closeQuickLook())
+  ipcMain.on('focus-cat', (_e, c: 'pdf' | 'text' | 'other') => { spaceTarget = c })
   ipcMain.handle('check-updates', () => checkForUpdatesManual())
   ipcMain.handle('quit-and-install', () => quitAndInstall())
   ipcMain.handle('read-file', async (_e, p: string) => {
@@ -161,8 +199,7 @@ function createWindow() {
     app.dock.setIcon(icon)
   }
 
-  engine = new Engine() // in-process; loads the persisted index instantly
-  registerIpc()
+  registerIpc() // handlers await engineReady, so it's safe to register before the engine exists
   buildMenu()
 
   mainWindow = new BrowserWindow({
@@ -177,13 +214,32 @@ function createWindow() {
       plugins: true // enable Chromium's built-in PDF viewer
     }
   })
+  // build the engine (loads + parses the saved index) only after the splash is on
+  // screen, so a large library doesn't delay the window from appearing
+  const startEngine = () => {
+    if (engine) return
+    engine = new Engine()
+    resolveEngineReady()
+  }
   // show only once the renderer has painted (the splash), so the window appears
-  // already branded instead of blank; fall back after 1.5s in case the event lags
+  // already branded instead of blank; fall back after 1.5s in case the event lags.
+  // load the index a tick later, once the painted splash is up.
   const reveal = () => {
     if (mainWindow && !mainWindow.isVisible()) mainWindow.show()
+    setImmediate(startEngine)
   }
   mainWindow.once('ready-to-show', reveal)
   setTimeout(reveal, 1500)
+
+  // When the embedded PDF preview has focus it swallows Space (to scroll) before the
+  // renderer ever sees it. Intercept Space here and let the app toggle Quick Look —
+  // but only over the PDF, so typing a space in the search field still works.
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key === ' ' && spaceTarget === 'pdf') {
+      event.preventDefault()
+      mainWindow?.webContents.send('main-space')
+    }
+  })
   mainWindow.on('close', () => {
     if (qlWin && !qlWin.isDestroyed()) qlWin.close() // don't leave the pop-out orphaned
   })

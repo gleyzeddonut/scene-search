@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { api } from './api'
 import type { UpdateMsg, UpdatePhase } from './api'
 
 const THEMES: [string, string][] = [
@@ -21,6 +22,7 @@ const STATUS: Record<UpdatePhase, string> = {
 export function SettingsModal(props: { theme: string; onTheme: (t: string) => void; onClose: () => void }) {
   const [version, setVersion] = useState('')
   const [upd, setUpd] = useState<UpdateMsg>({ phase: 'idle' })
+  const [rebuildMsg, setRebuildMsg] = useState('')
 
   useEffect(() => {
     // guard against an older preload (e.g. dev not fully restarted) so the
@@ -48,6 +50,14 @@ export function SettingsModal(props: { theme: string; onTheme: (t: string) => vo
       /* ignore */
     }
   }
+  const rebuild = async () => {
+    try {
+      await api.rebuild() // kicks off a full re-parse in the background
+      setRebuildMsg('Rebuilding your library… progress shows in the Library tab.')
+    } catch {
+      setRebuildMsg('Couldn’t start the rebuild.')
+    }
+  }
 
   const phase = upd.phase
   const pct = Math.min(100, Math.max(0, Math.round(upd.pct || 0)))
@@ -69,6 +79,18 @@ export function SettingsModal(props: { theme: string; onTheme: (t: string) => vo
               </span>
             ))}
           </div>
+        </div>
+
+        <div className="set-row">
+          <div>
+            <div className="set-label">Rebuild library</div>
+            <div className="set-sub">
+              {rebuildMsg || 'Re-parse every script from scratch — use if something looks parsed wrong. Your tags and edits are kept.'}
+            </div>
+          </div>
+          <button className="ghost" onClick={rebuild} disabled={!!rebuildMsg}>
+            {rebuildMsg ? 'Rebuilding…' : 'Rebuild'}
+          </button>
         </div>
 
         <div className="updcard">

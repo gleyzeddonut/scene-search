@@ -11,6 +11,8 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
   const [idx, setIdx] = useState({ scanned: 0, total: 0, file: '' })
   const [unreadable, setUnreadable] = useState<string[]>([])
   const [stale, setStale] = useState(false) // index built by an older parser
+  const [moveTarget, setMoveTarget] = useState<string | null>(null) // chosen folder, pending confirm
+  const [moving, setMoving] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const pct = idx.total > 0 ? Math.min(100, Math.round((idx.scanned / idx.total) * 100)) : 0
@@ -92,7 +94,26 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
     startPolling()
   }
   const reindex = () => beginIndex(false)
-  const rebuild = () => beginIndex(true)
+  const pickMoveTarget = async () => {
+    const f = await api.pickFolder()
+    if (f) setMoveTarget(f)
+  }
+  const doMove = async () => {
+    if (!moveTarget) return
+    setMoving(true)
+    try {
+      const r = await api.moveAll(moveTarget)
+      const parts = [`Moved ${r.moved} script${r.moved !== 1 ? 's' : ''}`]
+      if (r.skipped) parts.push(`${r.skipped} already there`)
+      if (r.failed) parts.push(`${r.failed} couldn’t move`)
+      setStatus(parts.join(' · '))
+    } catch {
+      setStatus('Couldn’t move the scripts')
+    }
+    setMoving(false)
+    setMoveTarget(null)
+    await load() // refresh folders (the destination is now a root) + stats
+  }
   const stop = async () => {
     setStopping(true)
     try {
@@ -164,10 +185,6 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
                   ? 'A Scripty update improved how scripts are read — re-index to apply it to everything already in your library.'
                   : 'Re-indexing only re-reads files that changed.'}
               </div>
-              <div className="s" style={{ marginTop: 2 }}>
-                Think a script parsed wrong?{' '}
-                <span className="linklike" onClick={rebuild}>Rebuild from scratch</span>.
-              </div>
             </div>
             <button className="go" onClick={reindex}>Re-index now</button>
           </div>
@@ -186,12 +203,56 @@ export function LibraryView({ refreshKey }: { refreshKey: number }) {
           </div>
         )}
 
+        {stats.scripts > 0 && (
+          <>
+            <div className="libhead" style={{ marginTop: 28 }}>
+              <span className="lab">Organize</span>
+            </div>
+            <div className="banner">
+              <div style={{ flex: 1 }}>
+                <div className="t">Move all scripts into one folder</div>
+                <div className="s">
+                  Gather every indexed script into a folder you choose. Your genre tags and gender edits
+                  move with each file.
+                </div>
+              </div>
+              <button className="go" onClick={pickMoveTarget} disabled={busy || moving}>
+                Choose folder…
+              </button>
+            </div>
+          </>
+        )}
+
         <div className="libnote">
           Reads <span className="mono">.pdf .fountain .fdx .txt .docx</span> · detects screenplays by
           INT./EXT. headings, character cues and dialogue · re-downloaded copies fold into one stack ·
           scanned image-only PDFs can't be read.
         </div>
       </div>
+
+      {moveTarget && (
+        <div className="modal-backdrop" onClick={() => !moving && setMoveTarget(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">Move all scripts?</div>
+            <div className="ed-sub" style={{ margin: '0 0 8px' }}>
+              Move {stats.scripts} script{stats.scripts !== 1 ? 's' : ''} into{' '}
+              <b>{moveTarget.split('/').pop()}</b>
+            </div>
+            <div className="muted" style={{ lineHeight: 1.5 }}>
+              Files are moved on disk into <span className="mono">{moveTarget}</span>. Your genre tags and
+              gender edits stay with them, and this folder becomes part of your library.
+            </div>
+            <div className="modal-foot">
+              <button className="ghost" onClick={() => setMoveTarget(null)} disabled={moving}>
+                Cancel
+              </button>
+              <button className="btn-accent" onClick={doMove} disabled={moving}>
+                {moving ? 'Moving…' : 'Move all'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

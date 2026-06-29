@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -40,5 +40,29 @@ describe('Engine.add parser-version stamp', () => {
     expect((await eng.add(f)).result).toBe('added')
     const saved = JSON.parse(readFileSync(join(dir, 'index.json'), 'utf-8'))
     expect(saved.parserVersion).toBe(PARSER_VERSION)
+  })
+})
+
+describe('Engine.moveAll', () => {
+  it('relocates files and carries the index + manual metadata along', async () => {
+    seed(PARSER_VERSION)
+    const eng = new Engine()
+    const src = mkdtempSync(join(tmpdir(), 'src-'))
+    const dest = mkdtempSync(join(tmpdir(), 'dest-'))
+    const f = join(src, 'show.fountain'); writeFileSync(f, SCRIPT)
+    expect((await eng.add(f)).result).toBe('added')
+    eng.setMeta(f, { genres: ['Comedy'], genders: { NEIL: 'male' } })
+
+    const r = await eng.moveAll(dest)
+    expect(r.moved).toBe(1)
+
+    const moved = join(dest, 'show.fountain')
+    expect(existsSync(moved)).toBe(true)
+    expect(existsSync(f)).toBe(false)
+    // the index now points at the new location
+    expect(eng.scenes({}).scenes.every((s) => s.script_path === moved)).toBe(true)
+    // and the manual metadata followed the file
+    expect(eng.getMeta(moved).genres).toEqual(['Comedy'])
+    expect(eng.getMeta(f).genres).toEqual([])
   })
 })

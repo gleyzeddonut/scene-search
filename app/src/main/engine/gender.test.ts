@@ -10,8 +10,15 @@ describe('gender', () => {
     expect(guessGender('WAITRESS')).toBe('female')
     expect(guessGender('OLD MAN')).toBe('male')
   })
+  it('skips leading titles to read the given name', () => {
+    expect(guessGender('DR. DAVID DELUCA')).toBe('male')
+    expect(guessGender('DR. GRANT LEVI')).toBe('male')
+    expect(guessGender('SGT. MARIA LOPEZ')).toBe('female')
+    expect(guessGender('MR. SMITH')).toBe('male') // gendered title still backstops a non-name
+  })
   it('unknown when no signal', () => {
     expect(guessGender('ZZQX')).toBe('unknown')
+    expect(guessGender('DR. WHO')).toBe('unknown') // "WHO" isn't a name and "DR" carries no gender
   })
   it('pairs two-person scenes', () => {
     expect(scenePairing(['JOHN', 'MARY'])).toBe('MW')
