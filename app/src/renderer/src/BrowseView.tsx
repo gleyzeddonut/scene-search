@@ -24,6 +24,8 @@ function gletter(g: string) {
 export function BrowseView({ search }: { search: string }) {
   const [size, setSize] = useState(2)
   const [pair, setPair] = useState(0)
+  const [openSize, setOpenSize] = useState(true)
+  const [openPair, setOpenPair] = useState(true)
   const [scenes, setScenes] = useState<Scene[]>([])
   const [sel, setSel] = useState<Scene | null>(null)
 
@@ -45,30 +47,40 @@ export function BrowseView({ search }: { search: string }) {
     <>
       <div className="rail">
         <div className="fsection">
-          <div className="fhead">
+          <div className="fhead" onClick={() => setOpenSize((v) => !v)}>
             <span className="flabel">Scene size</span>
-            <span className="fsummary">{SIZE[size][0]}</span>
+            <span className="fright">
+              <span className={'fsummary' + (size !== 0 ? ' active' : '')}>{SIZE[size][0]}</span>
+              <span className={'caret' + (openSize ? ' open' : '')}>›</span>
+            </span>
           </div>
-          <div className="seg-size">
-            {SIZE.map(([l], i) => (
-              <button key={l} className={i === size ? 'on' : ''} onClick={() => setSize(i)}>
-                {l}
-              </button>
-            ))}
-          </div>
+          {openSize && (
+            <div className="seg-size">
+              {SIZE.map(([l], i) => (
+                <button key={l} className={i === size ? 'on' : ''} onClick={() => setSize(i)}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="fsection">
-          <div className="fhead">
+          <div className="fhead" onClick={() => setOpenPair((v) => !v)}>
             <span className="flabel">Partner pairing</span>
-            <span className="fsummary">{PAIR[pair][0]}</span>
+            <span className="fright">
+              <span className={'fsummary' + (pair !== 0 ? ' active' : '')}>{PAIR[pair][0]}</span>
+              <span className={'caret' + (openPair ? ' open' : '')}>›</span>
+            </span>
           </div>
-          <div className="chips">
-            {PAIR.map(([l], i) => (
-              <button key={l} className={'chip' + (i === pair ? ' on' : '')} onClick={() => setPair(i)}>
-                {l}
-              </button>
-            ))}
-          </div>
+          {openPair && (
+            <div className="chips">
+              {PAIR.map(([l], i) => (
+                <button key={l} className={'chip' + (i === pair ? ' on' : '')} onClick={() => setPair(i)}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

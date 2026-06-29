@@ -52,9 +52,13 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 /* ---- filters rail ---- */
 .rail{width:274px;flex:none;padding:0 18px;overflow-y:auto;border-right:1px solid var(--border);background:var(--rail)}
 .fsection{border-bottom:1px solid var(--border-soft)}
-.fhead{display:flex;align-items:center;justify-content:space-between;padding:13px 0;cursor:pointer}
+.fhead{display:flex;align-items:center;justify-content:space-between;padding:13px 0;cursor:pointer;user-select:none}
 .flabel{font:700 10px/1 'Space Grotesk';letter-spacing:.11em;text-transform:uppercase;color:var(--text-3)}
-.fsummary{font:600 11px/1 'Space Grotesk';color:var(--accent-text)}
+.fright{display:flex;align-items:center;gap:9px}
+.fsummary{font:600 11px/1 'Space Grotesk';color:var(--text-3)}
+.fsummary.active{color:var(--accent-text)}
+.caret{font-size:16px;line-height:1;color:var(--text-3);transition:transform .15s ease}
+.caret.open{transform:rotate(90deg)}
 .seg-size{display:flex;padding:3px;gap:3px;border-radius:9px;background:var(--chip);margin:0 0 16px}
 .seg-size button{flex:1;border:none;background:transparent;border-radius:7px;padding:7px 0;font:600 12px/1 'Space Grotesk';color:var(--text-2);cursor:pointer}
 .seg-size button.on{background:var(--window);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.06)}
