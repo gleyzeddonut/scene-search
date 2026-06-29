@@ -6,8 +6,10 @@ PROJECT_ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
 
 datas = [(os.path.join(PROJECT_ROOT, "scenesearch", "screenplay", "names_gender.json"),
           "scenesearch/screenplay")]
-hiddenimports = []
-for pkg in ("uvicorn", "fastapi", "anyio", "starlette", "pydantic"):
+# pypdf/docx are imported lazily inside functions, so name them explicitly so
+# PyInstaller bundles them (a missing pypdf would silently break PDF indexing).
+hiddenimports = ["pypdf", "docx", "send2trash"]
+for pkg in ("uvicorn", "fastapi", "anyio", "starlette", "pydantic", "pypdf", "docx"):
     d, b, h = collect_all(pkg)
     datas += d
     hiddenimports += h
