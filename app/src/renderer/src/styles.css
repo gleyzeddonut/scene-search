@@ -1,3 +1,5 @@
+@font-face{font-family:'Space Grotesk';src:url('./fonts/SpaceGrotesk.ttf') format('truetype');font-weight:400 700;font-display:swap}
+@font-face{font-family:'Courier Prime';src:url('./fonts/CourierPrime.ttf') format('truetype');font-weight:400;font-display:swap}
 :root{
   --app-bg:oklch(0.96 0.004 270); --chrome:oklch(0.975 0.003 270); --rail:oklch(0.985 0.002 270);
   --nav:oklch(0.97 0.003 270); --panel:oklch(0.978 0.003 270); --window:oklch(0.997 0.001 270);
