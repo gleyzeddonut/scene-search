@@ -2,6 +2,7 @@
   "name": "scripty",
   "version": "0.1.0",
   "description": "Scripty",
+  "author": "Daniel Gleyzer",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

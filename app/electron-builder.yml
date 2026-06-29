@@ -15,7 +15,7 @@ mac:
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
-  identity: "Developer ID Application: Daniel Gleyzer (K7VM2MP885)"
+  identity: "Daniel Gleyzer (K7VM2MP885)"
   target:
     - dmg
     - zip
