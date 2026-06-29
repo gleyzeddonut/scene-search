@@ -126,9 +126,11 @@ function buildMenu() {
 }
 
 function createWindow() {
-  const iconPath = join(app.getAppPath(), 'resources', 'icon.png')
-  if (process.platform === 'darwin' && app.dock) {
-    app.dock.setIcon(nativeImage.createFromPath(iconPath))
+  const icon = nativeImage.createFromPath(join(app.getAppPath(), 'resources', 'icon.png'))
+  // only override the dock icon when the image actually loaded — otherwise we'd
+  // blank the bundle's .icns icon in the packaged app (where resources/ isn't on disk)
+  if (process.platform === 'darwin' && app.dock && !icon.isEmpty()) {
+    app.dock.setIcon(icon)
   }
 
   engine = new Engine() // in-process; loads the persisted index instantly
