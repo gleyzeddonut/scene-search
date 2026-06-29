@@ -14,6 +14,7 @@ declare global {
     scripty: {
       engineInfo: () => Promise<{ port: number; token: string }>
       pickFolder: () => Promise<string | null>
+      onOpenSettings: (cb: () => void) => void
     }
   }
 }

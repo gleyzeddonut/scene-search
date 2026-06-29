@@ -21,6 +21,14 @@ export function IconLibrary() {
     </svg>
   )
 }
+export function IconGear() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <circle cx="10" cy="10" r="3" />
+      <circle cx="10" cy="10" r="7" />
+    </svg>
+  )
+}
 export function IconFolder() {
   return (
     <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">

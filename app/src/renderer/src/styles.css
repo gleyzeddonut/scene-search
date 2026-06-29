@@ -48,6 +48,17 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 .navItem:hover{background:var(--border-soft)}
 .navItem.on{background:var(--accent-soft);color:var(--accent-text)}
 .navItem span{font:600 9.5px/1 'Space Grotesk';letter-spacing:.02em}
+.nav-spacer{flex:1}
+.navItem.gear{height:34px;padding:0}
+
+/* ---- settings modal ---- */
+.modal-backdrop{position:fixed;inset:0;background:rgba(20,22,40,.32);display:flex;align-items:center;justify-content:center;z-index:50}
+.modal{width:420px;background:var(--window);border:1px solid var(--border);border-radius:14px;box-shadow:0 30px 70px -24px rgba(20,22,40,.4);padding:22px}
+.modal-title{font:700 18px/1 'Space Grotesk';margin-bottom:18px}
+.set-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-top:1px solid var(--border-soft)}
+.set-label{font:600 14px/1.2 'Space Grotesk'}
+.set-sub{font:500 12px/1.3 'Space Grotesk';color:var(--text-3);margin-top:3px}
+.modal-foot{display:flex;justify-content:flex-end;margin-top:18px}
 
 /* ---- filters rail ---- */
 .rail{width:274px;flex:none;padding:0 18px;overflow-y:auto;border-right:1px solid var(--border);background:var(--rail)}
@@ -55,9 +66,9 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 .fhead{display:flex;align-items:center;justify-content:space-between;padding:13px 0;cursor:pointer;user-select:none}
 .flabel{font:700 10px/1 'Space Grotesk';letter-spacing:.11em;text-transform:uppercase;color:var(--text-3)}
 .fright{display:flex;align-items:center;gap:9px}
-.fsummary{font:600 11px/1 'Space Grotesk';color:var(--text-3)}
+.fsummary{font:600 12px/1 'Space Grotesk';color:var(--text-3)}
 .fsummary.active{color:var(--accent-text)}
-.caret{font-size:16px;line-height:1;color:var(--text-3);transition:transform .15s ease}
+.caret{display:inline-block;font:600 15px/1 'Space Grotesk';color:var(--text-3);transition:transform .15s ease}
 .caret.open{transform:rotate(90deg)}
 .seg-size{display:flex;padding:3px;gap:3px;border-radius:9px;background:var(--chip);margin:0 0 16px}
 .seg-size button{flex:1;border:none;background:transparent;border-radius:7px;padding:7px 0;font:600 12px/1 'Space Grotesk';color:var(--text-2);cursor:pointer}
@@ -75,9 +86,9 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 .result{font:500 12px/1 'Space Grotesk';color:var(--text-3);white-space:nowrap}
 .colhead{flex:none;display:flex;align-items:center;gap:14px;padding:9px 20px;font:600 10px/1 'Space Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);border-bottom:1px solid var(--border-soft)}
 .list{flex:1;overflow-y:auto}
-.row{display:flex;align-items:center;gap:14px;padding:11px 20px;border-bottom:1px solid var(--border-soft);cursor:pointer}
+.row{display:flex;align-items:center;gap:14px;padding:12px 20px 12px 17px;border-bottom:1px solid var(--border-soft);border-left:3px solid transparent;cursor:pointer}
 .row:hover{background:var(--border-soft)}
-.row.on{background:var(--sel)}
+.row.on{background:var(--sel);border-left:3px solid var(--accent)}
 .row .main{flex:1;min-width:0}
 .row .title{font:600 14px/1.2 'Space Grotesk';color:var(--text);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .sub{font:400 11.5px/1 'Courier Prime',monospace;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

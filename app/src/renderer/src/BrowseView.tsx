@@ -1,46 +1,59 @@
 import { useEffect, useState } from 'react'
 import { api, Scene } from './api'
 
+// Semantic size labels (matches the Cue handoff). Values map to char-count range.
 const SIZE: [string, [number, number]][] = [
   ['Any', [0, 50]],
-  ['1', [1, 1]],
-  ['2', [2, 2]],
-  ['3', [3, 3]],
-  ['4+', [4, 50]]
+  ['Solo', [1, 1]],
+  ['Duet', [2, 2]],
+  ['3+', [3, 50]]
 ]
+const SIZE_CHIP = ['', 'Solo', 'Duet', 'Ensemble']
+const DUET = 2 // index of the Duet option
+
 const PAIR: [string, string | null][] = [
   ['Any', null],
-  ['M+W', 'MW'],
-  ['M+M', 'MM'],
-  ['W+W', 'WW'],
-  ['?', 'has_unknown']
+  ['W + M', 'MW'],
+  ['W + W', 'WW'],
+  ['M + M', 'MM']
 ]
-const PAIR_PRETTY: Record<string, string> = { MW: 'Man + Woman', MM: 'Man + Man', WW: 'Woman + Woman', has_unknown: 'Has unknown' }
+const PAIR_TAG: Record<string, string> = { MW: 'W + M', WW: 'W + W', MM: 'M + M', has_unknown: 'Mixed / unknown' }
 
 function gletter(g: string) {
   return g === 'female' ? 'W' : g === 'male' ? 'M' : 'U'
 }
+function sizeTag(n: number) {
+  return n === 1 ? 'Solo' : n === 2 ? 'Duet' : n >= 3 ? 'Ensemble' : 'No dialogue'
+}
 
 export function BrowseView({ search }: { search: string }) {
-  const [size, setSize] = useState(2)
+  const [size, setSize] = useState(DUET)
   const [pair, setPair] = useState(0)
   const [openSize, setOpenSize] = useState(true)
   const [openPair, setOpenPair] = useState(true)
   const [scenes, setScenes] = useState<Scene[]>([])
   const [sel, setSel] = useState<Scene | null>(null)
 
+  const showPairing = size === DUET
+  const pairValue = showPairing ? PAIR[pair][1] : null
+
   useEffect(() => {
     const [mn, mx] = SIZE[size][1]
     api
-      .scenes({ min_chars: mn, max_chars: mx, pairing: PAIR[pair][1] || undefined, search })
+      .scenes({ min_chars: mn, max_chars: mx, pairing: pairValue || undefined, search })
       .then((r) => {
         setScenes(r.scenes)
         setSel(r.scenes[0] || null)
       })
   }, [size, pair, search])
 
+  const chooseSize = (i: number) => {
+    setSize(i)
+    if (i !== DUET) setPair(0) // pairing only applies to duets
+  }
+
   const sizeChip = size !== 0
-  const pairChip = pair !== 0
+  const pairChip = showPairing && pair !== 0
   const hasChips = sizeChip || pairChip
 
   return (
@@ -57,31 +70,34 @@ export function BrowseView({ search }: { search: string }) {
           {openSize && (
             <div className="seg-size">
               {SIZE.map(([l], i) => (
-                <button key={l} className={i === size ? 'on' : ''} onClick={() => setSize(i)}>
+                <button key={l} className={i === size ? 'on' : ''} onClick={() => chooseSize(i)}>
                   {l}
                 </button>
               ))}
             </div>
           )}
         </div>
-        <div className="fsection">
-          <div className="fhead" onClick={() => setOpenPair((v) => !v)}>
-            <span className="flabel">Partner pairing</span>
-            <span className="fright">
-              <span className={'fsummary' + (pair !== 0 ? ' active' : '')}>{PAIR[pair][0]}</span>
-              <span className={'caret' + (openPair ? ' open' : '')}>›</span>
-            </span>
+
+        {showPairing && (
+          <div className="fsection">
+            <div className="fhead" onClick={() => setOpenPair((v) => !v)}>
+              <span className="flabel">Partner pairing</span>
+              <span className="fright">
+                <span className={'fsummary' + (pair !== 0 ? ' active' : '')}>{PAIR[pair][0]}</span>
+                <span className={'caret' + (openPair ? ' open' : '')}>›</span>
+              </span>
+            </div>
+            {openPair && (
+              <div className="chips">
+                {PAIR.map(([l], i) => (
+                  <button key={l} className={'chip' + (i === pair ? ' on' : '')} onClick={() => setPair(i)}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          {openPair && (
-            <div className="chips">
-              {PAIR.map(([l], i) => (
-                <button key={l} className={'chip' + (i === pair ? ' on' : '')} onClick={() => setPair(i)}>
-                  {l}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       <div className="listpane">
@@ -90,10 +106,16 @@ export function BrowseView({ search }: { search: string }) {
             {hasChips ? (
               <>
                 {sizeChip && (
-                  <span className="fchip">{SIZE[size][0]} {SIZE[size][0] === '1' ? 'character' : 'characters'}<span className="x" onClick={() => setSize(0)}>✕</span></span>
+                  <span className="fchip">
+                    {SIZE_CHIP[size]}
+                    <span className="x" onClick={() => chooseSize(0)}>✕</span>
+                  </span>
                 )}
                 {pairChip && (
-                  <span className="fchip">{PAIR_PRETTY[PAIR[pair][1]!]}<span className="x" onClick={() => setPair(0)}>✕</span></span>
+                  <span className="fchip">
+                    {PAIR[pair][0]}
+                    <span className="x" onClick={() => setPair(0)}>✕</span>
+                  </span>
                 )}
               </>
             ) : (
@@ -140,8 +162,8 @@ export function BrowseView({ search }: { search: string }) {
             <div className="dtitle">{sel.script_name.replace(/\.[^.]+$/, '')}</div>
             <div className="dmeta">{sel.characters.map((c) => c.name).join(', ')}</div>
             <div className="dtags">
-              <span className="tag size">{sel.char_count === 2 ? 'Two-hander' : `${sel.char_count} cast`}</span>
-              {sel.pairing && <span className="tag">{PAIR_PRETTY[sel.pairing] || sel.pairing}</span>}
+              <span className="tag size">{sizeTag(sel.char_count)}</span>
+              {sel.pairing && <span className="tag">{PAIR_TAG[sel.pairing] || sel.pairing}</span>}
             </div>
             <div className="dcard">
               <div className="h">{sel.heading}</div>

@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import { IconBrowse, IconPrepare, IconLibrary } from './icons'
+import { IconBrowse, IconPrepare, IconLibrary, IconGear } from './icons'
 
 const NAV: [string, string, ReactNode][] = [
   ['browse', 'Browse', <IconBrowse key="b" />],
@@ -16,6 +16,7 @@ export function AppShell(props: {
   onSearch: (s: string) => void
   theme: string
   onTheme: (t: string) => void
+  onSettings: () => void
   children: ReactNode
 }) {
   return (
@@ -54,6 +55,10 @@ export function AppShell(props: {
               <span>{label}</span>
             </button>
           ))}
+          <div className="nav-spacer" />
+          <button className="navItem gear" title="Settings" onClick={props.onSettings}>
+            <IconGear />
+          </button>
         </div>
         {props.children}
       </div>
