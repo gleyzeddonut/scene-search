@@ -91,6 +91,11 @@ def test_reindex_reports_scanned_progress(tmp_path):
     assert c.get("/reindex/status", headers=_auth()).json()["scanned"] == 3
 
 
+def test_reindex_stop_endpoint(tmp_path):
+    c = _client(tmp_path)
+    assert c.post("/reindex/stop", headers=_auth()).json() == {"stopped": True}
+
+
 def test_reindex_scans_every_configured_folder(tmp_path):
     a = tmp_path / "a"
     b = tmp_path / "b"

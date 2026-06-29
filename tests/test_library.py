@@ -79,6 +79,24 @@ def test_reindex_full_reparse_after_version_bump(tmp_path):
     assert len(scene["lines"]) > 0
 
 
+def test_reindex_can_be_cancelled(tmp_path):
+    (tmp_path / "a.fountain").write_text(SCRIPT)
+    (tmp_path / "b.fountain").write_text(SCRIPT)
+    lib = Library(tmp_path / "index.db")
+    lib.reindex(tmp_path, should_cancel=lambda: True)
+    assert lib.script_count() == 0  # stopped before indexing anything
+
+
+def test_cancelled_reindex_keeps_existing_entries(tmp_path):
+    (tmp_path / "a.fountain").write_text(SCRIPT)
+    lib = Library(tmp_path / "index.db")
+    lib.reindex(tmp_path)
+    assert lib.script_count() == 1
+    # a cancelled re-scan must not prune what was already indexed
+    lib.reindex(tmp_path, should_cancel=lambda: True)
+    assert lib.script_count() == 1
+
+
 def test_get_scene_returns_lines(tmp_path):
     (tmp_path / "a.fountain").write_text(
         "INT. OFFICE - DAY\n\nMICHAEL\nSit.\n\nJENNIFER\nNo.\n")

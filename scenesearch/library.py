@@ -56,7 +56,7 @@ class Library:
     def close(self) -> None:
         self._conn.close()
 
-    def reindex(self, folders, ignore_dirs=None, progress=None) -> None:
+    def reindex(self, folders, ignore_dirs=None, progress=None, should_cancel=None) -> None:
         # accept a single folder or a list; scan ALL of them
         if isinstance(folders, (str, Path)):
             folders = [folders]
@@ -65,6 +65,11 @@ class Library:
         full = self._stored_version < INDEX_VERSION
         present: set[str] = set()
         for path in iter_candidates(folders, ignore_dirs):
+            if should_cancel and should_cancel():
+                # keep what we indexed so far; don't prune or bump version since
+                # the scan is incomplete
+                self._conn.commit()
+                return
             present.add(str(path.resolve()))
             self._index_file(path, full=full)
             if progress:  # report every file examined, not just (re)parsed ones

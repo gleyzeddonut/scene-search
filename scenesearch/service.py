@@ -28,7 +28,7 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
     app = FastAPI()
     settings = Settings(settings_path or Path.home() / ".scripty_settings.json")
     index_path = Path(index_path or Path.home() / ".scripty_index.db")
-    state = {"running": False, "scanned": 0, "scripts": 0, "scenes": 0}
+    state = {"running": False, "scanned": 0, "scripts": 0, "scenes": 0, "cancel": False}
 
     def auth(x_scripty_token: str = Header(default="")):
         if x_scripty_token != token:
@@ -95,14 +95,15 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
         return s
 
     def _do_reindex(roots, ignored):
-        state.update(running=True, scanned=0)
+        state.update(running=True, scanned=0, cancel=False)
         try:
             if roots:
                 worker = lib()
                 try:
                     def _progress(_name):
                         state["scanned"] += 1
-                    worker.reindex(roots, ignore_dirs=ignored, progress=_progress)
+                    worker.reindex(roots, ignore_dirs=ignored, progress=_progress,
+                                   should_cancel=lambda: state["cancel"])
                     state["scripts"] = worker.script_count()
                     state["scenes"] = worker.scene_count()
                 finally:
@@ -119,6 +120,11 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
         if not state["running"]:
             threading.Thread(target=_do_reindex, args=(roots, ignored), daemon=True).start()
         return {"started": True}
+
+    @app.post("/reindex/stop")
+    def reindex_stop(_=Depends(auth)):
+        state["cancel"] = True
+        return {"stopped": True}
 
     @app.get("/reindex/status")
     def reindex_status(_=Depends(auth)):

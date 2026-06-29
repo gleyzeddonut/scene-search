@@ -67,6 +67,10 @@ export function LibraryView() {
     await api.reindex()
     startPolling()
   }
+  const stop = async () => {
+    setStatus('Stopping…')
+    await api.reindexStop()
+  }
 
   return (
     <div className="libwrap">
@@ -105,7 +109,7 @@ export function LibraryView() {
             <div className="t">{status || (busy ? 'Indexing…' : 'Index your library')}</div>
             <div className="s">Re-indexing only re-reads files that changed.</div>
           </div>
-          <button className="go" onClick={reindex} disabled={busy}>{busy ? 'Indexing…' : 'Re-index now'}</button>
+          <button className="go" onClick={busy ? stop : reindex}>{busy ? 'Stop indexing' : 'Re-index now'}</button>
         </div>
 
         <div className="libnote">

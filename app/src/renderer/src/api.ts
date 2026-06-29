@@ -55,6 +55,7 @@ export const api = {
   setFolders: (roots: string[], ignored: string[]) =>
     call('/folders', { method: 'PUT', body: JSON.stringify({ roots, ignored }) }),
   reindex: () => call('/reindex', { method: 'POST' }),
+  reindexStop: () => call('/reindex/stop', { method: 'POST' }),
   reindexStatus: () =>
     call('/reindex/status') as Promise<{ running: boolean; scanned: number; scripts: number; scenes: number }>,
   stats: () => call('/stats') as Promise<{ scripts: number; scenes: number }>,
