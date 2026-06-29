@@ -34,7 +34,9 @@ async function extractPdf(path: string): Promise<string> {
     parts.push(text)
     if (parts.reduce((n, p) => n + p.length, 0) >= MAX_CHARS) break
   }
-  return parts.join('\f').slice(0, MAX_CHARS)
+  // join pages with form-feed + newline so a heading at the top of a page is its
+  // own line (not glued to the previous page's last line) — \f still marks pages
+  return parts.join('\f\n').slice(0, MAX_CHARS)
 }
 
 async function extractDocx(path: string): Promise<string> {

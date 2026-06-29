@@ -23,4 +23,8 @@ describe('parseScenes', () => {
     expect(parseScenes('')).toEqual([])
     expect(parseScenes('12  INT. OFFICE - DAY\n\nBOB\nHi.\n')[0].heading).toBe('INT. OFFICE - DAY')
   })
+  it('handles a leading scene-number column (production scripts)', () => {
+    const s = parseScenes('SC. 5.A5 EXT. TURNER’S STOOP - DAY\n\nNORA\nHi.\n\n5.12 INT. CELLAR - LATER\n\nSAM\nYo.\n')
+    expect(s.map((x) => x.heading)).toEqual(['EXT. TURNER’S STOOP - DAY', 'INT. CELLAR - LATER'])
+  })
 })

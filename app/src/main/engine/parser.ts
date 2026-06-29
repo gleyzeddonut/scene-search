@@ -1,7 +1,9 @@
 import type { Scene, SceneBlock } from './types'
 
-const SCENE_RE = /^\s*(?:\d+[A-Za-z]?[.)]?\s+)?(INT\.?\/EXT\.?|EXT\.?\/INT\.?|INT|EXT|I\/E|E\/I)[.\s]/i
-const SCENE_NUM_PREFIX = /^\s*\d+[A-Za-z]?[.)]?\s+/
+// optional leading scene-number column (incl. "SC. 5.A5" from gutter numbers
+// some PDF extractors place at the start of the heading line)
+const SCENE_RE = /^\s*(?:SC\.?\s*)?(?:\d+[\dA-Za-z.]*[.)]?[\s*]+)?(INT\.?\/EXT\.?|EXT\.?\/INT\.?|INT|EXT|I\/E|E\/I)[.\s]/i
+const SCENE_NUM_PREFIX = /^\s*(?:SC\.?\s*)?\d+[\dA-Za-z.]*[.)]?[\s*]+/
 const TRANSITION_RE = /\b(FADE IN|FADE OUT|FADE TO BLACK|CUT TO|SMASH CUT|MATCH CUT|DISSOLVE TO)\b/
 const CUE_RE = /^[ \t]*[A-Z][A-Z0-9 .'\-]{0,30}(\([^)]*\))?[ \t]*$/
 const PAREN_RE = /\([^)]*\)/g
