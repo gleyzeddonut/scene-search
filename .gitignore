@@ -11,3 +11,6 @@ app/node_modules/
 app/out/
 app/dist/
 .superpowers/
+# obsolete Python build artifacts (pure-JS app no longer uses these)
+dist-engine/
+.venv-intel/
