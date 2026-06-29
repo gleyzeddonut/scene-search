@@ -61,15 +61,13 @@ export function SettingsModal(props: { theme: string; onTheme: (t: string) => vo
         <div className="set-row">
           <div>
             <div className="set-label">Version</div>
-            <div className="set-sub">
-              Scripty {version}
-              {STATUS_TEXT[status] ? ` · ${STATUS_TEXT[status]}` : ''}
-            </div>
+            <div className="set-sub">Scripty {version}</div>
           </div>
           <button className="ghost" onClick={check}>
             Check for Updates
           </button>
         </div>
+        <div className="set-status">{STATUS_TEXT[status] || ' '}</div>
 
         <div className="modal-foot">
           <button className="ghost" onClick={props.onClose}>Done</button>

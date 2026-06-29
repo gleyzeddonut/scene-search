@@ -23,6 +23,11 @@ mac:
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   identity: "Daniel Gleyzer (K7VM2MP885)"
+  extendInfo:
+    NSDesktopFolderUsageDescription: Scripty searches this folder for your script files.
+    NSDocumentsFolderUsageDescription: Scripty searches this folder for your script files.
+    NSDownloadsFolderUsageDescription: Scripty searches this folder for your script files.
+    NSRemovableVolumesUsageDescription: Scripty searches connected drives for your script files.
   target:
     - dmg
     - zip
