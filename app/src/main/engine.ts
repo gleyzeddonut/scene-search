@@ -21,7 +21,7 @@ function freePort(): Promise<number> {
   })
 }
 
-async function waitForHealth(port: number, token: string, tries = 100): Promise<void> {
+async function waitForHealth(port: number, token: string, tries = 200): Promise<void> {
   for (let i = 0; i < tries; i++) {
     try {
       const r = await fetch(`http://127.0.0.1:${port}/health`, {
@@ -39,14 +39,22 @@ async function waitForHealth(port: number, token: string, tries = 100): Promise<
 export async function startEngine(): Promise<EngineHandle> {
   const port = await freePort()
   const token = randomBytes(16).toString('hex')
-  // dev: run the repo venv python; prod (Phase 2) will use the bundled binary
-  const repoRoot = join(app.getAppPath(), '..')
-  const python = join(repoRoot, '.venv', 'bin', 'python')
-  const proc = spawn(
-    python,
-    ['-m', 'scenesearch.service', '--port', String(port), '--token', token],
-    { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] }
-  )
+  let cmd: string
+  let args: string[]
+  let cwd: string
+  if (app.isPackaged) {
+    // bundled PyInstaller engine binary
+    cmd = join(process.resourcesPath, 'engine', 'scripty-engine')
+    args = ['--port', String(port), '--token', token]
+    cwd = process.resourcesPath
+  } else {
+    // dev: run the repo venv python module
+    const repoRoot = join(app.getAppPath(), '..')
+    cmd = join(repoRoot, '.venv', 'bin', 'python')
+    args = ['-m', 'scenesearch.service', '--port', String(port), '--token', token]
+    cwd = repoRoot
+  }
+  const proc = spawn(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
   proc.stderr?.on('data', (d) => console.error('[engine]', d.toString()))
   await waitForHealth(port, token)
   return { port, token, proc }

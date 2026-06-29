@@ -1,0 +1,22 @@
+appId: com.gleyzer.scripty
+productName: Scripty
+directories:
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+extraResources:
+  - from: ../dist-engine/scripty-engine
+    to: engine
+mac:
+  category: public.app-category.productivity
+  icon: build/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  identity: "Developer ID Application: Daniel Gleyzer (K7VM2MP885)"
+  target:
+    - dmg
+    - zip
+afterSign: scripts/notarize.cjs

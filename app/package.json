@@ -6,11 +6,14 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "dist": "electron-vite build && electron-builder --mac --arm64",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
+    "@electron/notarize": "^2.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
     "electron-vite": "^2.3.0",
     "typescript": "^5.5.0",
     "vite": "^5.3.0",
