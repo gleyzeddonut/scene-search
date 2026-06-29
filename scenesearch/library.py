@@ -56,7 +56,8 @@ class Library:
     def close(self) -> None:
         self._conn.close()
 
-    def reindex(self, folders, ignore_dirs=None, progress=None, should_cancel=None) -> None:
+    def reindex(self, folders, ignore_dirs=None, progress=None, should_cancel=None,
+                on_error=None) -> None:
         # accept a single folder or a list; scan ALL of them
         if isinstance(folders, (str, Path)):
             folders = [folders]
@@ -64,7 +65,8 @@ class Library:
         # every file once (ignoring mtime) so old entries get refreshed.
         full = self._stored_version < INDEX_VERSION
         present: set[str] = set()
-        for path in iter_candidates(folders, ignore_dirs, should_cancel=should_cancel):
+        for path in iter_candidates(folders, ignore_dirs, should_cancel=should_cancel,
+                                    on_error=on_error):
             if should_cancel and should_cancel():
                 break
             present.add(str(path.resolve()))

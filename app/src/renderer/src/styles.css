@@ -154,6 +154,10 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 .banner .t{font:700 14px/1.2 'Space Grotesk';color:var(--accent-text);margin-bottom:4px}
 .banner .s{font:500 12px/1.4 'Space Grotesk';color:var(--accent-text);opacity:.85}
 .banner .go{padding:11px 20px;border-radius:9px;background:var(--accent);color:#fff;font:700 13px/1 'Space Grotesk';cursor:pointer;border:none}
+.warnbox{margin-top:14px;border:1px solid rgba(214,158,46,.5);background:rgba(214,158,46,.12);border-radius:11px;padding:14px 16px}
+.warnbox .wt{font:700 13px/1.2 'Space Grotesk';color:#b7791f;margin-bottom:5px}
+.warnbox .ws{font:500 12px/1.5 'Space Grotesk';color:var(--text-2);margin-bottom:8px}
+.warnbox .wpath{font:500 11.5px/1.5 'Courier Prime',monospace;color:var(--text-3);word-break:break-all}
 .libnote{font:500 12px/1.6 'Space Grotesk';color:var(--text-3)}
 .libnote .mono{font-family:'Courier Prime',monospace;color:var(--text-2)}
 

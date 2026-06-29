@@ -57,7 +57,13 @@ export const api = {
   reindex: () => call('/reindex', { method: 'POST' }),
   reindexStop: () => call('/reindex/stop', { method: 'POST' }),
   reindexStatus: () =>
-    call('/reindex/status') as Promise<{ running: boolean; scanned: number; scripts: number; scenes: number }>,
+    call('/reindex/status') as Promise<{
+      running: boolean
+      scanned: number
+      scripts: number
+      scenes: number
+      errors: string[]
+    }>,
   stats: () => call('/stats') as Promise<{ scripts: number; scenes: number }>,
   scenes: (p: { min_chars?: number; max_chars?: number; pairing?: string; search?: string }) => {
     const q = new URLSearchParams()

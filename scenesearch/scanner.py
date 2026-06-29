@@ -20,16 +20,23 @@ def default_roots() -> list[Path]:
 
 
 def iter_candidates(roots: Iterable, ignore_dirs: Iterable = None,
-                    should_cancel=None) -> Iterator[Path]:
+                    should_cancel=None, on_error=None) -> Iterator[Path]:
     ignored = {Path(p).resolve() for p in (ignore_dirs or [])}
     seen: set[Path] = set()
+
+    def _onerror(err):
+        # os.walk reports unreadable dirs here (permission denied, missing, …)
+        if on_error:
+            on_error(getattr(err, "filename", "") or "", err)
+
     for root in roots:
         root = Path(root)
-        if not root.is_dir():
+        try:
+            if root.resolve() in ignored:
+                continue
+        except OSError:
             continue
-        if root.resolve() in ignored:
-            continue
-        for dirpath, dirnames, filenames in os.walk(root):
+        for dirpath, dirnames, filenames in os.walk(root, onerror=_onerror):
             if should_cancel and should_cancel():
                 return  # stop the walk promptly when cancelled
             dirnames[:] = [

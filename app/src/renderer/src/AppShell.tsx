@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import { ReactNode, useEffect, useRef } from 'react'
 import { IconBrowse, IconPrepare, IconLibrary, IconGear } from './icons'
 
 const NAV: [string, string, ReactNode][] = [
@@ -17,6 +17,18 @@ export function AppShell(props: {
   onSettings: () => void
   children: ReactNode
 }) {
+  const searchRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        searchRef.current?.focus()
+        searchRef.current?.select()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   return (
     <div className="app">
       <div className="toolbar">
@@ -29,11 +41,12 @@ export function AppShell(props: {
           <div className="search">
             <span className="search-dot" />
             <input
+              ref={searchRef}
               placeholder="Search scenes, characters…"
               value={props.search}
               onChange={(e) => props.onSearch(e.target.value)}
             />
-            <span className="kbd">⌘K</span>
+            <span className="kbd">⌘F</span>
           </div>
         </div>
       </div>

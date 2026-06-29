@@ -28,7 +28,8 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
     app = FastAPI()
     settings = Settings(settings_path or Path.home() / ".scripty_settings.json")
     index_path = Path(index_path or Path.home() / ".scripty_index.db")
-    state = {"running": False, "scanned": 0, "scripts": 0, "scenes": 0, "cancel": False}
+    state = {"running": False, "scanned": 0, "scripts": 0, "scenes": 0,
+             "cancel": False, "errors": []}
 
     def auth(x_scripty_token: str = Header(default="")):
         if x_scripty_token != token:
@@ -95,15 +96,23 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
         return s
 
     def _do_reindex(roots, ignored):
-        state.update(running=True, scanned=0, cancel=False)
+        state.update(running=True, scanned=0, cancel=False, errors=[])
+        bad: set[str] = set()
         try:
             if roots:
                 worker = lib()
                 try:
                     def _progress(_name):
                         state["scanned"] += 1
+
+                    def _on_error(path, _err):
+                        if path:
+                            bad.add(path)
+                            state["errors"] = sorted(bad)
+
                     worker.reindex(roots, ignore_dirs=ignored, progress=_progress,
-                                   should_cancel=lambda: state["cancel"])
+                                   should_cancel=lambda: state["cancel"],
+                                   on_error=_on_error)
                     state["scripts"] = worker.script_count()
                     state["scenes"] = worker.scene_count()
                 finally:
@@ -129,7 +138,8 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
     @app.get("/reindex/status")
     def reindex_status(_=Depends(auth)):
         return {"running": state["running"], "scanned": state["scanned"],
-                "scripts": state["scripts"], "scenes": state["scenes"]}
+                "scripts": state["scripts"], "scenes": state["scenes"],
+                "errors": state["errors"]}
 
     @app.post("/open")
     def open_file(body: PathBody, _=Depends(auth)):

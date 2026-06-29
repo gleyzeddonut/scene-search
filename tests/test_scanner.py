@@ -1,6 +1,13 @@
 from scenesearch.scanner import iter_candidates, SCRIPT_EXTENSIONS, default_roots
 
 
+def test_reports_unreadable_root(tmp_path):
+    errors = []
+    list(iter_candidates([tmp_path / "does-not-exist"], on_error=lambda p, e: errors.append(p)))
+    assert len(errors) == 1
+    assert "does-not-exist" in errors[0]
+
+
 def test_finds_script_extensions_and_skips_others(tmp_path):
     (tmp_path / "a.pdf").write_text("x")
     (tmp_path / "b.fountain").write_text("x")

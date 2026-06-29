@@ -7,6 +7,7 @@ export function LibraryView() {
   const [stats, setStats] = useState({ scripts: 0, scenes: 0 })
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
+  const [unreadable, setUnreadable] = useState<string[]>([])
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const startPolling = () => {
@@ -20,6 +21,7 @@ export function LibraryView() {
           setBusy(false)
           setStatus('')
           setStats(st)
+          setUnreadable(st.errors || [])
         } else {
           setStatus(`Indexing… ${st.scanned} files scanned`)
         }
@@ -69,6 +71,7 @@ export function LibraryView() {
     }
     setBusy(true)
     setStatus('Indexing…')
+    setUnreadable([])
     await api.reindex()
     startPolling()
   }
@@ -121,6 +124,19 @@ export function LibraryView() {
           </div>
           <button className="go" onClick={busy ? stop : reindex}>{busy ? 'Stop indexing' : 'Re-index now'}</button>
         </div>
+
+        {unreadable.length > 0 && (
+          <div className="warnbox">
+            <div className="wt">⚠ Couldn’t read {unreadable.length} folder{unreadable.length > 1 ? 's' : ''}</div>
+            <div className="ws">
+              macOS may be blocking access. Grant Scripty permission in System Settings → Privacy &
+              Security → Files and Folders (or Full Disk Access), then re-index.
+            </div>
+            {unreadable.slice(0, 6).map((p) => (
+              <div className="wpath" key={p}>{p}</div>
+            ))}
+          </div>
+        )}
 
         <div className="libnote">
           Reads <span className="mono">.pdf .fountain .fdx .txt .docx</span> · detects screenplays by
