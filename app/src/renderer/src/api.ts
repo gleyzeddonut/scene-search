@@ -34,6 +34,9 @@ export function isPdf(path: string): boolean {
   return path.toLowerCase().endsWith('.pdf')
 }
 
+// a filename without its extension ("Heat.pdf" → "Heat")
+export const stem = (name: string): string => name.replace(/\.[^.]+$/, '')
+
 export type UpdatePhase =
   | 'idle'
   | 'checking'

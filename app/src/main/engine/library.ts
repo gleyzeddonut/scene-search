@@ -1,5 +1,5 @@
 import { stat, readFile } from 'node:fs/promises'
-import { basename, resolve, extname } from 'node:path'
+import { basename, resolve, extname, dirname } from 'node:path'
 import { extractPaginated as realExtract, extractLayout, layoutToText, isSparsePdf, ocrPdf } from './extract'
 import { parseScenes, parseLayout, parseHeadingless, parseScenesHeadingless } from './parser'
 import { parseFdx, parseFountain } from './formats'
@@ -58,9 +58,11 @@ export class Library {
   toJSON() {
     return { scripts: [...this.scripts.values()], scenes: this.scenes }
   }
-  fromJSON(data: { scripts: ScriptRow[]; scenes: SceneRow[] }) {
-    this.scripts = new Map(data.scripts.map((s) => [s.path, s]))
-    this.scenes = data.scenes
+  fromJSON(data: { scripts?: ScriptRow[]; scenes?: SceneRow[] }) {
+    // tolerate a malformed/old-shape index.json (loadIndex only catches parse errors)
+    // rather than throwing — a throw here would leave the engine half-built
+    this.scripts = new Map((Array.isArray(data?.scripts) ? data.scripts : []).map((s) => [s.path, s]))
+    this.scenes = Array.isArray(data?.scenes) ? data.scenes : []
   }
 
   // dispatch by format: structured markup (fdx/fountain) parses natively; everything
@@ -171,9 +173,10 @@ export class Library {
     }
   }
 
-  // every indexed script's path (for bulk operations like move-all)
+  // paths of real scripts (scenes > 0), for bulk ops like move-all — matches the
+  // "N scripts" count the UI shows, so the move doesn't relocate 0-scene junk files
   allPaths(): string[] {
-    return [...this.scripts.keys()]
+    return [...this.scripts.values()].filter((s) => s.sceneCount > 0).map((s) => s.path)
   }
 
   // distinct character names across a script's scenes (for the Edit-details modal)
@@ -189,24 +192,34 @@ export class Library {
     f: { minChars?: number; maxChars?: number; pairing?: string | null },
     genderOf: (path: string, name: string) => string = (_p, n) => guessGender(n)
   ): SceneMatch[] {
-    const pairingOf = (s: SceneRow) => pairingFromGenders(s.characters.map((n) => genderOf(s.path, n)))
+    const pcache = new Map<SceneRow, string | null>() // compute each scene's pairing once
+    const pairingOf = (s: SceneRow) => {
+      if (pcache.has(s)) return pcache.get(s)!
+      const p = pairingFromGenders(s.characters.map((n) => genderOf(s.path, n)))
+      pcache.set(s, p)
+      return p
+    }
     let rows = this.scenes.filter((s) => {
       if (f.minChars != null && s.charCount < f.minChars) return false
       if (f.maxChars != null && s.charCount > f.maxChars) return false
       if (f.pairing != null && pairingOf(s) !== f.pairing) return false
       return true
     })
-    // fold re-download copies: keep the representative (shortest name) per canonical key
+    // fold re-download copies: keep the representative (shortest name) per canonical
+    // key, scoped to the FOLDER — a re-download ("Heat (1).pdf") sits beside its
+    // original, whereas two distinct scripts that merely share a name in different
+    // folders must both stay visible
+    const foldKey = (s: SceneRow) => dirname(s.path) + '\0' + canonicalKey(s.name)
     const rep = new Map<string, string>()
     const repName = new Map<string, string>()
     for (const s of rows) {
-      const key = canonicalKey(s.name)
+      const key = foldKey(s)
       if (!repName.has(key) || s.name.length < repName.get(key)!.length) {
         rep.set(key, s.path)
         repName.set(key, s.name)
       }
     }
-    rows = rows.filter((s) => rep.get(canonicalKey(s.name)) === s.path)
+    rows = rows.filter((s) => rep.get(foldKey(s)) === s.path)
     rows.sort((a, b) => (a.name === b.name ? a.index - b.index : a.name < b.name ? -1 : 1))
     return rows.map((s) => ({
       script_path: s.path, script_name: s.name, heading: s.heading, page: s.page,

@@ -16,6 +16,13 @@ describe('gender', () => {
     expect(guessGender('SGT. MARIA LOPEZ')).toBe('female')
     expect(guessGender('MR. SMITH')).toBe('male') // gendered title still backstops a non-name
   })
+  it('still resolves a bare title-word cue the names table covers', () => {
+    // these are in the names table; the title-skip must not drop them to unknown
+    expect(guessGender('DOCTOR')).toBe('male')
+    expect(guessGender('NANA')).toBe('female')
+    expect(guessGender('CAPTAIN')).toBe('male')
+    expect(guessGender('JUDGE')).toBe('male')
+  })
   it('unknown when no signal', () => {
     expect(guessGender('ZZQX')).toBe('unknown')
     expect(guessGender('DR. WHO')).toBe('unknown') // "WHO" isn't a name and "DR" carries no gender

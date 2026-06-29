@@ -49,6 +49,16 @@ describe('Library', () => {
     expect(rows.length).toBe(2)
     expect(rows.every((r) => !r.script_name.includes('(1)'))).toBe(true)
   })
+  it('keeps distinct same-named scripts in different folders both visible', async () => {
+    const a = tmp(); const b = tmp()
+    writeFileSync(join(a, 'Sides.fountain'), 'INT. A - DAY\n\nJOHN\nHi.\n')
+    writeFileSync(join(b, 'Sides.fountain'), 'INT. B - DAY\n\nMARY\nYo.\n')
+    const lib = new Library(); await lib.reindex([a, b])
+    const rows = lib.query({})
+    expect(rows.length).toBe(2) // not folded as copies despite the shared filename
+    expect(new Set(rows.map((r) => r.heading))).toEqual(new Set(['INT. A - DAY', 'INT. B - DAY']))
+  })
+
   it('survives one bad file', async () => {
     const d = tmp()
     writeFileSync(join(d, 'good.fountain'), SCRIPT)

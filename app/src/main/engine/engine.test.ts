@@ -43,7 +43,38 @@ describe('Engine.add parser-version stamp', () => {
   })
 })
 
+describe('Engine.setMeta', () => {
+  it('persists only gender overrides that differ from the guess', async () => {
+    seed(PARSER_VERSION)
+    const eng = new Engine()
+    const f = join(h.userData, 'a.fountain'); writeFileSync(f, 'INT. ROOM - DAY\n\nJOHN\nHi.\n\nMARY\nYo.\n')
+    await eng.add(f)
+    const metaFile = join(h.userData, 'scripty', 'meta.json')
+    // saving the guessed genders (JOHN→male, MARY→female) must store nothing
+    eng.setMeta(f, { genres: [], genders: { JOHN: 'male', MARY: 'female' } })
+    expect(JSON.parse(readFileSync(metaFile, 'utf-8'))[f]).toBeUndefined()
+    // a deliberate change stores just that one override
+    eng.setMeta(f, { genres: [], genders: { JOHN: 'male', MARY: 'male' } })
+    expect(JSON.parse(readFileSync(metaFile, 'utf-8'))[f].genders).toEqual({ MARY: 'male' })
+  })
+})
+
 describe('Engine.moveAll', () => {
+  it('keeps two same-named scripts both visible after consolidating (no copy-fold)', async () => {
+    seed(PARSER_VERSION)
+    const eng = new Engine()
+    const A = mkdtempSync(join(tmpdir(), 'mvA-'))
+    const B = mkdtempSync(join(tmpdir(), 'mvB-'))
+    const D = mkdtempSync(join(tmpdir(), 'mvD-'))
+    writeFileSync(join(A, 'Sides.fountain'), 'INT. A - DAY\n\nJOHN\nHi.\n')
+    writeFileSync(join(B, 'Sides.fountain'), 'INT. B - DAY\n\nMARY\nYo.\n')
+    await eng.add(join(A, 'Sides.fountain'))
+    await eng.add(join(B, 'Sides.fountain'))
+    expect(eng.scenes({}).scenes.length).toBe(2) // both visible before
+    expect((await eng.moveAll(D)).moved).toBe(2)
+    expect(eng.scenes({}).scenes.length).toBe(2) // and still both after the move
+  })
+
   it('relocates files and carries the index + manual metadata along', async () => {
     seed(PARSER_VERSION)
     const eng = new Engine()

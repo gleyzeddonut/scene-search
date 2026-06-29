@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
-import { api } from './api'
+import { api, stem } from './api'
 
 const SUGGESTED = [
   'Drama', 'Comedy', 'Thriller', 'Romance', 'Horror', 'Sci-Fi',
   'Action', 'Fantasy', 'Mystery', 'Crime', 'Family', 'Coming-of-Age'
 ]
 const GENDERS: [string, string][] = [['W', 'female'], ['M', 'male'], ['U', 'unknown']]
-const stem = (n: string) => n.replace(/\.[^.]+$/, '')
 
 // Manual per-script metadata: genre tags + character-gender overrides.
 export function EditDetailsModal({

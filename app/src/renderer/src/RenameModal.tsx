@@ -30,7 +30,13 @@ export function RenameModal({
       const r = await api.renameScript(path, v)
       if (r.ok) return onDone(`Renamed to “${v}${ext}”`)
       setBusy(false)
-      setErr(r.error === 'exists' ? 'A file with that name already exists.' : 'Couldn’t rename the file.')
+      setErr(
+        r.error === 'exists'
+          ? 'A file with that name already exists.'
+          : r.error === 'busy'
+            ? 'Library is indexing — try again in a moment.'
+            : 'Couldn’t rename the file.'
+      )
     } catch {
       setBusy(false)
       setErr('Couldn’t rename the file.')

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { api, Scene, SceneChar, SceneDetail, sceneBlocks, isPdf } from './api'
+import { api, Scene, SceneChar, SceneDetail, sceneBlocks, isPdf, stem } from './api'
 import { PdfFrame } from './PdfFrame'
 
 // Semantic size labels (matches the Cue handoff). Values map to char-count range.
@@ -34,7 +34,6 @@ function gletter(g: string) {
 function sizeTag(n: number) {
   return n === 1 ? 'Solo' : n === 2 ? 'Duet' : n >= 3 ? 'Ensemble' : 'No dialogue'
 }
-const stem = (name: string) => name.replace(/\.[^.]+$/, '')
 
 function renderBlocks(detail: SceneDetail, dialogueOnly: boolean) {
   let blocks = sceneBlocks(detail)
@@ -227,9 +226,9 @@ export function BrowseView({
         const i = selScene ? list.indexOf(selScene) : -1
         const ni = e.key === 'ArrowRight' ? Math.min(list.length - 1, i + 1) : Math.max(0, i - 1)
         if (list[ni]) chooseScene(list[ni])
-      } else if (e.key === ' ' && el?.tagName !== 'BUTTON') {
+      } else if (e.key === ' ' && !e.repeat && el?.tagName !== 'BUTTON') {
         e.preventDefault()
-        toggleQuickLook()
+        toggleQuickLook() // !e.repeat: holding Space shouldn't strobe the pop-out
       }
     }
     window.addEventListener('keydown', onKey)

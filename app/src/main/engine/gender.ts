@@ -34,11 +34,14 @@ const TITLES = new Set([
 ])
 
 function fromTable(name: string): string {
-  for (const raw of name.split(/\s+/)) {
-    const tok = strip(raw.toLowerCase())
-    if (!tok || TITLES.has(tok)) continue // skip leading titles to reach the given name
-    return NAMES[tok] ?? 'unknown' // first real (non-title) token = the given name
+  const toks = name.split(/\s+/).map((t) => strip(t.toLowerCase())).filter(Boolean)
+  // prefer the first non-title token (the given name): "DR. DAVID" → DAVID
+  for (const tok of toks) {
+    if (TITLES.has(tok)) continue
+    return NAMES[tok] ?? 'unknown'
   }
+  // every token was a title (a bare "DOCTOR" / "NANA" cue) — look the title up itself
+  for (const tok of toks) if (NAMES[tok]) return NAMES[tok]
   return 'unknown'
 }
 

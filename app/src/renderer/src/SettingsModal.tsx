@@ -52,8 +52,12 @@ export function SettingsModal(props: { theme: string; onTheme: (t: string) => vo
   }
   const rebuild = async () => {
     try {
-      await api.rebuild() // kicks off a full re-parse in the background
-      setRebuildMsg('Rebuilding your library… progress shows in the Library tab.')
+      const r = await api.rebuild() // kicks off a full re-parse in the background
+      setRebuildMsg(
+        r.started
+          ? 'Rebuilding your library… progress shows in the Library tab.'
+          : 'An index is already running — it’ll finish first.'
+      )
     } catch {
       setRebuildMsg('Couldn’t start the rebuild.')
     }
@@ -88,9 +92,7 @@ export function SettingsModal(props: { theme: string; onTheme: (t: string) => vo
               {rebuildMsg || 'Re-parse every script from scratch — use if something looks parsed wrong. Your tags and edits are kept.'}
             </div>
           </div>
-          <button className="ghost" onClick={rebuild} disabled={!!rebuildMsg}>
-            {rebuildMsg ? 'Rebuilding…' : 'Rebuild'}
-          </button>
+          <button className="ghost" onClick={rebuild}>Rebuild</button>
         </div>
 
         <div className="updcard">

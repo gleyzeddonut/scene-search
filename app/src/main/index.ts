@@ -52,7 +52,7 @@ function openQuickLook(p: QlPayload) {
     // intercept Space/Esc at the webContents level so they close the pop-out even
     // when the PDF iframe has focus (otherwise Space scrolls the PDF) — Finder-style
     qlWin.webContents.on('before-input-event', (event, input) => {
-      if (input.type === 'keyDown' && (input.key === ' ' || input.key === 'Escape')) {
+      if (input.type === 'keyDown' && !input.isAutoRepeat && (input.key === ' ' || input.key === 'Escape')) {
         event.preventDefault()
         closeQuickLook()
       }
@@ -218,8 +218,16 @@ function createWindow() {
   // screen, so a large library doesn't delay the window from appearing
   const startEngine = () => {
     if (engine) return
-    engine = new Engine()
-    resolveEngineReady()
+    // ALWAYS release engineReady, even if construction throws — otherwise every
+    // engine IPC handler awaits it forever and the app silently hangs. A failed
+    // engine just makes those handlers reject (visible error) instead.
+    try {
+      engine = new Engine()
+    } catch (err) {
+      console.error('Engine failed to initialize:', err)
+    } finally {
+      resolveEngineReady()
+    }
   }
   // show only once the renderer has painted (the splash), so the window appears
   // already branded instead of blank; fall back after 1.5s in case the event lags.
@@ -235,7 +243,8 @@ function createWindow() {
   // renderer ever sees it. Intercept Space here and let the app toggle Quick Look —
   // but only over the PDF, so typing a space in the search field still works.
   mainWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.type === 'keyDown' && input.key === ' ' && spaceTarget === 'pdf') {
+    // ignore key-repeat so holding Space doesn't strobe the pop-out open/closed
+    if (input.type === 'keyDown' && input.key === ' ' && !input.isAutoRepeat && spaceTarget === 'pdf') {
       event.preventDefault()
       mainWindow?.webContents.send('main-space')
     }

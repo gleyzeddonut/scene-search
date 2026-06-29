@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, Scene, SceneDetail, sceneBlocks, isPdf } from './api'
+import { api, Scene, SceneDetail, sceneBlocks, isPdf, stem } from './api'
 import { PdfFrame } from './PdfFrame'
 
 function mmss(s: number) {
@@ -7,7 +7,6 @@ function mmss(s: number) {
   return `${m}:${String(s % 60).padStart(2, '0')}`
 }
 
-const stem = (name: string) => name.replace(/\.[^.]+$/, '')
 
 export function PrepareView({
   scene,

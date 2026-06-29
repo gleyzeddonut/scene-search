@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { join, basename, dirname, extname } from 'node:path'
+import { join, basename, dirname, extname, resolve } from 'node:path'
 import { existsSync } from 'node:fs'
 import { rename as renameFile, copyFile, rm } from 'node:fs/promises'
 import { Library } from './library'
@@ -56,13 +56,19 @@ export class Engine {
     )
     const s = (f.search || '').toLowerCase()
     const wantGenres = f.genres && f.genres.length ? new Set(f.genres) : null
+    const gcache = new Map<string, string[]>() // a script's genres, looked up once
+    const genresOf = (p: string) => {
+      let g = gcache.get(p)
+      if (!g) gcache.set(p, (g = this.meta.genres(p)))
+      return g
+    }
     const out = rows
       .filter((m) => !s || m.script_name.toLowerCase().includes(s) || m.heading.toLowerCase().includes(s))
-      .filter((m) => !wantGenres || this.meta.genres(m.script_path).some((g) => wantGenres.has(g)))
+      .filter((m) => !wantGenres || genresOf(m.script_path).some((g) => wantGenres.has(g)))
       .map((m) => ({
         ...m,
         characters: m.characters.map((n) => ({ name: n, gender: this.genderOf(m.script_path, n) })),
-        genres: this.meta.genres(m.script_path)
+        genres: genresOf(m.script_path)
       }))
     return { scenes: out }
   }
@@ -83,7 +89,14 @@ export class Engine {
     }
   }
   setMeta(path: string, m: { genres: string[]; genders: Record<string, Gender> }) {
-    this.meta.set(path, m)
+    // only persist a gender that DIFFERS from the guess — so opening Edit-details and
+    // saving doesn't freeze every character's guess as a permanent override (which
+    // would mask future guesser improvements and leave the entry undeletable)
+    const genders: Record<string, Gender> = {}
+    for (const [name, g] of Object.entries(m.genders)) {
+      if (g !== guessGender(name)) genders[name] = g
+    }
+    this.meta.set(path, { genres: m.genres, genders })
     return { ok: true }
   }
   reindexStatus() {
@@ -105,7 +118,8 @@ export class Engine {
   // force = re-parse every file regardless of mtime (explicit "Rebuild library").
   // A stale index (older parser) also forces a full pass on the next reindex.
   reindex(force = false) {
-    if (this.state.running) return { started: true }
+    if (this.state.running) return { started: false } // one is already running
+
     const full = force || this.stale
     const roots = this.settings.getRoots() ?? defaultRoots()
     const ignored = this.settings.getIgnored() ?? []
@@ -163,11 +177,17 @@ export class Engine {
   // rename a file on disk (newStem = the new name without extension; the original
   // extension is kept) and move it within the index in place
   async rename(oldPath: string, newStem: string): Promise<{ ok: boolean; path?: string; error?: string }> {
+    // a running reindex captured the old path in its 'present' set; renaming now would
+    // let its orphan sweep delete the moved row. Make the user wait it out.
+    if (this.state.running) return { ok: false, error: 'busy' }
     const stem = newStem.trim().replace(/[/\\]/g, '') // no path separators
     if (!stem) return { ok: false, error: 'empty' }
     const newPath = join(dirname(oldPath), stem + extname(oldPath))
     if (newPath === oldPath) return { ok: true, path: oldPath }
-    if (existsSync(newPath)) return { ok: false, error: 'exists' }
+    // a capitalization-only change is the SAME file on a case-insensitive volume, so
+    // existsSync would falsely report a collision — allow it through
+    const caseOnly = newPath.toLowerCase() === oldPath.toLowerCase()
+    if (!caseOnly && existsSync(newPath)) return { ok: false, error: 'exists' }
     try {
       await renameFile(oldPath, newPath)
     } catch {
@@ -184,23 +204,35 @@ export class Engine {
   // file, filename collisions get a " (n)" suffix, and destDir becomes an indexed
   // root so the moved files stay tracked.
   async moveAll(destDir: string): Promise<{ moved: number; skipped: number; failed: number }> {
+    if (this.state.running) return { moved: 0, skipped: 0, failed: 0 } // see rename's note
+    const dest = resolve(destDir) // normalize so the "already here?" check is reliable
+    // make the destination an indexed root UP FRONT, so even an interrupted move
+    // leaves the already-moved files re-indexable on the next launch (no orphaning)
+    const roots = this.settings.getRoots() ?? defaultRoots()
+    if (!roots.includes(dest)) this.settings.setRoots([...roots, dest])
     let moved = 0
     let skipped = 0
     let failed = 0
     for (const oldPath of this.lib.allPaths()) {
-      if (dirname(oldPath) === destDir) {
+      if (dirname(oldPath) === dest) {
         skipped++
         continue
       }
-      const target = this.freeTarget(destDir, basename(oldPath))
+      const target = this.freeTarget(dest, basename(oldPath), dirname(oldPath))
       try {
         try {
           await renameFile(oldPath, target)
         } catch (e) {
-          if ((e as NodeJS.ErrnoException).code === 'EXDEV') {
-            await copyFile(oldPath, target) // across volumes: copy then remove
+          if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e
+          // across volumes: copy then remove the original; roll back the copy on any
+          // failure so we never leave a partial/duplicate and never lose the original
+          try {
+            await copyFile(oldPath, target)
             await rm(oldPath)
-          } else throw e
+          } catch (err) {
+            await rm(target).catch(() => {})
+            throw err
+          }
         }
         this.lib.renamePath(oldPath, target)
         this.meta.rename(oldPath, target)
@@ -209,22 +241,24 @@ export class Engine {
         failed++
       }
     }
-    // keep the destination indexed so the moved scripts aren't orphaned next reindex
-    const roots = this.settings.getRoots() ?? defaultRoots()
-    if (!roots.includes(destDir)) this.settings.setRoots([...roots, destDir])
     saveIndex(this.dir, { parserVersion: this.stale ? 0 : PARSER_VERSION, ...this.lib.toJSON() })
     return { moved, skipped, failed }
   }
 
-  // a non-colliding path in dir for the given filename ("name.pdf" → "name (1).pdf")
-  private freeTarget(dir: string, base: string): string {
+  // a non-colliding path in dir for a moved file. On a name clash, disambiguate with
+  // the SOURCE folder name — NOT a "(n)"/"copy" suffix, which canonicalKey folds as a
+  // re-download copy and would hide the script from results.
+  private freeTarget(dir: string, base: string, fromDir: string): string {
     let t = join(dir, base)
     if (!existsSync(t)) return t
     const dot = base.lastIndexOf('.')
     const stem = dot > 0 ? base.slice(0, dot) : base
     const ext = dot > 0 ? base.slice(dot) : ''
-    for (let i = 1; ; i++) {
-      t = join(dir, `${stem} (${i})${ext}`)
+    const tag = basename(fromDir) || 'moved'
+    t = join(dir, `${stem} - ${tag}${ext}`)
+    if (!existsSync(t)) return t
+    for (let i = 2; ; i++) {
+      t = join(dir, `${stem} - ${tag} ${i}${ext}`)
       if (!existsSync(t)) return t
     }
   }
