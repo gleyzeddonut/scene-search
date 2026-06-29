@@ -23,7 +23,7 @@ export function PrepareView({ scene, onBack }: { scene: Scene; onBack: () => voi
   const name = scene.script_name.replace(/\.[^.]+$/, '')
 
   return (
-    <div className="prepare">
+    <div className="prepareview">
       <div className="prep-head">
         <div>
           <div className="dheading">{data.heading}</div>
