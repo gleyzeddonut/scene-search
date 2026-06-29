@@ -96,6 +96,22 @@ def test_reindex_stop_endpoint(tmp_path):
     assert c.post("/reindex/stop", headers=_auth()).json() == {"stopped": True}
 
 
+def test_reindex_after_stop_still_completes(tmp_path):
+    # a stop flag set before/between runs must not leak into the next re-index
+    lib_dir = tmp_path / "lib"
+    lib_dir.mkdir()
+    (lib_dir / "a.fountain").write_text("INT. OFFICE - DAY\n\nMICHAEL\nSit.\n\nJENNIFER\nNo.\n")
+    c = _client(tmp_path)
+    c.put("/folders", headers=_auth(), json={"roots": [str(lib_dir)], "ignored": []})
+    c.post("/reindex/stop", headers=_auth())  # set cancel while idle
+    c.post("/reindex", headers=_auth())
+    for _ in range(100):
+        if not c.get("/reindex/status", headers=_auth()).json()["running"]:
+            break
+        time.sleep(0.02)
+    assert c.get("/stats", headers=_auth()).json()["scripts"] == 1
+
+
 def test_reindex_scans_every_configured_folder(tmp_path):
     a = tmp_path / "a"
     b = tmp_path / "b"
