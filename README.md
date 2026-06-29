@@ -1,88 +1,65 @@
 # Scripty
 
 A native macOS app that finds, browses, and prepares movie scripts on your Mac —
-fully offline. The UI is **Electron + React**; the screenplay engine is **Python**,
-run as a local sidecar process the UI talks to over `127.0.0.1` (token-authed).
+fully offline. **Electron + React + TypeScript**, with the screenplay engine running
+in the Electron main process (no sidecar, no Python).
 
 ## Architecture
 
 ```
-Electron main (Node)  ─ spawns ─►  Python engine sidecar (FastAPI/uvicorn)
-React renderer  ── fetch(127.0.0.1:<port>, token) ──►  engine
+Electron main (Node)  ── engine/ (TypeScript) ──  in-memory index (JSON on disk)
+React renderer  ──  ipcRenderer.invoke(eng:*)  ──►  engine
 ```
 
-- **Engine** (`scenesearch/`): the offline screenplay engine — scanner, SQLite
-  index (`library`), screenplay parser, gender inference, scene filtering
-  (`finder`) — exposed via `scenesearch/service.py` (FastAPI). GUI-free and
-  unit-tested.
-- **App** (`app/`): Electron + Vite + React + TypeScript. The main process
-  spawns the engine on a random free port with a per-launch token and kills it
-  on quit; the renderer calls the engine via `fetch`.
+- **Engine** (`app/src/main/engine/`): scanner, text extraction (pdfjs-dist /
+  mammoth / fast-xml-parser / fs), screenplay parser, gender inference, runtime
+  estimate, and an in-memory `Library` (index, query, duplicate folding, add).
+  Persisted as JSON in the app's `userData`. Pure TS, unit-tested with vitest.
+- **App** (`app/`): Electron + Vite + React. The main process hosts the engine
+  and exposes it to the renderer over `eng:*` IPC (no HTTP, no token). Starts
+  instantly — there is no separate process to spawn.
 
 ## Develop
 
 ```bash
-# 1. engine
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m pytest          # run the engine + service tests
-
-# 2. app
 cd app
 npm install
-npm run dev                         # launches Electron + the engine sidecar
+npx vitest run          # engine tests
+npm run dev             # launches Electron
 ```
 
-`npm run dev` opens the window, which starts the Python engine, then shows the
-**Library** (point it at folders, Re-index) and **Browse** (filter scenes by
-size / gender pairing) views. Light/dark themes via the toolbar toggle.
+`npm run dev` opens the window and shows **Library** (point it at folders,
+Re-index), **Browse** (filter scenes; PDF / Full scene / Dialogue views), and
+**Prepare** (sides). Drag a script onto the window to add it. Appearance
+(Light/Dark/System) and update checks are in Settings.
 
 ## Package a signed release (both architectures)
 
 ```bash
-cd app && npm install && cd ..      # one-time: install the JS toolchain
+cd app && npm install && cd ..      # one-time
 ./packaging/build_app.sh             # builds, signs + notarizes arm64 AND Intel
 # -> app/dist/Scripty-<version>-arm64.dmg  and  Scripty-<version>.dmg (x64)
 ```
 
-`build_app.sh` builds the renderer once, then for each arch builds the matching
-PyInstaller engine binary (arm64 from `.venv`, Intel from `.venv-intel` via
-Rosetta) and packages + signs + notarizes the app. Each app bundles its own
-engine binary and fonts, so it's fully offline. Notarization uses the
-`scene-search-notary` keychain profile.
-
-For a single arch: build the engine (`./packaging/build_engine.sh` or
-`VENV=.venv-intel ./packaging/build_engine.sh`) then `cd app && npm run pack:arm`
-(or `pack:intel`).
-
-The Intel venv needs the engine deps once:
-`uv pip install --python .venv-intel/bin/python -r requirements.txt pyinstaller`.
+No engine binary to build — `build_app.sh` just runs `electron-vite build` then
+`electron-builder` for both arches in one pass (so one correct `latest-mac.yml`).
+Notarization uses the `scene-search-notary` keychain profile.
 
 ### Publishing an auto-updatable release
 
 ```bash
-# bump app/package.json "version" first (e.g. 0.1.0 -> 0.2.0)
+# bump app/package.json "version" first
 export GH_TOKEN="$(gh auth token)"
 PUBLISH=always ./packaging/build_app.sh
 ```
 
-This uploads the signed `.dmg`/`.zip` + `latest-mac.yml` to a GitHub release.
-Installed apps (kept in Applications) pick it up on next launch via
-electron-updater and prompt to restart. **Check for Updates…** in the menu
-triggers a manual check.
-
-## Status
-
-- **Phase 1 (done):** working dev app — Electron/React shell + Python engine
-  sidecar; Browse + Library.
-- **Phase 2 (done):** PyInstaller engine binary + electron-builder packaging;
-  Developer-ID sign + notarize.
-- **Phase 3:** auto-update (electron-updater) and the Prepare/Sides feature.
+Uploads the signed `.dmg`/`.zip` + `latest-mac.yml` to a GitHub release;
+installed apps (kept in Applications) update on next launch via electron-updater.
+**Check for Updates…** in Settings triggers a manual check.
 
 ## Notes
 
-- Offline-only: the engine binds to `127.0.0.1` and never makes external network
-  calls. Detection reads `.pdf .fountain .fdx .txt .docx`; scanned image-only
-  PDFs can't be read.
-- The previous PySide6 UI was retired in favor of the Electron app (kept in git
-  history); the Python engine and its tests carried over unchanged.
+- Offline-only: no external network calls except the GitHub update check.
+  Reads `.pdf .fountain .fdx .txt .docx`; scanned image-only PDFs can't be read.
+- The Python sidecar (and the earlier PySide6 UI) were retired in favor of this
+  pure-JS app; both remain in git history.
