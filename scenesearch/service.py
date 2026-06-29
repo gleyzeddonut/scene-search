@@ -38,6 +38,7 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
     )
     settings = Settings(settings_path or Path.home() / ".scripty_settings.json")
     index_path = Path(index_path or Path.home() / ".scripty_index.db")
+    Library(index_path, init=True).close()  # create/migrate schema + enable WAL once
     state = {"running": False, "scanned": 0, "scripts": 0, "scenes": 0,
              "cancel": False, "errors": []}
 
@@ -46,7 +47,7 @@ def create_app(token: str, settings_path=None, index_path=None) -> FastAPI:
             raise HTTPException(status_code=401, detail="bad token")
 
     def lib() -> Library:
-        return Library(index_path)
+        return Library(index_path, init=False)  # schema already set up at startup
 
     @app.get("/health")
     def health(_=Depends(auth)):

@@ -41,22 +41,27 @@ class SceneMatch:
 
 
 class Library:
-    def __init__(self, db_path):
+    def __init__(self, db_path, init=True):
+        # init=True creates/migrates the schema (do this once at startup). Per-request
+        # connections pass init=False so they don't run DDL on every call — that was
+        # a writer and collided with an in-progress re-index ("database is locked").
         self.db_path = Path(db_path)
         self._conn = sqlite3.connect(str(self.db_path))
         self._conn.execute("PRAGMA busy_timeout=10000")  # wait, don't fail, on lock
-        self._conn.executescript(_SCHEMA)
-        # migrate older dbs that predate the dialogue/runtime columns
-        for col, typ in (("dialogue_json", "TEXT"), ("est_seconds", "INTEGER"),
-                         ("content_json", "TEXT")):
-            try:
-                self._conn.execute(f"ALTER TABLE scenes ADD COLUMN {col} {typ}")
+        if init:
+            self._conn.execute("PRAGMA journal_mode=WAL")  # readers don't block the writer
+            self._conn.executescript(_SCHEMA)
+            # migrate older dbs that predate the dialogue/runtime columns
+            for col, typ in (("dialogue_json", "TEXT"), ("est_seconds", "INTEGER"),
+                             ("content_json", "TEXT")):
+                try:
+                    self._conn.execute(f"ALTER TABLE scenes ADD COLUMN {col} {typ}")
+                except sqlite3.OperationalError:
+                    pass
+            try:  # drag-and-dropped files are pinned so a re-index won't prune them
+                self._conn.execute("ALTER TABLE scripts ADD COLUMN pinned INTEGER DEFAULT 0")
             except sqlite3.OperationalError:
                 pass
-        try:  # drag-and-dropped files are pinned so a re-index won't prune them
-            self._conn.execute("ALTER TABLE scripts ADD COLUMN pinned INTEGER DEFAULT 0")
-        except sqlite3.OperationalError:
-            pass
         self._stored_version = self._conn.execute("PRAGMA user_version").fetchone()[0]
 
     def close(self) -> None:
