@@ -12,12 +12,15 @@ let qlWin: BrowserWindow | null = null // the Quick Look pop-out (a real OS wind
 // can move anywhere, even onto another display. It loads our renderer (with the
 // preload) and renders the preview through the same byte-read→blob path the main
 // window uses, so the PDF reliably shows.
-function openQuickLook(p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) {
+type QlPayload = { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }
+
+function openQuickLook(p: QlPayload) {
   if (!qlWin || qlWin.isDestroyed()) {
     qlWin = new BrowserWindow({
       width: 760,
       height: 900,
       title: p.title,
+      show: false,
       backgroundColor: nativeTheme.shouldUseDarkColors ? '#1d1e23' : '#fdfdfe',
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
@@ -28,6 +31,7 @@ function openQuickLook(p: { title: string; path: string; sceneIndex: number; pag
     })
     qlWin.on('closed', () => {
       qlWin = null
+      mainWindow?.webContents.send('quicklook-closed') // keep the renderer's toggle state in sync
     })
   }
   qlWin.setTitle(p.title)
@@ -37,8 +41,21 @@ function openQuickLook(p: { title: string; path: string; sceneIndex: number; pag
   } else {
     qlWin.loadFile(join(__dirname, '../renderer/index.html'), { search })
   }
-  if (!qlWin.isVisible()) qlWin.show()
-  qlWin.focus()
+  qlWin.showInactive() // visible but DON'T take focus — the list keeps Space/arrows (Finder-style)
+}
+
+// follow the selection without a full reload (and without stealing focus)
+function updateQuickLook(p: QlPayload) {
+  if (qlWin && !qlWin.isDestroyed()) {
+    qlWin.setTitle(p.title)
+    qlWin.webContents.send('ql-scene', p)
+  } else {
+    openQuickLook(p)
+  }
+}
+
+function closeQuickLook() {
+  if (qlWin && !qlWin.isDestroyed()) qlWin.close()
 }
 
 function registerIpc() {
@@ -60,6 +77,8 @@ function registerIpc() {
   })
   ipcMain.handle('app-version', () => app.getVersion())
   ipcMain.handle('quicklook', (_e, p) => openQuickLook(p))
+  ipcMain.handle('quicklook-update', (_e, p) => updateQuickLook(p))
+  ipcMain.handle('quicklook-close', () => closeQuickLook())
   ipcMain.handle('check-updates', () => checkForUpdatesManual())
   ipcMain.handle('quit-and-install', () => quitAndInstall())
   ipcMain.handle('read-file', async (_e, p: string) => {

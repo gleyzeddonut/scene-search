@@ -30,6 +30,19 @@ contextBridge.exposeInMainWorld('scripty', {
   quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
   quickLook: (p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) =>
     ipcRenderer.invoke('quicklook', p),
+  quickLookUpdate: (p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) =>
+    ipcRenderer.invoke('quicklook-update', p),
+  quickLookClose: () => ipcRenderer.invoke('quicklook-close'),
+  onQuickLookClosed: (cb: () => void) => {
+    const l = () => cb()
+    ipcRenderer.on('quicklook-closed', l)
+    return () => ipcRenderer.removeListener('quicklook-closed', l)
+  },
+  onQuickLookScene: (cb: (p: unknown) => void) => {
+    const l = (_e: unknown, p: unknown) => cb(p)
+    ipcRenderer.on('ql-scene', l)
+    return () => ipcRenderer.removeListener('ql-scene', l)
+  },
   onUpdateStatus: (cb: (m: unknown) => void) => {
     const listener = (_e: unknown, m: unknown) => cb(m)
     ipcRenderer.on('update-status', listener)

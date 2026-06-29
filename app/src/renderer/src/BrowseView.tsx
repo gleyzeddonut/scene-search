@@ -72,6 +72,10 @@ export function BrowseView({
     localStorage.setItem('sceneView', v)
   }
   const listRef = useRef<HTMLDivElement>(null)
+  const [qlOpen, setQlOpen] = useState(false)
+
+  // the pop-out can be closed from its own window — keep our toggle state in sync
+  useEffect(() => window.scripty.onQuickLookClosed?.(() => setQlOpen(false)), [])
 
   // pairing only applies to two-person scenes; show it for Any + Duet, hide for Solo / 3+
   const showPairing = size === 0 || size === DUET
@@ -111,18 +115,24 @@ export function BrowseView({
     }
   }, [sel])
 
-  // open the selected scene in a real, separate Quick Look window (movable anywhere)
-  const openQL = (s: Scene) => {
-    window.scripty.quickLook({
-      title: s.script_name.replace(/\.[^.]+$/, ''),
-      path: s.script_path,
-      sceneIndex: s.scene_index,
-      page: s.page,
-      isPdf: isPdf(s.script_path)
-    })
+  const qlPayload = (s: Scene) => ({
+    title: s.script_name.replace(/\.[^.]+$/, ''),
+    path: s.script_path,
+    sceneIndex: s.scene_index,
+    page: s.page,
+    isPdf: isPdf(s.script_path)
+  })
+  // pop out (or, if already open, retarget) the Quick Look window for a scene
+  const popOut = (s: Scene) => {
+    if (qlOpen) window.scripty.quickLookUpdate(qlPayload(s))
+    else {
+      window.scripty.quickLook(qlPayload(s))
+      setQlOpen(true)
+    }
   }
 
-  // keyboard: ↑/↓ move the selection, Space pops the preview out into its own window
+  // keyboard, Finder-style: ↑/↓ move the selection (and the open pop-out follows),
+  // Space toggles the pop-out. The pop-out never steals focus, so this keeps working.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = document.activeElement as HTMLElement | null
@@ -134,18 +144,24 @@ export function BrowseView({
         e.preventDefault()
         const i = sel ? scenes.indexOf(sel) : -1
         const ni = e.key === 'ArrowDown' ? Math.min(scenes.length - 1, i + 1) : Math.max(0, i - 1)
-        setSel(scenes[ni] || null)
+        const next = scenes[ni] || null
+        setSel(next)
+        if (qlOpen && next) window.scripty.quickLookUpdate(qlPayload(next))
       } else if (e.key === ' ' && el?.tagName !== 'BUTTON') {
-        if (sel) {
-          e.preventDefault()
-          openQL(sel)
+        e.preventDefault()
+        if (qlOpen) {
+          window.scripty.quickLookClose()
+          setQlOpen(false)
+        } else if (sel) {
+          window.scripty.quickLook(qlPayload(sel))
+          setQlOpen(true)
         }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenes, sel])
+  }, [scenes, sel, qlOpen])
 
   // keep the keyboard-selected row visible
   useEffect(() => {
@@ -283,7 +299,7 @@ export function BrowseView({
                     </span>
                   </div>
                   {eff === 'pdf' ? (
-                    <PdfFrame path={sel.script_path} page={sel.page} />
+                    <PdfFrame path={sel.script_path} page={sel.page} nonce={sel.scene_index} />
                   ) : (
                     <div className="dcard">
                       <div className="h">{sel.heading}</div>
@@ -301,7 +317,7 @@ export function BrowseView({
               <button className="prepare" onClick={() => onPrepare(sel)}>Prepare scene →</button>
             </div>
             <div className="dbtns">
-              <button className="ghost" onClick={() => openQL(sel)} title="Pop out (Space)">⤢ Pop out</button>
+              <button className="ghost" onClick={() => popOut(sel)} title="Pop out (Space)">⤢ Pop out</button>
               <button className="ghost" onClick={() => api.openFile(sel.script_path)}>Open file</button>
               <button className="ghost" onClick={() => api.revealFile(sel.script_path)}>Reveal</button>
             </div>

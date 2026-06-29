@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 // Loads PDF bytes via IPC into a blob URL for Chromium's PDF viewer. To avoid a
 // flicker when the selection changes, it double-buffers: the visible iframe stays
 // up until the next page/file has fully loaded in a second iframe, then swaps.
-export function PdfFrame({ path, page }: { path: string; page?: number }) {
+export function PdfFrame({ path, page, nonce }: { path: string; page?: number; nonce?: string | number }) {
   const [url, setUrl] = useState('') // blob URL; reused across page changes within a file
   const [err, setErr] = useState(false)
   const blob = useRef<{ path: string; url: string } | null>(null)
@@ -35,8 +35,12 @@ export function PdfFrame({ path, page }: { path: string; page?: number }) {
     []
   )
 
-  // #toolbar=0&navpanes=0 hides Chromium's PDF toolbar + side panel
-  const target = url ? url + `#toolbar=0&navpanes=0${page ? `&page=${page}` : ''}` : ''
+  // #toolbar=0&navpanes=0 hides Chromium's PDF toolbar + side panel. Always pin a
+  // page (the scene's, or 1) and append a per-scene token so each selection opens
+  // fresh at the top of its page instead of restoring the previous scroll.
+  const target = url
+    ? url + `#toolbar=0&navpanes=0&page=${page || 1}${nonce != null ? `&n=${nonce}` : ''}`
+    : ''
 
   // load the next target into the hidden buffer; it becomes visible on its onLoad
   useEffect(() => {

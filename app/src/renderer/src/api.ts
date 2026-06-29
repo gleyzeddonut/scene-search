@@ -79,6 +79,10 @@ declare global {
       checkUpdates: () => Promise<void>
       quitAndInstall: () => Promise<void>
       quickLook: (p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) => Promise<void>
+      quickLookUpdate: (p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) => Promise<void>
+      quickLookClose: () => Promise<void>
+      onQuickLookClosed: (cb: () => void) => () => void
+      onQuickLookScene: (cb: (p: unknown) => void) => () => void
       onUpdateStatus: (cb: (m: UpdateMsg) => void) => () => void
     }
   }

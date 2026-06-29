@@ -3,27 +3,34 @@ import './styles.css'
 import { PdfFrame } from './PdfFrame'
 import { api, SceneDetail, sceneBlocks } from './api'
 
-// Full-window preview rendered inside the pop-out Quick Look window. Reuses the
-// same PdfFrame (byte-read → blob) as the main preview, so PDFs render reliably.
-export function QuickLookView(props: { path: string; sceneIndex: number; page?: number; isPdf: boolean }) {
+type QlScene = { path: string; sceneIndex: number; page?: number; isPdf: boolean; title?: string }
+
+// Full-window preview inside the pop-out Quick Look window. It renders through the
+// same PdfFrame (byte-read → blob) as the main preview, and follows the list
+// selection in place (the main window sends 'ql-scene' as you arrow through rows).
+export function QuickLookView(initial: QlScene) {
+  const [scene, setScene] = useState<QlScene>(initial)
   const [detail, setDetail] = useState<SceneDetail | null>(null)
 
+  // follow the selection without reloading the whole window
+  useEffect(() => window.scripty.onQuickLookScene?.((p) => setScene(p as QlScene)), [])
+
   useEffect(() => {
-    if (props.isPdf) return
+    if (scene.isPdf) return
     let active = true
     api
-      .getScene(props.path, props.sceneIndex)
+      .getScene(scene.path, scene.sceneIndex)
       .then((d) => active && setDetail(d))
       .catch(() => active && setDetail(null))
     return () => {
       active = false
     }
-  }, [props.path, props.sceneIndex, props.isPdf])
+  }, [scene.path, scene.sceneIndex, scene.isPdf])
 
-  if (props.isPdf) {
+  if (scene.isPdf) {
     return (
       <div className="qlview">
-        <PdfFrame path={props.path} page={props.page} />
+        <PdfFrame path={scene.path} page={scene.page} nonce={scene.sceneIndex} />
       </div>
     )
   }
