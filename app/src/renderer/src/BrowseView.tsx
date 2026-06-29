@@ -62,8 +62,18 @@ export function BrowseView({
 
   // pull the selected scene's dialogue so the preview shows the full scene
   useEffect(() => {
+    let active = true
     setDetail(null)
-    if (sel) api.getScene(sel.script_path, sel.scene_index).then(setDetail)
+    if (sel) {
+      const empty: SceneDetail = { heading: sel.heading, characters: [], est_seconds: 0, lines: [] }
+      api
+        .getScene(sel.script_path, sel.scene_index)
+        .then((d) => active && setDetail(d))
+        .catch(() => active && setDetail(empty)) // don't hang on "Loading…" if /scene fails
+    }
+    return () => {
+      active = false // ignore a stale response when the selection changed
+    }
   }, [sel])
 
   const chooseSize = (i: number) => {
