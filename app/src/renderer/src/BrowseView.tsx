@@ -94,17 +94,19 @@ export function BrowseView({
     }
   }, [size, pair, search, refreshKey])
 
-  // pull the selected scene's dialogue so the preview shows the full scene
+  // pull the selected scene's dialogue so the preview shows the full scene.
+  // keep the previous scene visible until the new one arrives (no "Loading…" flash)
   useEffect(() => {
     let active = true
-    setDetail(null)
-    if (sel) {
-      const empty: SceneDetail = { heading: sel.heading, characters: [], est_seconds: 0, lines: [], content: [] }
-      api
-        .getScene(sel.script_path, sel.scene_index)
-        .then((d) => active && setDetail(d))
-        .catch(() => active && setDetail(empty)) // don't hang on "Loading…" if /scene fails
+    if (!sel) {
+      setDetail(null)
+      return
     }
+    const empty: SceneDetail = { heading: sel.heading, characters: [], est_seconds: 0, lines: [], content: [] }
+    api
+      .getScene(sel.script_path, sel.scene_index)
+      .then((d) => active && setDetail(d))
+      .catch(() => active && setDetail(empty)) // don't hang on "Loading…" if /scene fails
     return () => {
       active = false // ignore a stale response when the selection changed
     }
