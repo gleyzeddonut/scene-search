@@ -21,7 +21,7 @@ function nextNonEmpty(lines: string[], start: number): string | null {
 
 function isCue(line: string): boolean {
   const stripped = line.trim()
-  if (!stripped || SCENE_RE.test(line) || TRANSITION_RE.test(stripped)) return false
+  if (!stripped || isHeading(line, false) || TRANSITION_RE.test(stripped)) return false
   if (!CUE_RE.test(line)) return false
   const name = normalizeCharacter(stripped)
   if (name && '.!?'.includes(name[name.length - 1])) return false
@@ -37,6 +37,23 @@ function isCueShaped(t: string): boolean {
   if ('.!?'.includes(base[base.length - 1])) return false
   const words = base.split(/\s+/).filter(Boolean)
   return words.length >= 1 && words.length <= 5
+}
+
+const TIME_OF_DAY_RE =
+  /(?:--?|–|—)\s*(DAY|NIGHT|MORNING|EVENING|AFTERNOON|DUSK|DAWN|CONTINUOUS|LATER|MOMENTS LATER|SAME TIME|SAME|SUNSET|SUNRISE|NOON|MIDNIGHT|MAGIC HOUR)\s*$/i
+const isAllCaps = (t: string) => /[A-Z]/.test(t) && !/[a-z]/.test(t.replace(PAREN_RE, ''))
+
+// A scene heading is INT./EXT., an ALL-CAPS location with a time-of-day suffix
+// ("KITCHEN - NIGHT"), or the first short ALL-CAPS location right after a
+// transition ("FADE IN:" → location). Lets us recover scripts that don't use INT./EXT.
+function isHeading(text: string, afterTransition: boolean): boolean {
+  const t = text.trim()
+  if (!t) return false
+  if (SCENE_RE.test(text)) return true
+  if (!isAllCaps(t)) return false
+  if (TIME_OF_DAY_RE.test(t)) return true
+  if (afterTransition && t.split(/\s+/).filter(Boolean).length <= 9) return true
+  return false
 }
 
 // Layout-aware parser for PDFs: classify each line by its left indentation rather
@@ -60,11 +77,10 @@ export function parseLayout(rawLines: LayoutLine[]): Scene[] {
   const dialogueMin = cueIndent * 0.2
   const cueMin = cueIndent * 0.6
 
-  type Role = 'HEADING' | 'CUE' | 'DIALOGUE' | 'PAREN' | 'ACTION'
+  type Role = 'CUE' | 'DIALOGUE' | 'PAREN' | 'ACTION'
   const classify = (l: LayoutLine): Role => {
     const t = l.text.trim()
     const indent = l.x - base
-    if (SCENE_RE.test(l.text) && indent < cueIndent * 0.5) return 'HEADING'
     if (t.startsWith('(')) return 'PAREN'
     if (indent >= cueMin && isCueShaped(t)) return 'CUE'
     if (indent >= dialogueMin) return 'DIALOGUE'
@@ -103,9 +119,11 @@ export function parseLayout(rawLines: LayoutLine[]): Scene[] {
     pending = null
   }
 
+  let afterTransition = false
   for (const l of lines) {
-    const role = classify(l)
-    if (role === 'HEADING') {
+    const t = l.text.trim()
+    const flushLeft = l.x - base < cueIndent * 0.5
+    if (flushLeft && isHeading(l.text, afterTransition)) {
       flushDialogue()
       flushAction()
       current = {
@@ -118,9 +136,17 @@ export function parseLayout(rawLines: LayoutLine[]): Scene[] {
       }
       scenes.push(current)
       seen = new Set()
+      afterTransition = false
       continue
     }
+    if (flushLeft && (TRANSITION_RE.test(t) || /\bTO:$/.test(t))) {
+      flushDialogue()
+      afterTransition = true // the next flush-left ALL-CAPS line is likely a new scene
+      continue
+    }
+    afterTransition = false
     if (!current) continue
+    const role = classify(l)
     if (role === 'CUE') {
       flushDialogue()
       flushAction()
@@ -149,6 +175,7 @@ export function parseScenes(text: string): Scene[] {
   let page = 1
   let skipUntil = 0
   let action: string[] = []
+  let afterTransition = false
 
   const flushAction = () => {
     if (current) {
@@ -162,7 +189,7 @@ export function parseScenes(text: string): Scene[] {
     const raw = lines[i]
     page += (raw.match(/\f/g) || []).length
     if (i < skipUntil) continue
-    if (SCENE_RE.test(raw)) {
+    if (isHeading(raw, afterTransition)) {
       flushAction()
       current = {
         heading: squish(raw.replace(SCENE_NUM_PREFIX, '')),
@@ -174,8 +201,15 @@ export function parseScenes(text: string): Scene[] {
       }
       scenes.push(current)
       seen = new Set()
+      afterTransition = false
       continue
     }
+    if (raw.trim() && (TRANSITION_RE.test(raw.trim()) || /\bTO:$/.test(raw.trim()))) {
+      flushAction()
+      afterTransition = true // the next ALL-CAPS location line is likely a new scene
+      continue
+    }
+    if (raw.trim()) afterTransition = false
     if (!current) continue
     if (!raw.trim()) {
       flushAction()
@@ -183,7 +217,7 @@ export function parseScenes(text: string): Scene[] {
     }
     if (isCue(raw)) {
       const nxt = nextNonEmpty(lines, i + 1)
-      if (nxt === null || SCENE_RE.test(nxt)) {
+      if (nxt === null || isHeading(nxt, false)) {
         action.push(raw.trim())
         continue
       }
@@ -198,7 +232,7 @@ export function parseScenes(text: string): Scene[] {
       while (j < lines.length) {
         const n = lines[j]
         if (!n.trim()) break
-        if (SCENE_RE.test(n) || isCue(n)) break
+        if (isHeading(n, false) || isCue(n)) break
         said.push(n.trim())
         j++
       }
