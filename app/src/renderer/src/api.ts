@@ -1,4 +1,5 @@
 export interface SceneChar { name: string; gender: string }
+
 export interface Scene {
   script_path: string
   script_name: string
@@ -32,10 +33,43 @@ export function isPdf(path: string): boolean {
   return path.toLowerCase().endsWith('.pdf')
 }
 
+export type UpdatePhase =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'downloading'
+  | 'ready'
+  | 'none'
+  | 'error'
+  | 'dev'
+
+export interface UpdateMsg {
+  phase: UpdatePhase
+  pct?: number
+  version?: string
+}
+
+interface EngineApi {
+  getFolders: () => Promise<{ roots: string[]; ignored: string[] }>
+  setFolders: (r: string[], ig: string[]) => Promise<unknown>
+  stats: () => Promise<{ scripts: number; scenes: number }>
+  scenes: (f: unknown) => Promise<{ scenes: Scene[] }>
+  scene: (p: string, i: number) => Promise<SceneDetail>
+  reindex: () => Promise<{ started: boolean }>
+  reindexStatus: () => Promise<{
+    running: boolean; scanned: number; total: number; file: string
+    scripts: number; scenes: number; errors: string[]
+  }>
+  reindexStop: () => Promise<{ stopped: boolean }>
+  add: (p: string) => Promise<{ result: 'added' | 'exists' | 'not_script' | 'unreadable'; name: string }>
+  open: (p: string) => Promise<unknown>
+  reveal: (p: string) => Promise<unknown>
+}
+
 declare global {
   interface Window {
     scripty: {
-      engineInfo: () => Promise<{ port: number; token: string }>
+      engine: EngineApi
       pathForFile: (file: File) => string
       pickFolder: () => Promise<string | null>
       onOpenSettings: (cb: () => void) => void
@@ -43,62 +77,29 @@ declare global {
       appVersion: () => Promise<string>
       readFile: (path: string) => Promise<Uint8Array>
       checkUpdates: () => Promise<void>
-      onUpdateStatus: (cb: (s: string) => void) => () => void
+      quitAndInstall: () => Promise<void>
+      quickLook: (p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) => Promise<void>
+      onUpdateStatus: (cb: (m: UpdateMsg) => void) => () => void
     }
   }
 }
 
-let base = ''
-let token = ''
-
-export async function init() {
-  const info = await window.scripty.engineInfo()
-  base = `http://127.0.0.1:${info.port}`
-  token = info.token
-}
-
-async function call(path: string, opts: RequestInit = {}) {
-  const r = await fetch(base + path, {
-    ...opts,
-    headers: { 'X-Scripty-Token': token, 'Content-Type': 'application/json', ...(opts.headers || {}) }
-  })
-  if (!r.ok) throw new Error(`${path} → ${r.status}`)
-  return r.json()
-}
+const eng = () => window.scripty.engine
 
 export const api = {
-  getFolders: () => call('/folders') as Promise<{ roots: string[]; ignored: string[] }>,
-  setFolders: (roots: string[], ignored: string[]) =>
-    call('/folders', { method: 'PUT', body: JSON.stringify({ roots, ignored }) }),
-  reindex: () => call('/reindex', { method: 'POST' }),
-  reindexStop: () => call('/reindex/stop', { method: 'POST' }),
-  reindexStatus: () =>
-    call('/reindex/status') as Promise<{
-      running: boolean
-      scanned: number
-      scripts: number
-      scenes: number
-      errors: string[]
-    }>,
-  stats: () => call('/stats') as Promise<{ scripts: number; scenes: number }>,
-  scenes: (p: { min_chars?: number; max_chars?: number; pairing?: string; search?: string }) => {
-    const q = new URLSearchParams()
-    if (p.min_chars != null) q.set('min_chars', String(p.min_chars))
-    if (p.max_chars != null) q.set('max_chars', String(p.max_chars))
-    if (p.pairing) q.set('pairing', p.pairing)
-    if (p.search) q.set('search', p.search)
-    return call('/scenes?' + q.toString()) as Promise<{ scenes: Scene[] }>
-  },
-  addScript: (path: string) =>
-    call('/add', { method: 'POST', body: JSON.stringify({ path }) }) as Promise<{
-      result: 'added' | 'exists' | 'not_script' | 'unreadable'
-      name: string
-    }>,
-  openFile: (path: string) => call('/open', { method: 'POST', body: JSON.stringify({ path }) }),
-  revealFile: (path: string) => call('/reveal', { method: 'POST', body: JSON.stringify({ path }) }),
+  getFolders: () => eng().getFolders(),
+  setFolders: (roots: string[], ignored: string[]) => eng().setFolders(roots, ignored),
+  reindex: () => eng().reindex(),
+  reindexStop: () => eng().reindexStop(),
+  reindexStatus: () => eng().reindexStatus(),
+  stats: () => eng().stats(),
+  scenes: (p: { min_chars?: number; max_chars?: number; pairing?: string; search?: string }) =>
+    eng().scenes(p),
+  getScene: (path: string, index: number) => eng().scene(path, index),
+  addScript: (path: string) => eng().add(path),
+  openFile: (path: string) => eng().open(path),
+  revealFile: (path: string) => eng().reveal(path),
   pickFolder: () => window.scripty.pickFolder(),
-  getScene: (path: string, index: number) =>
-    call(`/scene?path=${encodeURIComponent(path)}&index=${index}`) as Promise<SceneDetail>,
   exportSides: (elementId: string, name: string) => {
     const el = document.getElementById(elementId)
     const css =

@@ -7,8 +7,10 @@ scenesearch_cache.json
 /build/
 /dist/
 *.spec.bak
-.venv-intel/
 app/node_modules/
 app/out/
 app/dist/
-/dist-engine/
+.superpowers/
+# obsolete Python build artifacts (pure-JS app no longer uses these)
+dist-engine/
+.venv-intel/

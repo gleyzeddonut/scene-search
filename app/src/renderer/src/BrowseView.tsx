@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, Scene, SceneDetail, sceneBlocks, isPdf } from './api'
 import { PdfFrame } from './PdfFrame'
 
@@ -71,6 +71,7 @@ export function BrowseView({
     setViewState(v)
     localStorage.setItem('sceneView', v)
   }
+  const listRef = useRef<HTMLDivElement>(null)
 
   // pairing only applies to two-person scenes; show it for Any + Duet, hide for Solo / 3+
   const showPairing = size === 0 || size === DUET
@@ -92,20 +93,63 @@ export function BrowseView({
     }
   }, [size, pair, search, refreshKey])
 
-  // pull the selected scene's dialogue so the preview shows the full scene
+  // pull the selected scene's dialogue so the preview shows the full scene.
+  // keep the previous scene visible until the new one arrives (no "Loading…" flash)
   useEffect(() => {
     let active = true
-    setDetail(null)
-    if (sel) {
-      const empty: SceneDetail = { heading: sel.heading, characters: [], est_seconds: 0, lines: [], content: [] }
-      api
-        .getScene(sel.script_path, sel.scene_index)
-        .then((d) => active && setDetail(d))
-        .catch(() => active && setDetail(empty)) // don't hang on "Loading…" if /scene fails
+    if (!sel) {
+      setDetail(null)
+      return
     }
+    const empty: SceneDetail = { heading: sel.heading, characters: [], est_seconds: 0, lines: [], content: [] }
+    api
+      .getScene(sel.script_path, sel.scene_index)
+      .then((d) => active && setDetail(d))
+      .catch(() => active && setDetail(empty)) // don't hang on "Loading…" if /scene fails
     return () => {
       active = false // ignore a stale response when the selection changed
     }
+  }, [sel])
+
+  // open the selected scene in a real, separate Quick Look window (movable anywhere)
+  const openQL = (s: Scene) => {
+    window.scripty.quickLook({
+      title: s.script_name.replace(/\.[^.]+$/, ''),
+      path: s.script_path,
+      sceneIndex: s.scene_index,
+      page: s.page,
+      isPdf: isPdf(s.script_path)
+    })
+  }
+
+  // keyboard: ↑/↓ move the selection, Space pops the preview out into its own window
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement as HTMLElement | null
+      const typing =
+        !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+      if (typing) return
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (!scenes.length) return
+        e.preventDefault()
+        const i = sel ? scenes.indexOf(sel) : -1
+        const ni = e.key === 'ArrowDown' ? Math.min(scenes.length - 1, i + 1) : Math.max(0, i - 1)
+        setSel(scenes[ni] || null)
+      } else if (e.key === ' ' && el?.tagName !== 'BUTTON') {
+        if (sel) {
+          e.preventDefault()
+          openQL(sel)
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenes, sel])
+
+  // keep the keyboard-selected row visible
+  useEffect(() => {
+    listRef.current?.querySelector('.row.on')?.scrollIntoView({ block: 'nearest' })
   }, [sel])
 
   const chooseSize = (i: number) => {
@@ -190,7 +234,7 @@ export function BrowseView({
           <span style={{ width: 64 }}>Cast</span>
           <span style={{ width: 42, textAlign: 'right' }}>Pg</span>
         </div>
-        <div className="list">
+        <div className="list" ref={listRef}>
           {scenes.length === 0 && <div className="empty">No scenes match these filters.</div>}
           {scenes.map((s) => (
             <div
@@ -257,12 +301,14 @@ export function BrowseView({
               <button className="prepare" onClick={() => onPrepare(sel)}>Prepare scene →</button>
             </div>
             <div className="dbtns">
+              <button className="ghost" onClick={() => openQL(sel)} title="Pop out (Space)">⤢ Pop out</button>
               <button className="ghost" onClick={() => api.openFile(sel.script_path)}>Open file</button>
               <button className="ghost" onClick={() => api.revealFile(sel.script_path)}>Reveal</button>
             </div>
           </>
         )}
       </div>
+
     </>
   )
 }

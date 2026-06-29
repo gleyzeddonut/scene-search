@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import './styles.css'
-import { init, api, Scene } from './api'
+import { api, Scene } from './api'
 import { AppShell } from './AppShell'
 import { BrowseView } from './BrowseView'
 import { LibraryView } from './LibraryView'
 import { PrepareView } from './PrepareView'
 import { SettingsModal } from './SettingsModal'
+import { Splash } from './Splash'
 
 export default function App() {
   const [ready, setReady] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [splashOut, setSplashOut] = useState(false)
+  const [splashDone, setSplashDone] = useState(false)
   const [section, setSection] = useState('library')
   const [search, setSearch] = useState('')
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system')
@@ -30,14 +32,21 @@ export default function App() {
   }
 
   useEffect(() => {
-    init()
-      .then(() => {
-        readyRef.current = true
-        setReady(true)
-      })
-      .catch(() => setFailed(true))
+    readyRef.current = true // engine is in-process; always available
+    setReady(true)
     window.scripty.onOpenSettings(() => setSettingsOpen(true))
   }, [])
+
+  // splash: once ready, keep it briefly so it's seen, then fade out (.5s) + unmount
+  useEffect(() => {
+    if (!ready) return
+    const t1 = setTimeout(() => setSplashOut(true), 1300)
+    const t2 = setTimeout(() => setSplashDone(true), 1800)
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+    }
+  }, [ready])
 
   // drag-and-drop a script file onto the window to add it
   useEffect(() => {
@@ -101,50 +110,48 @@ export default function App() {
     }
   }, [theme])
 
-  if (failed)
-    return (
-      <div style={{ padding: 40, lineHeight: 1.5 }}>
-        Couldn’t start the Scripty engine. Please quit and reopen Scripty.
-      </div>
-    )
-  if (!ready) return <div style={{ padding: 40 }}>Starting engine…</div>
   return (
     <>
-    <AppShell
-      section={section}
-      onSection={setSection}
-      search={search}
-      onSearch={setSearch}
-      onSettings={() => setSettingsOpen(true)}
-    >
-      {section === 'browse' && (
-        <BrowseView
+    {ready && (
+      <>
+        <AppShell
+          section={section}
+          onSection={setSection}
           search={search}
-          size={browseSize}
-          setSize={setBrowseSize}
-          pair={browsePair}
-          setPair={setBrowsePair}
-          refreshKey={refreshKey}
-          onPrepare={(s) => {
-            setPrepScene(s)
-            setSection('prepare')
-          }}
-        />
-      )}
-      {section === 'library' && <LibraryView refreshKey={refreshKey} />}
-      {section === 'prepare' && prepScene && (
-        <PrepareView scene={prepScene} onBack={() => setSection('browse')} />
-      )}
-      {section === 'prepare' && !prepScene && (
-        <div style={{ padding: 40, color: 'var(--text-3)' }}>
-          Select a scene in Browse, then “Prepare scene →”.
-        </div>
-      )}
-    </AppShell>
-    {settingsOpen && (
-      <SettingsModal theme={theme} onTheme={setTheme} onClose={() => setSettingsOpen(false)} />
+          onSearch={setSearch}
+          onSettings={() => setSettingsOpen(true)}
+        >
+          {section === 'browse' && (
+            <BrowseView
+              search={search}
+              size={browseSize}
+              setSize={setBrowseSize}
+              pair={browsePair}
+              setPair={setBrowsePair}
+              refreshKey={refreshKey}
+              onPrepare={(s) => {
+                setPrepScene(s)
+                setSection('prepare')
+              }}
+            />
+          )}
+          {section === 'library' && <LibraryView refreshKey={refreshKey} />}
+          {section === 'prepare' && prepScene && (
+            <PrepareView scene={prepScene} onBack={() => setSection('browse')} />
+          )}
+          {section === 'prepare' && !prepScene && (
+            <div style={{ padding: 40, color: 'var(--text-3)' }}>
+              Select a scene in Browse, then “Prepare scene →”.
+            </div>
+          )}
+        </AppShell>
+        {settingsOpen && (
+          <SettingsModal theme={theme} onTheme={setTheme} onClose={() => setSettingsOpen(false)} />
+        )}
+        {toast && <div className="toast">{toast}</div>}
+      </>
     )}
-    {toast && <div className="toast">{toast}</div>}
+    {!splashDone && <Splash out={splashOut} />}
     </>
   )
 }

@@ -1,26 +1,67 @@
-import { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell, nativeTheme } from 'electron'
 import { join } from 'path'
-import { startEngine, EngineHandle } from './engine'
-import { setupUpdater, checkForUpdatesManual } from './updater'
+import { Engine } from './engine/engine'
+import { setupUpdater, checkForUpdatesManual, quitAndInstall } from './updater'
 
 const HELP_URL = 'https://github.com/gleyzeddonut/scene-search'
-let engine: EngineHandle | null = null
-let enginePromise: Promise<EngineHandle> | null = null
+let engine: Engine
 let mainWindow: BrowserWindow | null = null
+let qlWin: BrowserWindow | null = null // the Quick Look pop-out (a real OS window)
+
+// Open (or update) a single Quick Look window — a genuine separate window the user
+// can move anywhere, even onto another display. It loads our renderer (with the
+// preload) and renders the preview through the same byte-read→blob path the main
+// window uses, so the PDF reliably shows.
+function openQuickLook(p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) {
+  if (!qlWin || qlWin.isDestroyed()) {
+    qlWin = new BrowserWindow({
+      width: 760,
+      height: 900,
+      title: p.title,
+      backgroundColor: nativeTheme.shouldUseDarkColors ? '#1d1e23' : '#fdfdfe',
+      webPreferences: {
+        preload: join(__dirname, '../preload/index.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        plugins: true // Chromium's PDF viewer for the blob iframe
+      }
+    })
+    qlWin.on('closed', () => {
+      qlWin = null
+    })
+  }
+  qlWin.setTitle(p.title)
+  const search = '?quicklook=' + encodeURIComponent(JSON.stringify(p))
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    qlWin.loadURL(process.env['ELECTRON_RENDERER_URL'] + search)
+  } else {
+    qlWin.loadFile(join(__dirname, '../renderer/index.html'), { search })
+  }
+  if (!qlWin.isVisible()) qlWin.show()
+  qlWin.focus()
+}
 
 function registerIpc() {
-  // resolves once the engine is healthy; rejects if it fails to start, so the
-  // renderer can show an error instead of hanging on a blank screen
-  ipcMain.handle('engine-info', async () => {
-    const e = await enginePromise!
-    return { port: e.port, token: e.token }
-  })
+  // in-process engine (no sidecar): the renderer calls these over IPC
+  ipcMain.handle('eng:getFolders', () => engine.getFolders())
+  ipcMain.handle('eng:setFolders', (_e, r: string[], ig: string[]) => engine.setFolders(r, ig))
+  ipcMain.handle('eng:stats', () => engine.stats())
+  ipcMain.handle('eng:scenes', (_e, f) => engine.scenes(f))
+  ipcMain.handle('eng:scene', (_e, p: string, i: number) => engine.scene(p, i))
+  ipcMain.handle('eng:reindex', () => engine.reindex())
+  ipcMain.handle('eng:reindexStatus', () => engine.reindexStatus())
+  ipcMain.handle('eng:reindexStop', () => engine.reindexStop())
+  ipcMain.handle('eng:add', (_e, p: string) => engine.add(p))
+  ipcMain.handle('eng:open', (_e, p: string) => { shell.openPath(p); return { ok: true } })
+  ipcMain.handle('eng:reveal', (_e, p: string) => { shell.showItemInFolder(p); return { ok: true } })
   ipcMain.handle('pick-folder', async () => {
     const r = await dialog.showOpenDialog({ properties: ['openDirectory'] })
     return r.canceled ? null : r.filePaths[0]
   })
   ipcMain.handle('app-version', () => app.getVersion())
+  ipcMain.handle('quicklook', (_e, p) => openQuickLook(p))
   ipcMain.handle('check-updates', () => checkForUpdatesManual())
+  ipcMain.handle('quit-and-install', () => quitAndInstall())
   ipcMain.handle('read-file', async (_e, p: string) => {
     const { readFile } = await import('fs/promises')
     return readFile(p) // Buffer → Uint8Array in the renderer
@@ -90,22 +131,15 @@ function createWindow() {
     app.dock.setIcon(nativeImage.createFromPath(iconPath))
   }
 
-  // boot the engine in the background so the window can show "Starting engine…"
-  enginePromise = startEngine()
-  enginePromise
-    .then((e) => {
-      engine = e
-    })
-    .catch((err) => {
-      console.error('engine failed to start:', err)
-    })
-
+  engine = new Engine() // in-process; loads the persisted index instantly
   registerIpc()
   buildMenu()
 
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 840,
+    show: false, // stay hidden until the first paint so there's no blank white flash
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1d1e23' : '#fdfdfe', // matches --window
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -113,6 +147,17 @@ function createWindow() {
       plugins: true // enable Chromium's built-in PDF viewer
     }
   })
+  // show only once the renderer has painted (the splash), so the window appears
+  // already branded instead of blank; fall back after 1.5s in case the event lags
+  const reveal = () => {
+    if (mainWindow && !mainWindow.isVisible()) mainWindow.show()
+  }
+  mainWindow.once('ready-to-show', reveal)
+  setTimeout(reveal, 1500)
+  mainWindow.on('close', () => {
+    if (qlWin && !qlWin.isDestroyed()) qlWin.close() // don't leave the pop-out orphaned
+  })
+
   if (process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -124,7 +169,3 @@ function createWindow() {
 
 app.whenReady().then(createWindow)
 app.on('window-all-closed', () => app.quit())
-app.on('before-quit', () => {
-  engine?.proc.kill()
-  enginePromise?.then((e) => e.proc.kill()).catch(() => {})
-})
