@@ -47,7 +47,8 @@ export function BrowseView({
   const [sel, setSel] = useState<Scene | null>(null)
   const [detail, setDetail] = useState<SceneDetail | null>(null)
 
-  const showPairing = size === DUET
+  // pairing only applies to two-person scenes; show it for Any + Duet, hide for Solo / 3+
+  const showPairing = size === 0 || size === DUET
   const pairValue = showPairing ? PAIR[pair][1] : null
 
   useEffect(() => {
@@ -78,7 +79,7 @@ export function BrowseView({
 
   const chooseSize = (i: number) => {
     setSize(i)
-    if (i !== DUET) setPair(0) // pairing only applies to duets
+    if (i === 1 || i === 3) setPair(0) // Solo / 3+ have no pairing
   }
 
   const sizeChip = size !== 0
