@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, Scene, SceneDetail, sceneBlocks, isPdf } from './api'
 import { PdfFrame } from './PdfFrame'
 
@@ -71,6 +71,8 @@ export function BrowseView({
     setViewState(v)
     localStorage.setItem('sceneView', v)
   }
+  const [quickLook, setQuickLook] = useState(false)
+  const listRef = useRef<HTMLDivElement>(null)
 
   // pairing only applies to two-person scenes; show it for Any + Duet, hide for Solo / 3+
   const showPairing = size === 0 || size === DUET
@@ -106,6 +108,43 @@ export function BrowseView({
     return () => {
       active = false // ignore a stale response when the selection changed
     }
+  }, [sel])
+
+  // keyboard: ↑/↓ move the selection, Space opens a Finder-style Quick Look
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement as HTMLElement | null
+      const typing =
+        !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+      if (typing) return
+      if (quickLook) {
+        if (e.key === ' ' || e.key === 'Escape') {
+          e.preventDefault()
+          setQuickLook(false)
+        }
+        return
+      }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (!scenes.length) return
+        e.preventDefault()
+        const i = sel ? scenes.indexOf(sel) : -1
+        const ni =
+          e.key === 'ArrowDown' ? Math.min(scenes.length - 1, i + 1) : Math.max(0, i - 1)
+        setSel(scenes[ni] || null)
+      } else if (e.key === ' ' && el?.tagName !== 'BUTTON') {
+        if (sel) {
+          e.preventDefault()
+          setQuickLook(true)
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [scenes, sel, quickLook])
+
+  // keep the keyboard-selected row visible
+  useEffect(() => {
+    listRef.current?.querySelector('.row.on')?.scrollIntoView({ block: 'nearest' })
   }, [sel])
 
   const chooseSize = (i: number) => {
@@ -190,7 +229,7 @@ export function BrowseView({
           <span style={{ width: 64 }}>Cast</span>
           <span style={{ width: 42, textAlign: 'right' }}>Pg</span>
         </div>
-        <div className="list">
+        <div className="list" ref={listRef}>
           {scenes.length === 0 && <div className="empty">No scenes match these filters.</div>}
           {scenes.map((s) => (
             <div
@@ -263,6 +302,30 @@ export function BrowseView({
           </>
         )}
       </div>
+
+      {quickLook && sel && (
+        <div className="ql-backdrop" onClick={() => setQuickLook(false)}>
+          <div className="ql-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="ql-head">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="ql-title">{sel.script_name.replace(/\.[^.]+$/, '')}</div>
+                <div className="ql-sub">{sel.heading}{sel.page ? ` · p.${sel.page}` : ''}</div>
+              </div>
+              <button className="ql-close" onClick={() => setQuickLook(false)} title="Close (Space / Esc)">✕</button>
+            </div>
+            <div className="ql-body">
+              {isPdf(sel.script_path) ? (
+                <PdfFrame path={sel.script_path} page={sel.page} />
+              ) : (
+                <div className="dcard ql-scene">
+                  <div className="h">{sel.heading}</div>
+                  {detail === null ? <div className="dnote">Loading scene…</div> : renderBlocks(detail, false)}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
