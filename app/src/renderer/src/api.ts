@@ -25,6 +25,9 @@ declare global {
       pickFolder: () => Promise<string | null>
       onOpenSettings: (cb: () => void) => void
       exportSides: (html: string, name: string) => Promise<boolean>
+      appVersion: () => Promise<string>
+      checkUpdates: () => Promise<void>
+      onUpdateStatus: (cb: (s: string) => void) => () => void
     }
   }
 }

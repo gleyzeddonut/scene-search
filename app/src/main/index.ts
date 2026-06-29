@@ -60,6 +60,8 @@ async function createWindow() {
     const r = await dialog.showOpenDialog({ properties: ['openDirectory'] })
     return r.canceled ? null : r.filePaths[0]
   })
+  ipcMain.handle('app-version', () => app.getVersion())
+  ipcMain.handle('check-updates', () => checkForUpdatesManual())
   ipcMain.handle('export-sides', async (_e, html: string, name: string) => {
     const r = await dialog.showSaveDialog({ defaultPath: `${name} - sides.pdf` })
     if (r.canceled || !r.filePath) return false
@@ -89,7 +91,7 @@ async function createWindow() {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
-  if (app.isPackaged) setupUpdater(() => mainWindow)
+  setupUpdater(() => mainWindow) // wires status events; only auto-checks when packaged
 }
 
 app.whenReady().then(createWindow)

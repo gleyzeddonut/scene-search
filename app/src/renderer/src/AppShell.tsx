@@ -14,8 +14,6 @@ export function AppShell(props: {
   onSection: (s: string) => void
   search: string
   onSearch: (s: string) => void
-  theme: string
-  onTheme: (t: string) => void
   onSettings: () => void
   children: ReactNode
 }) {
@@ -38,10 +36,9 @@ export function AppShell(props: {
             <span className="kbd">⌘K</span>
           </div>
         </div>
-        <div className="seg">
-          <span className={props.theme === 'light' ? 'on' : ''} onClick={() => props.onTheme('light')}>☀</span>
-          <span className={props.theme === 'dark' ? 'on' : ''} onClick={() => props.onTheme('dark')}>☾</span>
-        </div>
+        <button className="iconbtn" title="Settings" onClick={props.onSettings}>
+          <IconGear />
+        </button>
       </div>
       <div className="body">
         <div className="nav">
@@ -55,10 +52,6 @@ export function AppShell(props: {
               <span>{label}</span>
             </button>
           ))}
-          <div className="nav-spacer" />
-          <button className="navItem gear" title="Settings" onClick={props.onSettings}>
-            <IconGear />
-          </button>
         </div>
         {props.children}
       </div>

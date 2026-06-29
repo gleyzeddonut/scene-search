@@ -11,7 +11,7 @@ export default function App() {
   const [ready, setReady] = useState(false)
   const [section, setSection] = useState('library')
   const [search, setSearch] = useState('')
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [prepScene, setPrepScene] = useState<Scene | null>(null)
   // Browse filters live here so they persist across tab switches (this session).
@@ -23,8 +23,17 @@ export default function App() {
     window.scripty.onOpenSettings(() => setSettingsOpen(true))
   }, [])
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('theme', theme)
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const apply = () => {
+      const eff = theme === 'system' ? (mq.matches ? 'dark' : 'light') : theme
+      document.documentElement.setAttribute('data-theme', eff)
+    }
+    apply()
+    if (theme === 'system') {
+      mq.addEventListener('change', apply) // follow OS changes live
+      return () => mq.removeEventListener('change', apply)
+    }
   }, [theme])
 
   if (!ready) return <div style={{ padding: 40 }}>Starting engine…</div>
@@ -35,8 +44,6 @@ export default function App() {
       onSection={setSection}
       search={search}
       onSearch={setSearch}
-      theme={theme}
-      onTheme={setTheme}
       onSettings={() => setSettingsOpen(true)}
     >
       {section === 'browse' && (

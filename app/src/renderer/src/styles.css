@@ -40,8 +40,10 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 .search input{flex:1;border:none;outline:none;background:transparent;color:var(--text);font:400 13.5px/1 'Space Grotesk',sans-serif}
 .kbd{font:600 11px/1 'Space Grotesk';color:var(--text-3);border:1px solid var(--border);border-radius:5px;padding:3px 6px;flex:none}
 .seg{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer}
-.seg span{padding:5px 9px;font-size:13px;color:var(--text-3);display:flex;align-items:center}
+.seg span{padding:5px 11px;font:600 12px/1 'Space Grotesk';color:var(--text-3);display:flex;align-items:center}
 .seg span.on{background:var(--accent);color:#fff}
+.iconbtn{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--text-2);cursor:pointer;transition:background .12s ease,color .12s ease}
+.iconbtn:hover{background:var(--border-soft);color:var(--text)}
 
 /* ---- body ---- */
 .body{flex:1;display:flex;min-height:0}
