@@ -16,6 +16,8 @@ export function AppShell(props: {
   search: string
   onSearch: (s: string) => void
   onSettings: () => void
+  showPreview: boolean
+  onTogglePreview: () => void
   children: ReactNode
 }) {
   const searchRef = useRef<HTMLInputElement>(null)
@@ -49,6 +51,17 @@ export function AppShell(props: {
             />
             <span className="kbd">⌘F</span>
           </div>
+        </div>
+        <div className="toolbar-right">
+          {props.section === 'browse' && (
+            <button
+              className="prevtoggle"
+              title={props.showPreview ? 'Hide preview' : 'Show preview'}
+              onClick={props.onTogglePreview}
+            >
+              {props.showPreview ? '⇥ Hide preview' : '⇤ Show preview'}
+            </button>
+          )}
         </div>
       </div>
       <div className="body">

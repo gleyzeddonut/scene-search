@@ -49,15 +49,27 @@ export class Meta {
     return this.data[path]?.medium
   }
 
-  set(path: string, m: { genres: string[]; genders: Record<string, Gender>; medium?: string }) {
-    const genres = m.genres.map((g) => g.trim()).filter(Boolean)
-    const entry: ScriptMeta = {}
-    if (genres.length) entry.genres = [...new Set(genres)]
-    if (Object.keys(m.genders).length) entry.genders = m.genders
-    if (m.medium) entry.medium = m.medium
-    if (Object.keys(entry).length) this.data[path] = entry
+  // write an entry, stripping empty fields and dropping it entirely when nothing's left
+  private put(path: string, entry: ScriptMeta) {
+    const clean: ScriptMeta = {}
+    if (entry.genres?.length) clean.genres = [...new Set(entry.genres.map((g) => g.trim()).filter(Boolean))]
+    if (entry.genders && Object.keys(entry.genders).length) clean.genders = entry.genders
+    if (entry.medium) clean.medium = entry.medium
+    if (clean.genres?.length || clean.genders || clean.medium) this.data[path] = clean
     else delete this.data[path]
     this.save()
+  }
+
+  // full replace (the Edit-details modal saves everything at once)
+  set(path: string, m: { genres: string[]; genders: Record<string, Gender>; medium?: string }) {
+    this.put(path, { genres: m.genres, genders: m.genders, medium: m.medium })
+  }
+  // partial updates (inline row edits) that preserve the other fields
+  setGenres(path: string, genres: string[]) {
+    this.put(path, { ...this.data[path], genres })
+  }
+  setMedium(path: string, medium: string | undefined) {
+    this.put(path, { ...this.data[path], medium })
   }
 
   // follow a renamed file so its metadata isn't orphaned

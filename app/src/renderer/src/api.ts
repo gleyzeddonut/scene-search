@@ -92,6 +92,8 @@ interface EngineApi {
     p: string,
     m: { genres: string[]; genders: Record<string, string>; medium?: string }
   ) => Promise<{ ok: boolean }>
+  setGenres: (p: string, g: string[]) => Promise<{ genres: string[] }>
+  setMedium: (p: string, md: string) => Promise<{ medium: string | null }>
   open: (p: string) => Promise<unknown>
   reveal: (p: string) => Promise<unknown>
 }
@@ -113,7 +115,6 @@ declare global {
       quickLookUpdate: (p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) => Promise<void>
       quickLookClose: () => Promise<void>
       rowMenu: (p: { path: string; name: string }) => Promise<void>
-      onRenameRequest: (cb: (p: { path: string; name: string }) => void) => () => void
       onEditDetails: (cb: (p: { path: string; name: string }) => void) => () => void
       setFocusCat: (c: 'pdf' | 'text' | 'other') => void
       onMainSpace: (cb: () => void) => () => void
@@ -147,6 +148,8 @@ export const api = {
   getMeta: (path: string) => eng().getMeta(path),
   setMeta: (path: string, m: { genres: string[]; genders: Record<string, string>; medium?: string }) =>
     eng().setMeta(path, m),
+  setGenres: (path: string, genres: string[]) => eng().setGenres(path, genres),
+  setMedium: (path: string, medium: string) => eng().setMedium(path, medium),
   openFile: (path: string) => eng().open(path),
   revealFile: (path: string) => eng().reveal(path),
   pickFolder: () => window.scripty.pickFolder(),

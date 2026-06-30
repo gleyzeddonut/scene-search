@@ -25,15 +25,12 @@ contextBridge.exposeInMainWorld('scripty', {
     mediums: () => ipcRenderer.invoke('eng:mediums'),
     getMeta: (p: string) => ipcRenderer.invoke('eng:getMeta', p),
     setMeta: (p: string, m: unknown) => ipcRenderer.invoke('eng:setMeta', p, m),
+    setGenres: (p: string, g: string[]) => ipcRenderer.invoke('eng:setGenres', p, g),
+    setMedium: (p: string, md: string) => ipcRenderer.invoke('eng:setMedium', p, md),
     open: (p: string) => ipcRenderer.invoke('eng:open', p),
     reveal: (p: string) => ipcRenderer.invoke('eng:reveal', p)
   },
   rowMenu: (p: { path: string; name: string }) => ipcRenderer.invoke('row-menu', p),
-  onRenameRequest: (cb: (p: { path: string; name: string }) => void) => {
-    const l = (_e: unknown, p: { path: string; name: string }) => cb(p)
-    ipcRenderer.on('rename-request', l)
-    return () => ipcRenderer.removeListener('rename-request', l)
-  },
   onEditDetails: (cb: (p: { path: string; name: string }) => void) => {
     const l = (_e: unknown, p: { path: string; name: string }) => cb(p)
     ipcRenderer.on('edit-details-request', l)

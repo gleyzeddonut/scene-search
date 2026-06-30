@@ -64,6 +64,25 @@ describe('Engine medium', () => {
   })
 })
 
+describe('Engine partial meta setters', () => {
+  it('setGenres and setMedium each preserve the other field', async () => {
+    seed(PARSER_VERSION)
+    const eng = new Engine()
+    const f = join(h.userData, 'a.fountain'); writeFileSync(f, 'INT. ROOM - DAY\n\nJOHN\nHi.\n\nMARY\nYo.\n')
+    await eng.add(f)
+    // set a gender override + genre, then change medium inline — others must survive
+    eng.setMeta(f, { genres: ['Drama'], genders: { JOHN: 'female' } })
+    eng.setMedium(f, 'Film')
+    expect(eng.getMeta(f).genres).toEqual(['Drama']) // genre kept
+    expect(eng.getMeta(f).medium).toBe('Film')
+    // now change genres inline — medium + gender override must survive
+    eng.setGenres(f, ['Comedy', 'Crime'])
+    expect(eng.getMeta(f).genres).toEqual(['Comedy', 'Crime'])
+    expect(eng.getMeta(f).medium).toBe('Film')
+    expect(eng.scene(f, eng.scenes({}).scenes[0].scene_index).characters.find((c) => c.name === 'JOHN')?.gender).toBe('female')
+  })
+})
+
 describe('Engine.setMeta', () => {
   it('persists only gender overrides that differ from the guess', async () => {
     seed(PARSER_VERSION)

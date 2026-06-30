@@ -119,6 +119,16 @@ export class Engine {
     this.meta.set(path, { genres: m.genres, genders, medium })
     return { ok: true }
   }
+  // inline row edits — update one field, preserve the rest, return the effective value
+  setGenres(path: string, genres: string[]) {
+    this.meta.setGenres(path, genres)
+    return { genres: this.meta.genres(path) }
+  }
+  setMedium(path: string, medium: string) {
+    const persist = medium && medium !== this.lib.scriptMedium(path) ? medium : undefined
+    this.meta.setMedium(path, persist)
+    return { medium: this.mediumOf(path) ?? null }
+  }
   reindexStatus() {
     return {
       running: this.state.running,

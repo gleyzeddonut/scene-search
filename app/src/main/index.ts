@@ -106,13 +106,14 @@ function registerIpc() {
       engine.setMeta(p, m)
     )
   )
+  ipcMain.handle('eng:setGenres', onEngine((p: string, g: string[]) => engine.setGenres(p, g)))
+  ipcMain.handle('eng:setMedium', onEngine((p: string, md: string) => engine.setMedium(p, md)))
   ipcMain.handle('eng:open', (_e, p: string) => { shell.openPath(p); return { ok: true } })
   ipcMain.handle('eng:reveal', (_e, p: string) => { shell.showItemInFolder(p); return { ok: true } })
   // native right-click menu for a script row
   ipcMain.handle('row-menu', (e, p: { path: string; name: string }) => {
     const menu = Menu.buildFromTemplate([
       { label: 'Edit details…', click: () => e.sender.send('edit-details-request', p) },
-      { label: 'Rename…', click: () => e.sender.send('rename-request', p) },
       { type: 'separator' },
       { label: 'Show in Finder', click: () => shell.showItemInFolder(p.path) }
     ])

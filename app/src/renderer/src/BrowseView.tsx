@@ -3,6 +3,7 @@ import { api, Scene, SceneChar, SceneDetail, sceneBlocks, isPdf, isDocx, isPlain
 import { PdfFrame } from './PdfFrame'
 import { DocFrame } from './DocFrame'
 import { TextFrame } from './TextFrame'
+import { RowMetaEditor } from './RowMetaEditor'
 
 // Semantic size labels (matches the Cue handoff). Values map to char-count range.
 const SIZE: [string, [number, number]][] = [
@@ -66,6 +67,7 @@ export function BrowseView({
   setGenres,
   mediums,
   setMediums,
+  showPreview,
   refreshKey,
   onPrepare
 }: {
@@ -78,6 +80,7 @@ export function BrowseView({
   setGenres: (g: string[]) => void
   mediums: string[]
   setMediums: (m: string[]) => void
+  showPreview: boolean
   refreshKey: number
   onPrepare: (scene: Scene, scenes: Scene[]) => void
 }) {
@@ -87,12 +90,8 @@ export function BrowseView({
   const [openMedium, setOpenMedium] = useState(false)
   const [allGenres, setAllGenres] = useState<string[]>([])
   const [allMediums, setAllMediums] = useState<string[]>([])
-  const [showPreview, setShowPreview] = useState(localStorage.getItem('browsePreview') !== '0')
-  const togglePreview = () => {
-    const next = !showPreview
-    setShowPreview(next)
-    localStorage.setItem('browsePreview', next ? '1' : '0')
-  }
+  // inline genre/medium editor anchored to a row cell
+  const [metaEdit, setMetaEdit] = useState<{ path: string; kind: 'genre' | 'medium'; rect: DOMRect } | null>(null)
   const [scenes, setScenes] = useState<Scene[]>([])
   const [selScript, setSelScript] = useState<ScriptGroup | null>(null)
   const [selScene, setSelScene] = useState<Scene | null>(null)
@@ -272,6 +271,25 @@ export function BrowseView({
   const toggleMedium = (m: string) =>
     setMediums(mediums.includes(m) ? mediums.filter((x) => x !== m) : [...mediums, m])
 
+  // inline edits: update every scene of the script locally (so the row reflects it
+  // immediately) and persist; medium reflects the server's effective value (guess fallback)
+  const patchScript = (path: string, patch: Partial<Scene>) =>
+    setScenes((prev) => prev.map((s) => (s.script_path === path ? { ...s, ...patch } : s)))
+  const applyGenres = (path: string, g: string[]) => {
+    patchScript(path, { genres: g })
+    api.setGenres(path, g).then(() => api.allGenres().then(setAllGenres).catch(() => {})).catch(() => {})
+  }
+  const applyMedium = (path: string, m: string | null) => {
+    api
+      .setMedium(path, m ?? '')
+      .then((r) => patchScript(path, { medium: r.medium }))
+      .catch(() => {})
+  }
+  const openMetaEdit = (e: React.MouseEvent, path: string, kind: 'genre' | 'medium') => {
+    e.stopPropagation()
+    setMetaEdit({ path, kind, rect: e.currentTarget.getBoundingClientRect() })
+  }
+
   const sizeChip = size !== 0
   const pairChip = showPairing && pair !== 0
   const hasChips = sizeChip || pairChip || genres.length > 0 || mediums.length > 0
@@ -400,16 +418,7 @@ export function BrowseView({
               <span>All scripts · no filters applied</span>
             )}
           </div>
-          <span className="lhead-right">
-            <span className="result">{scripts.length} script{scripts.length !== 1 ? 's' : ''}</span>
-            <button
-              className="prevtoggle"
-              title={showPreview ? 'Hide preview' : 'Show preview'}
-              onClick={togglePreview}
-            >
-              {showPreview ? '⇥ Hide preview' : '⇤ Show preview'}
-            </button>
-          </span>
+          <span className="result">{scripts.length} script{scripts.length !== 1 ? 's' : ''}</span>
         </div>
         <div className="colhead">
           <span style={{ flex: 1 }}>Script</span>
@@ -439,18 +448,26 @@ export function BrowseView({
                   {g.cast.length !== 1 ? 's' : ''}
                 </div>
               </div>
-              <span className="col-genre" title={g.genres.join(', ')}>
+              <span
+                className="col-genre editable"
+                title={g.genres.length ? g.genres.join(', ') : 'Set genre'}
+                onClick={(e) => openMetaEdit(e, g.path, 'genre')}
+              >
                 {g.genres.length ? (
                   <>
                     {g.genres[0]}
                     {g.genres.length > 1 && <span className="more"> +{g.genres.length - 1}</span>}
                   </>
                 ) : (
-                  <span className="col-dash">—</span>
+                  <span className="col-dash">＋</span>
                 )}
               </span>
-              <span className="col-medium">
-                {g.medium ? <span className="medchip">{g.medium}</span> : <span className="col-dash">—</span>}
+              <span
+                className="col-medium editable"
+                title="Set medium"
+                onClick={(e) => openMetaEdit(e, g.path, 'medium')}
+              >
+                {g.medium ? <span className="medchip">{g.medium}</span> : <span className="col-dash">＋</span>}
               </span>
               <div className="cast">
                 {g.cast.slice(0, 3).map((c) => (
@@ -520,6 +537,25 @@ export function BrowseView({
         )}
       </div>
       )}
+
+      {metaEdit &&
+        (() => {
+          const g = scripts.find((x) => x.path === metaEdit.path)
+          if (!g) return null
+          return (
+            <RowMetaEditor
+              kind={metaEdit.kind}
+              rect={metaEdit.rect}
+              genres={g.genres}
+              medium={g.medium}
+              allGenres={allGenres}
+              allMediums={allMediums}
+              onApplyGenres={(next) => applyGenres(metaEdit.path, next)}
+              onApplyMedium={(next) => applyMedium(metaEdit.path, next)}
+              onClose={() => setMetaEdit(null)}
+            />
+          )
+        })()}
     </>
   )
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, stem } from './api'
+import { api } from './api'
 
 const SUGGESTED = [
   'Drama', 'Comedy', 'Thriller', 'Romance', 'Horror', 'Sci-Fi',
@@ -19,6 +19,10 @@ export function EditDetailsModal({
   onClose: () => void
   onDone: (msg: string) => void
 }) {
+  const dot = name.lastIndexOf('.')
+  const ext = dot > 0 ? name.slice(dot) : ''
+  const stem0 = dot > 0 ? name.slice(0, dot) : name
+  const [fileName, setFileName] = useState(stem0)
   const [loaded, setLoaded] = useState(false)
   const [genres, setGenres] = useState<string[]>([])
   const [cast, setCast] = useState<string[]>([])
@@ -27,6 +31,7 @@ export function EditDetailsModal({
   const [mediums, setMediums] = useState<string[]>([])
   const [custom, setCustom] = useState('')
   const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
 
   useEffect(() => {
     api
@@ -50,11 +55,32 @@ export function EditDetailsModal({
   }
   const save = async () => {
     setBusy(true)
+    setErr('')
     try {
-      await api.setMeta(path, { genres, genders, medium: medium || undefined })
+      // rename the file first (if changed) — engine.rename moves the index + metadata
+      // to the new path, which we then save the edited details against
+      let target = path
+      const newStem = fileName.trim()
+      if (newStem && newStem !== stem0) {
+        const r = await api.renameScript(path, newStem)
+        if (!r.ok) {
+          setBusy(false)
+          setErr(
+            r.error === 'exists'
+              ? 'A file with that name already exists.'
+              : r.error === 'busy'
+                ? 'Library is indexing — try again in a moment.'
+                : 'Couldn’t rename the file.'
+          )
+          return
+        }
+        target = r.path ?? path
+      }
+      await api.setMeta(target, { genres, genders, medium: medium || undefined })
       onDone('Saved details')
     } catch {
       setBusy(false)
+      setErr('Couldn’t save.')
     }
   }
 
@@ -62,12 +88,25 @@ export function EditDetailsModal({
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">Edit details</div>
-        <div className="ed-sub">{stem(name)}</div>
 
         {!loaded ? (
           <div className="dnote">Loading…</div>
         ) : (
           <div className="ed-body">
+            <div className="ed-sec">File name</div>
+            <div className="rename-row">
+              <input
+                className="rename-input"
+                value={fileName}
+                onChange={(e) => setFileName(e.target.value)}
+                onFocus={(e) => e.currentTarget.select()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') save()
+                }}
+              />
+              {ext && <span className="rename-ext">{ext}</span>}
+            </div>
+
             <div className="ed-sec">Medium</div>
             <div className="ed-suggest">
               <button className={'chip' + (medium === '' ? ' on' : '')} onClick={() => setMedium('')}>
@@ -141,6 +180,7 @@ export function EditDetailsModal({
           </div>
         )}
 
+        {err && <div className="rename-err">{err}</div>}
         <div className="modal-foot">
           <button className="ghost" onClick={onClose}>Cancel</button>
           <button className="btn-accent" onClick={save} disabled={busy || !loaded}>

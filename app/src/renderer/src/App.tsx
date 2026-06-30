@@ -6,7 +6,6 @@ import { BrowseView } from './BrowseView'
 import { LibraryView } from './LibraryView'
 import { PrepareView } from './PrepareView'
 import { SettingsModal } from './SettingsModal'
-import { RenameModal } from './RenameModal'
 import { EditDetailsModal } from './EditDetailsModal'
 import { Splash } from './Splash'
 
@@ -19,7 +18,6 @@ export default function App() {
   const [search, setSearch] = useState('')
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system')
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [renaming, setRenaming] = useState<{ path: string; name: string } | null>(null)
   const [editing, setEditing] = useState<{ path: string; name: string } | null>(null)
   const [prepScene, setPrepScene] = useState<Scene | null>(null)
   const [prepScenes, setPrepScenes] = useState<Scene[]>([]) // the script's matching scenes, for the Prepare switcher
@@ -28,6 +26,14 @@ export default function App() {
   const [browsePair, setBrowsePair] = useState(0)
   const [browseGenres, setBrowseGenres] = useState<string[]>([])
   const [browseMediums, setBrowseMediums] = useState<string[]>([])
+  const [showPreview, setShowPreview] = useState(localStorage.getItem('browsePreview') !== '0')
+  const togglePreview = () => {
+    setShowPreview((v) => {
+      const next = !v
+      localStorage.setItem('browsePreview', next ? '1' : '0')
+      return next
+    })
+  }
   const [toast, setToast] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
   const readyRef = useRef(false)
@@ -52,10 +58,8 @@ export default function App() {
       })
       .catch(() => {})
     // from a row's right-click menu
-    const offRename = window.scripty.onRenameRequest?.((p) => setRenaming(p))
     const offEdit = window.scripty.onEditDetails?.((p) => setEditing(p))
     return () => {
-      offRename?.()
       offEdit?.()
     }
   }, [])
@@ -183,6 +187,8 @@ export default function App() {
           search={search}
           onSearch={setSearch}
           onSettings={() => setSettingsOpen(true)}
+          showPreview={showPreview}
+          onTogglePreview={togglePreview}
         >
           {section === 'browse' && (
             <BrowseView
@@ -195,6 +201,7 @@ export default function App() {
               setGenres={setBrowseGenres}
               mediums={browseMediums}
               setMediums={setBrowseMediums}
+              showPreview={showPreview}
               refreshKey={refreshKey}
               onPrepare={(s, list) => {
                 setPrepScene(s)
@@ -215,18 +222,6 @@ export default function App() {
         </AppShell>
         {settingsOpen && (
           <SettingsModal theme={theme} onTheme={setTheme} onClose={() => setSettingsOpen(false)} />
-        )}
-        {renaming && (
-          <RenameModal
-            path={renaming.path}
-            name={renaming.name}
-            onClose={() => setRenaming(null)}
-            onDone={(msg) => {
-              setRenaming(null)
-              showToast(msg)
-              setRefreshKey((k) => k + 1) // re-read the library so the new name shows
-            }}
-          />
         )}
         {editing && (
           <EditDetailsModal
