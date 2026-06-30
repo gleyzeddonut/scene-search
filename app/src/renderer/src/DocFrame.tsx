@@ -16,7 +16,7 @@ const PAGE_CSS = `
     a { color: #9db4ff }
   }
   p { margin: 0 0 10px }
-  h1,h2,h3 { font-family: 'Space Grotesk', system-ui, sans-serif; line-height: 1.25 }
+  h1,h2,h3 { font-family: system-ui, sans-serif; line-height: 1.25 }
   img { max-width: 100%; height: auto }
   table { border-collapse: collapse }
   td, th { border: 1px solid #bbb; padding: 4px 8px }
