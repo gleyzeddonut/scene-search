@@ -132,7 +132,7 @@ export default function App() {
     const counts = { added: 0, exists: 0, notScript: 0, err: 0 }
     let last = ''
     for (const it of items) {
-      last = it.name
+      last = stem(it.name) // show the title without the extension, like the Remove toast
       try {
         const r = await api.addScript(it.path)
         if (r.result === 'added') counts.added++
@@ -160,7 +160,7 @@ export default function App() {
   // the + button: choose one or more files in a native picker, then add them
   const pickAndAdd = async () => {
     const paths = await window.scripty.pickFiles()
-    addFiles(paths.map((p) => ({ path: p, name: p.split('/').pop() || p })))
+    void addFiles(paths.map((p) => ({ path: p, name: p.split('/').pop() || p })))
   }
 
   // drag-and-drop a script file onto the window to add it
@@ -177,7 +177,7 @@ export default function App() {
         showToast('Couldn’t read the dropped file’s location')
         return
       }
-      addFiles(items)
+      void addFiles(items)
     }
     window.addEventListener('dragover', onDragOver)
     window.addEventListener('drop', onDrop)

@@ -331,17 +331,19 @@ export function BrowseView({
   // Space from main (PDF preview had focus and swallowed it) → toggle Quick Look
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => window.scripty.onMainSpace?.(toggleQuickLook), [qlOpen, selScene])
-  // "Quick Look" from a row's right-click menu → open it for the just-selected scene
+  // "Quick Look" from a row's right-click menu → open it for the just-selected scene.
+  // Only open when closed: the row's onContextMenu already ran chooseScript, which
+  // updates an already-open pop-out in place, so re-opening here would reload+flash it.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(
     () =>
       window.scripty.onQuickLookRequest?.(() => {
-        if (selScene) {
+        if (!qlOpen && selScene) {
           window.scripty.quickLook(qlPayload(selScene))
           setQlOpen(true)
         }
       }),
-    [selScene]
+    [selScene, qlOpen]
   )
 
   // pick a script (and reset to its earliest scene)

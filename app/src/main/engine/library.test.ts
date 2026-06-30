@@ -90,6 +90,21 @@ describe('Library', () => {
     expect(lib.query({ pairing: 'WW' }, genderOf).length).toBe(0) // not two women
   })
 
+  it('foldGroup returns every re-download duplicate of a path (so remove takes all)', async () => {
+    const d = tmp()
+    writeFileSync(join(d, 'Heat.fountain'), 'INT. A - DAY\n\nNEIL\nHi.\n')
+    writeFileSync(join(d, 'Heat (1).fountain'), 'INT. A - DAY\n\nNEIL\nHi.\n')
+    const lib = new Library()
+    await lib.reindex([d])
+    expect(lib.query({}).length).toBe(1) // Browse folds the duplicates to one row
+    const group = lib.foldGroup(join(d, 'Heat.fountain'))
+    expect(new Set(group)).toEqual(
+      new Set([resolve(join(d, 'Heat.fountain')), resolve(join(d, 'Heat (1).fountain'))])
+    )
+    group.forEach((p) => lib.remove(p))
+    expect(lib.query({}).length).toBe(0) // no twin promoted back into view
+  })
+
   it('remove() drops a script, and reindex skips ignored (removed) files', async () => {
     const d = tmp()
     writeFileSync(join(d, 'a.fountain'), 'INT. ROOM - DAY\n\nBOB\nHi.\n')

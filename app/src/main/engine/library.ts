@@ -301,6 +301,19 @@ export class Library {
     return true
   }
 
+  // every indexed path that folds together with `path` in the Browse list (same folder
+  // + canonical key — i.e. re-download duplicates). Removing the visible representative
+  // must take its hidden twins too, or query() just promotes a twin back into view.
+  foldGroup(path: string): string[] {
+    const rp = resolve(path)
+    const row = this.scripts.get(rp)
+    if (!row) return [rp]
+    const key = dirname(rp) + '\0' + canonicalKey(row.name)
+    return [...this.scripts.values()]
+      .filter((s) => dirname(s.path) + '\0' + canonicalKey(s.name) === key)
+      .map((s) => s.path)
+  }
+
   async addFile(path: string): Promise<'added' | 'exists' | 'not_script' | 'unreadable'> {
     const rp = resolve(path)
     const ext = rp.slice(rp.lastIndexOf('.')).toLowerCase()
