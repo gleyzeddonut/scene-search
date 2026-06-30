@@ -4,6 +4,7 @@ import { PdfFrame } from './PdfFrame'
 import { DocFrame } from './DocFrame'
 import { TextFrame } from './TextFrame'
 import { RowMetaEditor } from './RowMetaEditor'
+import { IconSortUp, IconSortDown, IconChevron } from './icons'
 
 // Semantic size labels (matches the Cue handoff). Values map to char-count range.
 const SIZE: [string, [number, number]][] = [
@@ -394,7 +395,7 @@ export function BrowseView({
             <span className="flabel">Scene size</span>
             <span className="fright">
               <span className={'fsummary' + (size !== 0 ? ' active' : '')}>{SIZE[size][0]}</span>
-              <span className={'caret' + (openSize ? ' open' : '')}>›</span>
+              <span className={'caret' + (openSize ? ' open' : '')}><IconChevron /></span>
             </span>
           </div>
           {openSize && (
@@ -414,7 +415,7 @@ export function BrowseView({
               <span className="flabel">Partner pairing</span>
               <span className="fright">
                 <span className={'fsummary' + (pair !== 0 ? ' active' : '')}>{PAIR[pair][0]}</span>
-                <span className={'caret' + (openPair ? ' open' : '')}>›</span>
+                <span className={'caret' + (openPair ? ' open' : '')}><IconChevron /></span>
               </span>
             </div>
             {openPair && (
@@ -436,7 +437,7 @@ export function BrowseView({
               <span className={'fsummary' + (genres.length ? ' active' : '')}>
                 {genres.length ? `${genres.length} selected` : 'Any'}
               </span>
-              <span className={'caret' + (openGenre ? ' open' : '')}>›</span>
+              <span className={'caret' + (openGenre ? ' open' : '')}><IconChevron /></span>
             </span>
           </div>
           {openGenre &&
@@ -460,7 +461,7 @@ export function BrowseView({
               <span className={'fsummary' + (mediums.length ? ' active' : '')}>
                 {mediums.length ? `${mediums.length} selected` : 'Any'}
               </span>
-              <span className={'caret' + (openMedium ? ' open' : '')}>›</span>
+              <span className={'caret' + (openMedium ? ' open' : '')}><IconChevron /></span>
             </span>
           </div>
           {openMedium && (
@@ -517,7 +518,7 @@ export function BrowseView({
               onClick={(e) => setSortMenu(e.currentTarget.getBoundingClientRect())}
             >
               Sort: {SORTS.find((s) => s.key === sort.key)?.label}
-              <span className="sortdir">{sort.dir === 'asc' ? '↑' : '↓'}</span>
+              <span className="sortdir">{sort.dir === 'asc' ? <IconSortUp /> : <IconSortDown />}</span>
             </button>
           </span>
         </div>
@@ -662,7 +663,7 @@ export function BrowseView({
             <div className="rme-list">
               {SORTS.map((s) => (
                 <button key={s.key} className={'rme-opt' + (sort.key === s.key ? ' on' : '')} onClick={() => setSort(s.key)}>
-                  <span className="rme-check">{sort.key === s.key ? (sort.dir === 'asc' ? '↑' : '↓') : ''}</span>
+                  <span className="rme-check">{sort.key === s.key ? (sort.dir === 'asc' ? <IconSortUp /> : <IconSortDown />) : ''}</span>
                   {s.label}
                 </button>
               ))}

@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef } from 'react'
-import { IconBrowse, IconPrepare, IconLibrary, IconGear } from './icons'
+import { IconBrowse, IconPrepare, IconLibrary, IconGear, IconPanelShow, IconPanelHide } from './icons'
 
 const NAV: [string, string, ReactNode][] = [
   ['browse', 'Browse', <IconBrowse key="b" />],
@@ -76,7 +76,15 @@ export function AppShell(props: {
               title={props.showPreview ? 'Hide preview' : 'Show preview'}
               onClick={props.onTogglePreview}
             >
-              {props.showPreview ? '⇥ Hide preview' : '⇤ Show preview'}
+              {props.showPreview ? (
+                <>
+                  <IconPanelHide /> Hide preview
+                </>
+              ) : (
+                <>
+                  <IconPanelShow /> Show preview
+                </>
+              )}
             </button>
           )}
         </div>
