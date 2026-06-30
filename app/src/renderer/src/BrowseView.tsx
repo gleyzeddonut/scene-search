@@ -33,6 +33,60 @@ interface ScriptGroup {
   medium: string | null
 }
 
+// optional list columns the user can show/hide by right-clicking the header (Script
+// is always shown). Persisted in localStorage.
+type ColKey = 'genre' | 'medium' | 'cast' | 'scenes'
+const COLS: { key: ColKey; label: string }[] = [
+  { key: 'genre', label: 'Genre' },
+  { key: 'medium', label: 'Medium' },
+  { key: 'cast', label: 'Cast' },
+  { key: 'scenes', label: 'Scenes' }
+]
+function loadCols(): Record<ColKey, boolean> {
+  let saved: Partial<Record<ColKey, boolean>> = {}
+  try {
+    saved = JSON.parse(localStorage.getItem('browseCols') || '{}')
+  } catch {
+    saved = {}
+  }
+  return { genre: saved.genre !== false, medium: saved.medium !== false, cast: saved.cast !== false, scenes: saved.scenes !== false }
+}
+
+// list sort — by any column; counts default to descending, text to ascending
+type SortKey = 'name' | 'genre' | 'medium' | 'cast' | 'scenes'
+interface Sort { key: SortKey; dir: 'asc' | 'desc' }
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: 'name', label: 'Script' },
+  { key: 'genre', label: 'Genre' },
+  { key: 'medium', label: 'Medium' },
+  { key: 'cast', label: 'Cast' },
+  { key: 'scenes', label: 'Scenes' }
+]
+const defaultDir = (k: SortKey): 'asc' | 'desc' => (k === 'cast' || k === 'scenes' ? 'desc' : 'asc')
+function loadSort(): Sort {
+  try {
+    const s = JSON.parse(localStorage.getItem('browseSort') || '')
+    if (s && s.key) return { key: s.key, dir: s.dir === 'desc' ? 'desc' : 'asc' }
+  } catch {
+    /* default below */
+  }
+  return { key: 'name', dir: 'asc' }
+}
+function sortGroups(groups: ScriptGroup[], sort: Sort): ScriptGroup[] {
+  const f = sort.dir === 'desc' ? -1 : 1
+  return [...groups].sort((a, b) => {
+    if (sort.key === 'cast') return (a.cast.length - b.cast.length) * f || a.name.localeCompare(b.name)
+    if (sort.key === 'scenes') return (a.scenes.length - b.scenes.length) * f || a.name.localeCompare(b.name)
+    if (sort.key === 'genre' || sort.key === 'medium') {
+      const av = sort.key === 'genre' ? a.genres[0] || '' : a.medium || ''
+      const bv = sort.key === 'genre' ? b.genres[0] || '' : b.medium || ''
+      if (!av !== !bv) return av ? -1 : 1 // untagged always sorts last
+      return av.localeCompare(bv) * f || a.name.localeCompare(b.name)
+    }
+    return a.name.localeCompare(b.name) * f
+  })
+}
+
 function gletter(g: string) {
   return g === 'female' ? 'W' : g === 'male' ? 'M' : 'U'
 }
@@ -92,6 +146,24 @@ export function BrowseView({
   const [allMediums, setAllMediums] = useState<string[]>([])
   // inline genre/medium editor anchored to a row cell
   const [metaEdit, setMetaEdit] = useState<{ path: string; kind: 'genre' | 'medium'; rect: DOMRect } | null>(null)
+  // which list columns are shown (right-click the header to toggle); persisted
+  const [cols, setColsState] = useState<Record<ColKey, boolean>>(loadCols)
+  const setCol = (k: ColKey, v: boolean) =>
+    setColsState((c) => {
+      const next = { ...c, [k]: v }
+      localStorage.setItem('browseCols', JSON.stringify(next))
+      return next
+    })
+  const [colMenu, setColMenu] = useState<{ x: number; y: number } | null>(null)
+  const [sort, setSortState] = useState<Sort>(loadSort)
+  const setSort = (key: SortKey) =>
+    setSortState((prev) => {
+      // clicking the active column flips direction; a new column uses its default
+      const next: Sort = { key, dir: prev.key === key ? (prev.dir === 'asc' ? 'desc' : 'asc') : defaultDir(key) }
+      localStorage.setItem('browseSort', JSON.stringify(next))
+      return next
+    })
+  const [sortMenu, setSortMenu] = useState<DOMRect | null>(null)
   const [scenes, setScenes] = useState<Scene[]>([])
   const [selScript, setSelScript] = useState<ScriptGroup | null>(null)
   const [selScene, setSelScene] = useState<Scene | null>(null)
@@ -99,6 +171,10 @@ export function BrowseView({
   const listRef = useRef<HTMLDivElement>(null)
   const navRef = useRef<HTMLDivElement>(null)
   const qlToggleAt = useRef(0)
+  // set when a fresh query result lands, so the selection-reset effect resets ONLY
+  // then — not when an inline edit patches the scene list in place (which would
+  // otherwise snap the selection back to the top)
+  const freshResult = useRef(true)
   const [qlOpen, setQlOpen] = useState(false)
 
   // the pop-out can be closed from its own window — keep our toggle state in sync
@@ -134,6 +210,8 @@ export function BrowseView({
     return [...map.values()] // api.scenes already returns scripts in name order
   }, [scenes])
 
+  const sorted = useMemo(() => sortGroups(scripts, sort), [scripts, sort])
+
   // the genres actually assigned across the library + the fixed medium list, for the rail
   useEffect(() => {
     api.allGenres().then(setAllGenres).catch(() => {})
@@ -154,6 +232,7 @@ export function BrowseView({
       })
       .then((r) => {
         if (!active) return // ignore a stale response when filters/search changed
+        freshResult.current = true // a new result set → the reset effect should reset
         setScenes(r.scenes)
       })
       .catch(() => {})
@@ -162,10 +241,17 @@ export function BrowseView({
     }
   }, [size, pair, search, genres, mediums, refreshKey])
 
-  // when the result set changes, select the first script and its earliest scene
+  // select the first script (in the current sort order) and its earliest scene — but
+  // ONLY when a fresh query result landed. An inline edit that patches scenes in place
+  // must not reset selection (and re-sorting only repositions it), so we gate on the
+  // freshResult flag rather than the `scripts` identity.
   useEffect(() => {
-    setSelScript(scripts[0] || null)
-    setSelScene(scripts[0]?.scenes[0] || null)
+    if (!freshResult.current) return
+    freshResult.current = false
+    const first = sorted[0] || null
+    setSelScript(first)
+    setSelScene(first?.scenes[0] || null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scripts])
 
   // pull the selected scene's dialogue so the preview shows the full scene.
@@ -233,11 +319,11 @@ export function BrowseView({
       const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
       if (typing) return
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        if (!scripts.length) return
+        if (!sorted.length) return
         e.preventDefault()
-        const i = selScript ? scripts.indexOf(selScript) : -1
-        const ni = e.key === 'ArrowDown' ? Math.min(scripts.length - 1, i + 1) : Math.max(0, i - 1)
-        if (scripts[ni]) chooseScript(scripts[ni])
+        const i = selScript ? sorted.indexOf(selScript) : -1
+        const ni = e.key === 'ArrowDown' ? Math.min(sorted.length - 1, i + 1) : Math.max(0, i - 1)
+        if (sorted[ni]) chooseScript(sorted[ni])
       } else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && selScript && selScript.scenes.length > 1) {
         e.preventDefault()
         const list = selScript.scenes
@@ -252,7 +338,7 @@ export function BrowseView({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scripts, selScript, selScene, qlOpen])
+  }, [sorted, selScript, selScene, qlOpen])
 
   // keep the keyboard-selected rows visible
   useEffect(() => {
@@ -418,18 +504,35 @@ export function BrowseView({
               <span>All scripts · no filters applied</span>
             )}
           </div>
-          <span className="result">{scripts.length} script{scripts.length !== 1 ? 's' : ''}</span>
+          <span className="lhead-right">
+            <span className="result">{scripts.length} script{scripts.length !== 1 ? 's' : ''}</span>
+            <button
+              className="sortbtn"
+              title="Sort scripts"
+              onClick={(e) => setSortMenu(e.currentTarget.getBoundingClientRect())}
+            >
+              Sort: {SORTS.find((s) => s.key === sort.key)?.label}
+              <span className="sortdir">{sort.dir === 'asc' ? '↑' : '↓'}</span>
+            </button>
+          </span>
         </div>
-        <div className="colhead">
+        <div
+          className="colhead"
+          title="Right-click to show or hide columns"
+          onContextMenu={(e) => {
+            e.preventDefault()
+            setColMenu({ x: e.clientX, y: e.clientY })
+          }}
+        >
           <span style={{ flex: 1 }}>Script</span>
-          <span style={{ width: 96 }}>Genre</span>
-          <span style={{ width: 78 }}>Medium</span>
-          <span style={{ width: 64 }}>Cast</span>
-          <span style={{ width: 42, textAlign: 'right' }}>Scenes</span>
+          {cols.genre && <span style={{ width: 96 }}>Genre</span>}
+          {cols.medium && <span style={{ width: 78 }}>Medium</span>}
+          {cols.cast && <span style={{ width: 64 }}>Cast</span>}
+          {cols.scenes && <span style={{ width: 42, textAlign: 'right' }}>Scenes</span>}
         </div>
         <div className="list" ref={listRef}>
-          {scripts.length === 0 && <div className="empty">No scripts match these filters.</div>}
-          {scripts.map((g) => (
+          {sorted.length === 0 && <div className="empty">No scripts match these filters.</div>}
+          {sorted.map((g) => (
             <div
               key={g.path}
               className={'row' + (selScript === g ? ' on' : '')}
@@ -448,35 +551,41 @@ export function BrowseView({
                   {g.cast.length !== 1 ? 's' : ''}
                 </div>
               </div>
-              <span
-                className="col-genre editable"
-                title={g.genres.length ? g.genres.join(', ') : 'Set genre'}
-                onClick={(e) => openMetaEdit(e, g.path, 'genre')}
-              >
-                {g.genres.length ? (
-                  <>
-                    {g.genres[0]}
-                    {g.genres.length > 1 && <span className="more"> +{g.genres.length - 1}</span>}
-                  </>
-                ) : (
-                  <span className="col-dash">＋</span>
-                )}
-              </span>
-              <span
-                className="col-medium editable"
-                title="Set medium"
-                onClick={(e) => openMetaEdit(e, g.path, 'medium')}
-              >
-                {g.medium ? <span className="medchip">{g.medium}</span> : <span className="col-dash">＋</span>}
-              </span>
-              <div className="cast">
-                {g.cast.slice(0, 3).map((c) => (
-                  <div key={c.name} className={'gchip ' + gletter(c.gender)} title={c.name}>
-                    {gletter(c.gender)}
-                  </div>
-                ))}
-              </div>
-              <span className="page">{g.scenes.length}</span>
+              {cols.genre && (
+                <span
+                  className="col-genre editable"
+                  title={g.genres.length ? g.genres.join(', ') : 'Set genre'}
+                  onClick={(e) => openMetaEdit(e, g.path, 'genre')}
+                >
+                  {g.genres.length ? (
+                    <>
+                      {g.genres[0]}
+                      {g.genres.length > 1 && <span className="more"> +{g.genres.length - 1}</span>}
+                    </>
+                  ) : (
+                    <span className="col-dash">＋</span>
+                  )}
+                </span>
+              )}
+              {cols.medium && (
+                <span
+                  className="col-medium editable"
+                  title="Set medium"
+                  onClick={(e) => openMetaEdit(e, g.path, 'medium')}
+                >
+                  {g.medium ? <span className="medchip">{g.medium}</span> : <span className="col-dash">＋</span>}
+                </span>
+              )}
+              {cols.cast && (
+                <div className="cast">
+                  {g.cast.slice(0, 3).map((c) => (
+                    <div key={c.name} className={'gchip ' + gletter(c.gender)} title={c.name}>
+                      {gletter(c.gender)}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {cols.scenes && <span className="page">{g.scenes.length}</span>}
             </div>
           ))}
         </div>
@@ -531,11 +640,50 @@ export function BrowseView({
               <button className="prepare" onClick={() => onPrepare(selScene, selScript.scenes)}>
                 Prepare scene →
               </button>
-              <button className="ghost" onClick={() => api.revealFile(selScene.script_path)}>Reveal</button>
             </div>
           </>
         )}
       </div>
+      )}
+
+      {sortMenu && (
+        <div className="rme-backdrop" onClick={() => setSortMenu(null)}>
+          <div
+            className="rme"
+            style={{ left: Math.min(sortMenu.left, window.innerWidth - 196), top: sortMenu.bottom + 4 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="rme-cap">Sort by</div>
+            <div className="rme-list">
+              {SORTS.map((s) => (
+                <button key={s.key} className={'rme-opt' + (sort.key === s.key ? ' on' : '')} onClick={() => setSort(s.key)}>
+                  <span className="rme-check">{sort.key === s.key ? (sort.dir === 'asc' ? '↑' : '↓') : ''}</span>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {colMenu && (
+        <div className="rme-backdrop" onClick={() => setColMenu(null)} onContextMenu={(e) => { e.preventDefault(); setColMenu(null) }}>
+          <div
+            className="rme"
+            style={{ left: Math.min(colMenu.x, window.innerWidth - 196), top: colMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="rme-cap">Columns</div>
+            <div className="rme-list">
+              {COLS.map((c) => (
+                <button key={c.key} className="rme-opt" onClick={() => setCol(c.key, !cols[c.key])}>
+                  <span className="rme-check">{cols[c.key] ? '✓' : ''}</span>
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {metaEdit &&

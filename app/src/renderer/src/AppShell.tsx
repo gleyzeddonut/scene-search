@@ -1,6 +1,5 @@
 import { ReactNode, useEffect, useRef } from 'react'
 import { IconBrowse, IconPrepare, IconLibrary, IconGear } from './icons'
-import iconUrl from './assets/icon.png'
 
 const NAV: [string, string, ReactNode][] = [
   ['browse', 'Browse', <IconBrowse key="b" />],
@@ -36,7 +35,7 @@ export function AppShell(props: {
     <div className="app">
       <div className="toolbar">
         <div className="brand">
-          <img className="brand-mark" src={iconUrl} alt="Scripty" />
+          <div className="brand-square" />
           <span className="wordmark">Scripty</span>
           <span className="brand-sep">/ {TITLES[props.section]}</span>
         </div>

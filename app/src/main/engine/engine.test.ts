@@ -57,10 +57,42 @@ describe('Engine medium', () => {
     expect(eng.scenes({ mediums: ['Commercial'] }).scenes.every((s) => s.script_path === com)).toBe(true)
     expect(eng.scenes({ mediums: ['Commercial'] }).scenes.length).toBeGreaterThan(0)
     expect(eng.getMeta(film).medium).toBe('') // untagged
+    // a ":30 COMMERCIAL" timing label (space before the colon) is also detected
+    const spot = join(h.userData, 'spot.fountain')
+    writeFileSync(spot, 'INT. KITCHEN - DAY\n\nANNCR\nThis is a :30 COMMERCIAL for soap.\n\nVO\nBuy now.\n')
+    await eng.add(spot)
+    expect(eng.getMeta(spot).medium).toBe('Commercial')
     // a manual override puts the feature under Film
     eng.setMeta(film, { genres: [], genders: {}, medium: 'Film' })
     expect(eng.getMeta(film).medium).toBe('Film')
     expect(eng.scenes({ mediums: ['Film'] }).scenes.every((s) => s.script_path === film)).toBe(true)
+  })
+})
+
+describe('Engine medium clear + rename re-guess', () => {
+  it('lets None clear an auto-guessed Commercial (sentinel suppresses the guess)', async () => {
+    seed(PARSER_VERSION)
+    const eng = new Engine()
+    const f = join(h.userData, 'Acme_Commercial_Sides.fountain')
+    writeFileSync(f, 'INT. SET - DAY\n\nMOM\nTry Acme.\n\nKID\nYum!\n')
+    await eng.add(f)
+    expect(eng.getMeta(f).medium).toBe('Commercial') // auto-guessed
+    eng.setMedium(f, '') // user picks None
+    expect(eng.getMeta(f).medium).toBe('') // stays cleared, doesn't revert to the guess
+    expect(eng.scenes({ mediums: ['Commercial'] }).scenes.length).toBe(0) // gone from the filter
+  })
+
+  it('re-guesses the medium for the new filename on rename', async () => {
+    seed(PARSER_VERSION)
+    const eng = new Engine()
+    const d = mkdtempSync(join(tmpdir(), 'rn-'))
+    const f = join(d, 'Wawa Commercial Sides.fountain')
+    writeFileSync(f, 'INT. STORE - DAY\n\nCLERK\nHi.\n\nCUST\nHello.\n')
+    await eng.add(f)
+    expect(eng.getMeta(f).medium).toBe('Commercial') // from the filename
+    const r = await eng.rename(f, 'Wawa Sides') // drop "Commercial" from the name
+    expect(r.ok).toBe(true)
+    expect(eng.getMeta(r.path!).medium).toBe('') // no longer guessed Commercial
   })
 })
 

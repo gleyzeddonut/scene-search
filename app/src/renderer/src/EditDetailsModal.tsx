@@ -3,7 +3,7 @@ import { api } from './api'
 
 const SUGGESTED = [
   'Drama', 'Comedy', 'Thriller', 'Romance', 'Horror', 'Sci-Fi',
-  'Action', 'Fantasy', 'Mystery', 'Crime', 'Family', 'Coming-of-Age'
+  'Action', 'Fantasy', 'Mystery', 'Crime'
 ]
 const GENDERS: [string, string][] = [['W', 'female'], ['M', 'male'], ['U', 'unknown']]
 

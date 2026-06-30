@@ -54,7 +54,9 @@ export default function App() {
     api
       .stats()
       .then((s) => {
-        if (s.scripts > 0) setSection('browse')
+        // only auto-switch if the user is still on the default Library tab — don't
+        // clobber a navigation they made while stats was resolving
+        if (s.scripts > 0 && sectionRef.current === 'library') setSection('browse')
       })
       .catch(() => {})
     // from a row's right-click menu

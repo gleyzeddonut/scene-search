@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 const SUGGESTED = [
   'Drama', 'Comedy', 'Thriller', 'Romance', 'Horror', 'Sci-Fi',
-  'Action', 'Fantasy', 'Mystery', 'Crime', 'Family', 'Coming-of-Age'
+  'Action', 'Fantasy', 'Mystery', 'Crime'
 ]
 
 // A small dropdown anchored to a Browse-row Genre/Medium cell for quick inline edits
@@ -21,6 +21,11 @@ export function RowMetaEditor(props: {
 }) {
   const [genres, setGenres] = useState<string[]>(props.genres)
   const [custom, setCustom] = useState('')
+  // freeze the option order when the dropdown opens — toggling a genre updates only
+  // its checkmark, never its position (selected genres don't jump around)
+  const [options, setOptions] = useState<string[]>(() => [
+    ...new Set([...props.allGenres, ...SUGGESTED, ...props.genres])
+  ])
 
   // position: below the cell, or above when there isn't room
   const openUp = window.innerHeight - props.rect.bottom < 280
@@ -39,6 +44,7 @@ export function RowMetaEditor(props: {
     if (v && !genres.some((g) => g.toLowerCase() === v.toLowerCase())) {
       const next = [...genres, v]
       setGenres(next)
+      if (!options.some((o) => o.toLowerCase() === v.toLowerCase())) setOptions((o) => [...o, v]) // append, don't reorder
       props.onApplyGenres(next)
     }
     setCustom('')
@@ -74,7 +80,7 @@ export function RowMetaEditor(props: {
         ) : (
           <>
             <div className="rme-list rme-genres">
-              {[...new Set([...props.allGenres, ...SUGGESTED, ...genres])].map((g) => (
+              {options.map((g) => (
                 <button
                   key={g}
                   className={'rme-opt' + (genres.includes(g) ? ' on' : '')}

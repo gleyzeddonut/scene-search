@@ -41,7 +41,9 @@ export function TextFrame({ path }: { path: string }) {
     () =>
       text == null
         ? ''
-        : `<!doctype html><html><head><meta charset="utf-8"><style>${PAGE_CSS}</style></head><body><pre>${escapeHtml(text)}</pre></body></html>`,
+        : `<!doctype html><html><head><meta charset="utf-8">` +
+          `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">` +
+          `<style>${PAGE_CSS}</style></head><body><pre>${escapeHtml(text)}</pre></body></html>`,
     [text]
   )
 

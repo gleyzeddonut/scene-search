@@ -43,9 +43,16 @@ export function DocFrame({ path }: { path: string }) {
     }
   }, [path])
 
-  // full self-contained document so the sandboxed iframe renders it standalone
+  // full self-contained document so the sandboxed iframe renders it standalone. A CSP
+  // blocks remote subresources — mammoth inlines images as data: URIs, so a malicious
+  // .docx can't beacon out a remote <img> (the sandbox already blocks scripts).
   const srcDoc = useMemo(
-    () => (html == null ? '' : `<!doctype html><html><head><meta charset="utf-8"><style>${PAGE_CSS}</style></head><body>${html}</body></html>`),
+    () =>
+      html == null
+        ? ''
+        : `<!doctype html><html><head><meta charset="utf-8">` +
+          `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">` +
+          `<style>${PAGE_CSS}</style></head><body>${html}</body></html>`,
     [html]
   )
 

@@ -31,14 +31,16 @@ interface ScriptRow { path: string; name: string; mtime: number; sceneCount: num
 // COMMERCIAL"). The bare word in prose is NOT enough (feature scripts say "commercial
 // flight" etc. — verified false positives across the corpus). We never guess
 // TV/Play/Film: audition sides are excerpts and don't reveal those.
+// the ":\d\d COMMERCIAL" form is split out without a leading \b — a word boundary
+// before ":" fails when it's preceded by a space, which would make that branch dead
 const COMMERCIAL_LABEL_RE =
-  /\bCOMMERCIAL\s+(?:AUDITION|SPOT|SCRIPT|STORYBOARD|BREAKDOWN)\b|\b(?:TV|RADIO|NATIONAL|REGIONAL|:\d\d)\s+COMMERCIAL\b/
-function guessMedium(name: string, scenes: Scene[]): string | undefined {
+  /\bCOMMERCIAL\s+(?:AUDITION|SPOT|SCRIPT|STORYBOARD|BREAKDOWN)\b|\b(?:TV|RADIO|NATIONAL|REGIONAL)\s+COMMERCIAL\b|:\d\d\s+COMMERCIAL\b/
+function guessMedium(name: string, scenes: { heading: string; blocks: SceneBlock[] }[]): string | undefined {
   // normalize separators first ("Wawa_Commercial_Sides" → "Wawa Commercial Sides"),
   // since '_' is a word char and would defeat the \b boundary
   if (/\bcommercials?\b/i.test(name.replace(/[^a-zA-Z]+/g, ' '))) return 'Commercial'
   const hay = scenes
-    .map((s) => s.heading + ' ' + s.blocks.map((b) => ('text' in b ? b.text : '')).join(' '))
+    .map((s) => s.heading + ' ' + s.blocks.map((b) => b.text).join(' '))
     .join(' ')
     .toUpperCase()
   return COMMERCIAL_LABEL_RE.test(hay) ? 'Commercial' : undefined
@@ -165,12 +167,15 @@ export class Library {
     if (!row) return
     const name = basename(newPath)
     this.scripts.delete(oldPath)
-    this.scripts.set(newPath, { ...row, path: newPath, name })
     for (const s of this.scenes)
       if (s.path === oldPath) {
         s.path = newPath
         s.name = name
       }
+    // re-guess the medium for the NEW name (the filename feeds the commercial guess,
+    // so a rename can change it; the scene text is unchanged)
+    const scenes = this.scenes.filter((s) => s.path === newPath).map((s) => ({ heading: s.heading, blocks: s.content }))
+    this.scripts.set(newPath, { ...row, path: newPath, name, medium: guessMedium(name, scenes) })
   }
 
   async reindex(folders: string[], opts: ReindexOpts = {}): Promise<void> {
