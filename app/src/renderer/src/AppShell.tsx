@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef } from 'react'
-import { IconBrowse, IconPrepare, IconLibrary, IconGear, IconPanelShow, IconPanelHide } from './icons'
+import { IconBrowse, IconPrepare, IconLibrary, IconGear, IconPanelShow, IconPanelHide, IconPlus } from './icons'
 
 const NAV: [string, string, ReactNode][] = [
   ['browse', 'Browse', <IconBrowse key="b" />],
@@ -71,11 +71,6 @@ export function AppShell(props: {
           </div>
         </div>
         <div className="toolbar-right">
-          <button className="addbtn" title="Add scripts…" onClick={props.onAdd}>
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
-              <path d="M8 3v10M3 8h10" />
-            </svg>
-          </button>
           {props.section === 'browse' && (
             <button
               className="prevtoggle"
@@ -93,6 +88,9 @@ export function AppShell(props: {
               )}
             </button>
           )}
+          <button className="addbtn" title="Add scripts…" onClick={props.onAdd}>
+            <IconPlus />
+          </button>
         </div>
       </div>
       <div className="body">

@@ -73,3 +73,10 @@ export function IconPanelHide() {
     </svg>
   )
 }
+export function IconPlus() {
+  return (
+    <svg width="15" height="15" viewBox="156 -1646 1848 1848" fill="currentColor" style={{ overflow: 'visible' }}>
+      <path d="M1170 14V-1458C1170 -1506 1129 -1547 1080 -1547C1031 -1547 991 -1506 991 -1458V14C991 62 1031 103 1080 103C1129 103 1170 62 1170 14ZM344 -633H1816C1864 -633 1905 -673 1905 -722C1905 -771 1864 -812 1816 -812H344C296 -812 255 -771 255 -722C255 -673 296 -633 344 -633Z" />
+    </svg>
+  )
+}

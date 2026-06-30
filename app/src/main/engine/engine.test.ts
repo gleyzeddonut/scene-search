@@ -96,6 +96,22 @@ describe('Engine medium clear + rename re-guess', () => {
   })
 })
 
+describe('Engine remove + re-add', () => {
+  it('removes a script and lets the same file be added again', async () => {
+    seed(PARSER_VERSION)
+    const eng = new Engine()
+    const f = join(h.userData, 'r.fountain')
+    writeFileSync(f, 'INT. ROOM - DAY\n\nBOB\nHi.\n\nAMY\nYo.\n')
+    expect((await eng.add(f)).result).toBe('added')
+    expect(eng.scenes({}).scenes.length).toBe(1)
+    eng.removeScript(f)
+    expect(eng.scenes({}).scenes.length).toBe(0) // gone
+    // manually adding the same file again brings it back (re-add un-hides it)
+    expect((await eng.add(f)).result).toBe('added')
+    expect(eng.scenes({}).scenes.length).toBe(1)
+  })
+})
+
 describe('Engine partial meta setters', () => {
   it('setGenres and setMedium each preserve the other field', async () => {
     seed(PARSER_VERSION)

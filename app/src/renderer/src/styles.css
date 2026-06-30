@@ -125,7 +125,7 @@ body{margin:0;font-family:system-ui,-apple-system,sans-serif;color:var(--text);b
 .sortbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:transparent;color:var(--text-2);border-radius:8px;padding:6px 11px;font:600 11.5px/1 system-ui;cursor:pointer;white-space:nowrap;transition:background .12s ease,color .12s ease}
 .sortbtn:hover{background:var(--border-soft);color:var(--text)}
 .sortbtn .sortdir{display:inline-flex;align-items:center;color:var(--accent-text)}
-.prevtoggle{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:transparent;color:var(--text-2);border-radius:8px;padding:6px 11px;font:600 11.5px/1 system-ui;cursor:pointer;white-space:nowrap;transition:background .12s ease,color .12s ease}
+.prevtoggle{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:124px;border:1px solid var(--border);background:transparent;color:var(--text-2);border-radius:8px;padding:6px 11px;font:600 11.5px/1 system-ui;cursor:pointer;white-space:nowrap;transition:background .12s ease,color .12s ease}
 .prevtoggle:hover{background:var(--border-soft);color:var(--text)}
 .colhead{flex:none;display:flex;align-items:center;gap:14px;padding:9px 20px;font:600 10px/1 system-ui;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);border-bottom:1px solid var(--border-soft)}
 .list{flex:1;overflow-y:auto}
