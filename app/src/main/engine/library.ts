@@ -4,7 +4,7 @@ import { extractPaginated as realExtract, extractLayout, layoutToText, isSparseP
 import { parseScenes, parseLayout, parseHeadingless, parseScenesHeadingless } from './parser'
 import { parseFdx, parseFountain } from './formats'
 import { scenePairing, guessGender, pairingFromGenders } from './gender'
-import { sceneWordCount, estimateSeconds } from './runtime'
+import { sceneWordCount, estimateSeconds, estimateScene } from './runtime'
 import { iterCandidates, SCRIPT_EXTENSIONS } from './scanner'
 import type { Scene, SceneMatch, SceneBlock } from './types'
 
@@ -272,7 +272,7 @@ export class Library {
       return {
         script_path: s.path, script_name: s.name, heading: s.heading, page: s.page, top: s.top,
         char_count: s.charCount, characters: s.characters, pairing: pairingOf(s),
-        scene_index: s.index, est_seconds: s.est,
+        scene_index: s.index, est_seconds: estimateScene(s.dialogue, s.content),
         added: row?.added ?? row?.mtime // creation time; mtime fallback for pre-reindex entries
       }
     })
@@ -286,7 +286,7 @@ export class Library {
       characters: s.characters.map((n) => ({ name: n, gender: genderOf(path, n) })),
       lines: s.dialogue.map(([who, text]) => ({ who, text })),
       content: s.content,
-      est_seconds: s.est
+      est_seconds: estimateScene(s.dialogue, s.content) // action fallback so it's never 0:00
     }
   }
 
