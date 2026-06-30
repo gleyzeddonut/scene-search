@@ -31,33 +31,45 @@ let spaceTarget: 'pdf' | 'text' | 'other' = 'other'
 type QlPayload = { title: string; path: string; sceneIndex: number; page?: number; top?: number; isPdf: boolean }
 
 function openQuickLook(p: QlPayload) {
-  if (!qlWin || qlWin.isDestroyed()) {
-    qlWin = new BrowserWindow({
-      width: 760,
-      height: 900,
-      title: p.title,
-      show: false,
-      backgroundColor: nativeTheme.shouldUseDarkColors ? '#1d1e23' : '#fdfdfe',
-      webPreferences: {
-        preload: join(__dirname, '../preload/index.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-        plugins: true // Chromium's PDF viewer for the blob iframe
-      }
-    })
-    qlWin.on('closed', () => {
-      qlWin = null
-      mainWindow?.webContents.send('quicklook-closed') // keep the renderer's toggle state in sync
-    })
-    // intercept Space/Esc at the webContents level so they close the pop-out even
-    // when the PDF iframe has focus (otherwise Space scrolls the PDF) — Finder-style
-    qlWin.webContents.on('before-input-event', (event, input) => {
-      if (input.type === 'keyDown' && !input.isAutoRepeat && (input.key === ' ' || input.key === 'Escape')) {
-        event.preventDefault()
-        closeQuickLook()
-      }
-    })
+  // the window is kept alive across closes (hidden, not destroyed), so after the first
+  // open its renderer bundle is already loaded — just update the scene and reveal it
+  // instantly instead of reloading the whole app (the ~1s grey-then-load).
+  if (qlWin && !qlWin.isDestroyed()) {
+    qlWin.setTitle(p.title)
+    qlWin.webContents.send('ql-scene', p)
+    if (!qlWin.isVisible()) qlWin.showInactive()
+    return
   }
+  qlWin = new BrowserWindow({
+    width: 760,
+    height: 900,
+    title: p.title,
+    show: false,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1d1e23' : '#fdfdfe',
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      plugins: true // Chromium's PDF viewer for the blob iframe
+    }
+  })
+  // closing the pop-out (red X) hides it rather than destroying it, so the next open is
+  // instant; the main window closing (below) force-destroys it on app teardown
+  qlWin.on('close', (e) => {
+    e.preventDefault()
+    qlWin?.hide()
+  })
+  qlWin.on('hide', () => mainWindow?.webContents.send('quicklook-closed')) // sync the toggle
+  qlWin.on('closed', () => { qlWin = null })
+  // intercept Space/Esc at the webContents level so they close the pop-out even
+  // when the PDF iframe has focus (otherwise Space scrolls the PDF) — Finder-style
+  qlWin.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && !input.isAutoRepeat && (input.key === ' ' || input.key === 'Escape')) {
+      event.preventDefault()
+      closeQuickLook()
+    }
+  })
+  qlWin.once('ready-to-show', () => qlWin?.showInactive()) // show only once painted — no grey flash
   qlWin.setTitle(p.title)
   const search = '?quicklook=' + encodeURIComponent(JSON.stringify(p))
   if (process.env['ELECTRON_RENDERER_URL']) {
@@ -65,7 +77,6 @@ function openQuickLook(p: QlPayload) {
   } else {
     qlWin.loadFile(join(__dirname, '../renderer/index.html'), { search })
   }
-  qlWin.showInactive() // visible but DON'T take focus — the list keeps Space/arrows (Finder-style)
 }
 
 // follow the selection without a full reload (and without stealing focus)
@@ -79,7 +90,7 @@ function updateQuickLook(p: QlPayload) {
 }
 
 function closeQuickLook() {
-  if (qlWin && !qlWin.isDestroyed()) qlWin.close()
+  if (qlWin && !qlWin.isDestroyed()) qlWin.hide() // hide (keep alive) so reopening is instant
 }
 
 function registerIpc() {
@@ -276,7 +287,8 @@ function createWindow() {
     }
   })
   mainWindow.on('close', () => {
-    if (qlWin && !qlWin.isDestroyed()) qlWin.close() // don't leave the pop-out orphaned
+    // force-destroy (not close → that just hides it now) so the app can fully quit
+    if (qlWin && !qlWin.isDestroyed()) qlWin.destroy()
   })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
