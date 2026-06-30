@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('scripty', {
   exportSides: (html: string, name: string) => ipcRenderer.invoke('export-sides', html, name),
   appVersion: () => ipcRenderer.invoke('app-version') as Promise<string>,
   readFile: (path: string) => ipcRenderer.invoke('read-file', path) as Promise<Uint8Array>,
+  renderDoc: (path: string) => ipcRenderer.invoke('render-doc', path) as Promise<string | null>,
   checkUpdates: () => ipcRenderer.invoke('check-updates'),
   quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
   quickLook: (p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) =>

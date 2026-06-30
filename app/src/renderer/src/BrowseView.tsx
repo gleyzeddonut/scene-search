@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { api, Scene, SceneChar, SceneDetail, sceneBlocks, isPdf, stem } from './api'
+import { api, Scene, SceneChar, SceneDetail, sceneBlocks, isPdf, isDocx, stem } from './api'
 import { PdfFrame } from './PdfFrame'
+import { DocFrame } from './DocFrame'
 
 // Semantic size labels (matches the Cue handoff). Values map to char-count range.
 const SIZE: [string, [number, number]][] = [
@@ -404,6 +405,8 @@ export function BrowseView({
             </div>
             {isPdf(selScene.script_path) ? (
               <PdfFrame path={selScene.script_path} page={selScene.page} nonce={selScene.scene_index} />
+            ) : isDocx(selScene.script_path) ? (
+              <DocFrame path={selScene.script_path} />
             ) : (
               <div className="dcard">
                 <div className="h">{selScene.heading}</div>

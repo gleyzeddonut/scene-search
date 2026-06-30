@@ -34,6 +34,12 @@ export function isPdf(path: string): boolean {
   return path.toLowerCase().endsWith('.pdf')
 }
 
+// .docx previews render the real document (mammoth → HTML), like the PDF viewer —
+// not the parsed-scene fallback the other text formats use
+export function isDocx(path: string): boolean {
+  return path.toLowerCase().endsWith('.docx')
+}
+
 // a filename without its extension ("Heat.pdf" → "Heat")
 export const stem = (name: string): string => name.replace(/\.[^.]+$/, '')
 
@@ -86,6 +92,7 @@ declare global {
       exportSides: (html: string, name: string) => Promise<boolean>
       appVersion: () => Promise<string>
       readFile: (path: string) => Promise<Uint8Array>
+      renderDoc: (path: string) => Promise<string | null>
       checkUpdates: () => Promise<void>
       quitAndInstall: () => Promise<void>
       quickLook: (p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) => Promise<void>

@@ -132,6 +132,17 @@ function registerIpc() {
     const { readFile } = await import('fs/promises')
     return readFile(p) // Buffer → Uint8Array in the renderer
   })
+  // render a .docx as its real document HTML (mammoth, images inlined as data URIs)
+  // so the preview shows the actual document, not the parsed scenes
+  ipcMain.handle('render-doc', async (_e, p: string): Promise<string | null> => {
+    try {
+      const mammoth: any = await import('mammoth')
+      const { value } = await mammoth.convertToHtml({ path: p })
+      return value as string
+    } catch {
+      return null
+    }
+  })
   ipcMain.handle('export-sides', async (_e, html: string, name: string) => {
     const r = await dialog.showSaveDialog({ defaultPath: `${name} - sides.pdf` })
     if (r.canceled || !r.filePath) return false
