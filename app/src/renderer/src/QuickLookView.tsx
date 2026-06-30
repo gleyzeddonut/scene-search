@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import './styles.css'
 import { PdfFrame } from './PdfFrame'
 import { DocFrame } from './DocFrame'
-import { api, SceneDetail, sceneBlocks, isDocx } from './api'
+import { TextFrame } from './TextFrame'
+import { api, SceneDetail, sceneBlocks, isDocx, isPlainText } from './api'
 
 type QlScene = { path: string; sceneIndex: number; page?: number; isPdf: boolean; title?: string }
 
@@ -17,9 +18,10 @@ export function QuickLookView(initial: QlScene) {
   useEffect(() => window.scripty.onQuickLookScene?.((p) => setScene(p as QlScene)), [])
 
   const docx = isDocx(scene.path)
+  const txt = isPlainText(scene.path)
 
   useEffect(() => {
-    if (scene.isPdf || docx) return // PDF/docx render the real document, not parsed text
+    if (scene.isPdf || docx || txt) return // these render the real file, not parsed text
     let active = true
     api
       .getScene(scene.path, scene.sceneIndex)
@@ -28,7 +30,7 @@ export function QuickLookView(initial: QlScene) {
     return () => {
       active = false
     }
-  }, [scene.path, scene.sceneIndex, scene.isPdf, docx])
+  }, [scene.path, scene.sceneIndex, scene.isPdf, docx, txt])
 
   if (scene.isPdf) {
     return (
@@ -41,6 +43,13 @@ export function QuickLookView(initial: QlScene) {
     return (
       <div className="qlview">
         <DocFrame path={scene.path} />
+      </div>
+    )
+  }
+  if (txt) {
+    return (
+      <div className="qlview">
+        <TextFrame path={scene.path} />
       </div>
     )
   }

@@ -40,6 +40,13 @@ export function isDocx(path: string): boolean {
   return path.toLowerCase().endsWith('.docx')
 }
 
+// readable plain-text scripts shown verbatim (real file), like Finder. .fdx is
+// excluded — its raw form is Final Draft XML, so the parsed view reads better.
+export function isPlainText(path: string): boolean {
+  const p = path.toLowerCase()
+  return p.endsWith('.txt') || p.endsWith('.fountain')
+}
+
 // a filename without its extension ("Heat.pdf" → "Heat")
 export const stem = (name: string): string => name.replace(/\.[^.]+$/, '')
 
