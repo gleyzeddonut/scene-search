@@ -31,7 +31,7 @@ export function canonicalKey(filename: string): string {
   return (stem.trim() + ext).toLowerCase()
 }
 
-interface ScriptRow { path: string; name: string; mtime: number; sceneCount: number; pinned: boolean; medium?: string }
+interface ScriptRow { path: string; name: string; mtime: number; added?: number; sceneCount: number; pinned: boolean; medium?: string }
 
 // A deliberately conservative medium guess: only auto-tag 'Commercial' when the
 // document essentially SAYS so — its filename contains "commercial", or the text uses
@@ -139,8 +139,11 @@ export class Library {
   private async indexFile(path: string, force = false): Promise<void> {
     const rp = resolve(path)
     let mtime = 0
+    let added: number | undefined
     try {
-      mtime = (await stat(rp)).mtimeMs
+      const st = await stat(rp)
+      mtime = st.mtimeMs
+      added = st.birthtimeMs || st.mtimeMs // file creation = download/added time (mtime fallback)
     } catch {
       return
     }
@@ -153,7 +156,7 @@ export class Library {
     // deletes unpinned scripts that fall outside the indexed folders
     const name = basename(rp)
     this.scripts.set(rp, {
-      path: rp, name, mtime, sceneCount: parsed.length, pinned: existing?.pinned ?? false,
+      path: rp, name, mtime, added, sceneCount: parsed.length, pinned: existing?.pinned ?? false,
       medium: guessMedium(name, parsed) // conservative auto-tag; undefined unless clearly a commercial
     })
     for (const s of parsed) {
@@ -264,11 +267,15 @@ export class Library {
     }
     rows = rows.filter((s) => rep.get(foldKey(s)) === s.path)
     rows.sort((a, b) => (a.name === b.name ? a.index - b.index : a.name < b.name ? -1 : 1))
-    return rows.map((s) => ({
-      script_path: s.path, script_name: s.name, heading: s.heading, page: s.page, top: s.top,
-      char_count: s.charCount, characters: s.characters, pairing: pairingOf(s),
-      scene_index: s.index, est_seconds: s.est
-    }))
+    return rows.map((s) => {
+      const row = this.scripts.get(s.path)
+      return {
+        script_path: s.path, script_name: s.name, heading: s.heading, page: s.page, top: s.top,
+        char_count: s.charCount, characters: s.characters, pairing: pairingOf(s),
+        scene_index: s.index, est_seconds: s.est,
+        added: row?.added ?? row?.mtime // creation time; mtime fallback for pre-reindex entries
+      }
+    })
   }
 
   getScene(path: string, index: number, genderOf: (path: string, name: string) => string = (_p, n) => guessGender(n)) {

@@ -13,6 +13,7 @@ export interface Scene {
   est_seconds: number
   genres?: string[] // manual genre tags on the script
   medium?: string | null // effective medium (manual or guessed), null = untagged
+  added?: number // file creation/added time (ms epoch), for the Date added sort
 }
 
 export type SceneBlock =

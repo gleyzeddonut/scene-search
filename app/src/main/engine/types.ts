@@ -28,6 +28,7 @@ export interface SceneMatch {
   pairing: string | null
   scene_index: number
   est_seconds: number
+  added?: number // file creation/added time (ms epoch)
 }
 
 export interface Folders {

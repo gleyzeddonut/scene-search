@@ -31,6 +31,7 @@ interface ScriptGroup {
   cast: SceneChar[]
   genres: string[]
   medium: string | null
+  added: number
 }
 
 // optional list columns the user can show/hide by right-clicking the header (Script
@@ -52,17 +53,19 @@ function loadCols(): Record<ColKey, boolean> {
   return { genre: saved.genre !== false, medium: saved.medium !== false, cast: saved.cast !== false, scenes: saved.scenes !== false }
 }
 
-// list sort — by any column; counts default to descending, text to ascending
-type SortKey = 'name' | 'genre' | 'medium' | 'cast' | 'scenes'
+// list sort — by any column; counts/date default to descending, text to ascending
+type SortKey = 'name' | 'genre' | 'medium' | 'cast' | 'scenes' | 'added'
 interface Sort { key: SortKey; dir: 'asc' | 'desc' }
 const SORTS: { key: SortKey; label: string }[] = [
-  { key: 'name', label: 'Script' },
+  { key: 'name', label: 'Name' },
+  { key: 'added', label: 'Date added' },
   { key: 'genre', label: 'Genre' },
   { key: 'medium', label: 'Medium' },
   { key: 'cast', label: 'Cast' },
   { key: 'scenes', label: 'Scenes' }
 ]
-const defaultDir = (k: SortKey): 'asc' | 'desc' => (k === 'cast' || k === 'scenes' ? 'desc' : 'asc')
+const defaultDir = (k: SortKey): 'asc' | 'desc' =>
+  k === 'cast' || k === 'scenes' || k === 'added' ? 'desc' : 'asc'
 function loadSort(): Sort {
   try {
     const s = JSON.parse(localStorage.getItem('browseSort') || '')
@@ -75,6 +78,7 @@ function loadSort(): Sort {
 function sortGroups(groups: ScriptGroup[], sort: Sort): ScriptGroup[] {
   const f = sort.dir === 'desc' ? -1 : 1
   return [...groups].sort((a, b) => {
+    if (sort.key === 'added') return ((a.added || 0) - (b.added || 0)) * f || a.name.localeCompare(b.name)
     if (sort.key === 'cast') return (a.cast.length - b.cast.length) * f || a.name.localeCompare(b.name)
     if (sort.key === 'scenes') return (a.scenes.length - b.scenes.length) * f || a.name.localeCompare(b.name)
     if (sort.key === 'genre' || sort.key === 'medium') {
@@ -191,8 +195,8 @@ export function BrowseView({
     for (const s of scenes) {
       let g = map.get(s.script_path)
       if (!g) {
-        // genre/medium are per-script, so any of its scenes carries them
-        g = { path: s.script_path, name: s.script_name, scenes: [], cast: [], genres: s.genres ?? [], medium: s.medium ?? null }
+        // genre/medium/added are per-script, so any of its scenes carries them
+        g = { path: s.script_path, name: s.script_name, scenes: [], cast: [], genres: s.genres ?? [], medium: s.medium ?? null, added: s.added ?? 0 }
         map.set(s.script_path, g)
       }
       g.scenes.push(s)
