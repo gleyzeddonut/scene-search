@@ -26,6 +26,9 @@ export default function App() {
   const [browsePair, setBrowsePair] = useState(0)
   const [browseGenres, setBrowseGenres] = useState<string[]>([])
   const [browseMediums, setBrowseMediums] = useState<string[]>([])
+  // remembers the Browse selection across tab switches (BrowseView unmounts on Prepare),
+  // so "Back to results" returns to the script you prepared
+  const browseSelRef = useRef<{ path: string; index: number } | null>(null)
   const [showPreview, setShowPreview] = useState(localStorage.getItem('browsePreview') !== '0')
   const togglePreview = () => {
     setShowPreview((v) => {
@@ -204,6 +207,7 @@ export default function App() {
               mediums={browseMediums}
               setMediums={setBrowseMediums}
               showPreview={showPreview}
+              selRef={browseSelRef}
               refreshKey={refreshKey}
               onPrepare={(s, list) => {
                 setPrepScene(s)

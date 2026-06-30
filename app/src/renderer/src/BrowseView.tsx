@@ -127,6 +127,7 @@ export function BrowseView({
   mediums,
   setMediums,
   showPreview,
+  selRef,
   refreshKey,
   onPrepare
 }: {
@@ -140,6 +141,9 @@ export function BrowseView({
   mediums: string[]
   setMediums: (m: string[]) => void
   showPreview: boolean
+  // remembers the selected script across tab switches (lives in App so it survives
+  // this view unmounting when you go to Prepare), so Back returns to the same script
+  selRef: React.MutableRefObject<{ path: string; index: number } | null>
   refreshKey: number
   onPrepare: (scene: Scene, scenes: Scene[]) => void
 }) {
@@ -180,6 +184,8 @@ export function BrowseView({
   // then — not when an inline edit patches the scene list in place (which would
   // otherwise snap the selection back to the top)
   const freshResult = useRef(true)
+  // the script to restore on mount (captured once) — e.g. coming Back from Prepare
+  const restoreRef = useRef(selRef.current)
   const [qlOpen, setQlOpen] = useState(false)
 
   // the pop-out can be closed from its own window — keep our toggle state in sync
@@ -252,12 +258,34 @@ export function BrowseView({
   // freshResult flag rather than the `scripts` identity.
   useEffect(() => {
     if (!freshResult.current) return
+    if (!sorted.length) {
+      // no matches: clear the preview but keep waiting (don't consume the restore)
+      setSelScript(null)
+      setSelScene(null)
+      return
+    }
     freshResult.current = false
-    const first = sorted[0] || null
-    setSelScript(first)
-    setSelScene(first?.scenes[0] || null)
+    // on mount, restore the remembered script (Back from Prepare); afterwards, and on
+    // filter changes, fall back to the first row
+    const restore = restoreRef.current
+    restoreRef.current = null
+    const g = restore ? sorted.find((x) => x.path === restore.path) : undefined
+    if (g) {
+      setSelScript(g)
+      setSelScene(g.scenes.find((s) => s.scene_index === restore!.index) || g.scenes[0] || null)
+    } else {
+      const first = sorted[0] || null
+      setSelScript(first)
+      setSelScene(first?.scenes[0] || null)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scripts])
+
+  // remember the current selection in App (a ref → no re-render) so it survives this
+  // view unmounting and can be restored when we come back
+  useEffect(() => {
+    if (selScene) selRef.current = { path: selScene.script_path, index: selScene.scene_index }
+  }, [selScene, selRef])
 
   // pull the selected scene's dialogue so the preview shows the full scene.
   // keep the previous scene visible until the new one arrives (no "Loading…" flash)
