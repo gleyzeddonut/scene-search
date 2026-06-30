@@ -9,6 +9,9 @@ import { guessGender } from './gender'
 import { Meta, Gender } from './meta'
 import { PARSER_VERSION } from './parser'
 
+// the fixed set of mediums a script can be tagged with
+const MEDIUMS = ['Film', 'TV', 'Play', 'Commercial']
+
 export class Engine {
   private dir = join(app.getPath('userData'), 'scripty')
   private settings: Settings
@@ -16,6 +19,9 @@ export class Engine {
   private meta = new Meta(this.dir)
   // resolve a character's gender: manual override first, then the name-based guess
   private genderOf = (path: string, name: string): string => this.meta.gender(path, name) ?? guessGender(name)
+  // a script's medium: manual override first, then the conservative parsed guess
+  // ('Commercial' or undefined). undefined = untagged (the user sets it manually).
+  private mediumOf = (path: string): string | undefined => this.meta.medium(path) ?? this.lib.scriptMedium(path)
   // true when the persisted index was built by an older parser — the next
   // reindex re-parses every file (not just changed ones) so the new parsing
   // reaches scripts that are already in the library
@@ -49,13 +55,17 @@ export class Engine {
   stats() {
     return { scripts: this.lib.scriptCount(), scenes: this.lib.sceneCount() }
   }
-  scenes(f: { min_chars?: number; max_chars?: number; pairing?: string; search?: string; genres?: string[] }) {
+  scenes(f: {
+    min_chars?: number; max_chars?: number; pairing?: string; search?: string
+    genres?: string[]; mediums?: string[]
+  }) {
     const rows = this.lib.query(
       { minChars: f.min_chars, maxChars: f.max_chars, pairing: f.pairing || null },
       this.genderOf
     )
     const s = (f.search || '').toLowerCase()
     const wantGenres = f.genres && f.genres.length ? new Set(f.genres) : null
+    const wantMediums = f.mediums && f.mediums.length ? new Set(f.mediums) : null
     const gcache = new Map<string, string[]>() // a script's genres, looked up once
     const genresOf = (p: string) => {
       let g = gcache.get(p)
@@ -65,10 +75,12 @@ export class Engine {
     const out = rows
       .filter((m) => !s || m.script_name.toLowerCase().includes(s) || m.heading.toLowerCase().includes(s))
       .filter((m) => !wantGenres || genresOf(m.script_path).some((g) => wantGenres.has(g)))
+      .filter((m) => !wantMediums || wantMediums.has(this.mediumOf(m.script_path) ?? ''))
       .map((m) => ({
         ...m,
         characters: m.characters.map((n) => ({ name: n, gender: this.genderOf(m.script_path, n) })),
-        genres: genresOf(m.script_path)
+        genres: genresOf(m.script_path),
+        medium: this.mediumOf(m.script_path) ?? null
       }))
     return { scenes: out }
   }
@@ -77,18 +89,23 @@ export class Engine {
     if (!s) throw new Error('no such scene')
     return s
   }
-  // manual metadata: genres + per-character gender overrides for a script
+  // manual metadata: genres + per-character gender overrides + medium for a script
   allGenres() {
     return this.meta.allGenres()
+  }
+  mediums() {
+    return MEDIUMS
   }
   getMeta(path: string) {
     return {
       genres: this.meta.genres(path),
       // effective gender per character (override or guess) so the editor starts right
-      cast: this.lib.scriptCharacters(path).map((name) => ({ name, gender: this.genderOf(path, name) }))
+      cast: this.lib.scriptCharacters(path).map((name) => ({ name, gender: this.genderOf(path, name) })),
+      medium: this.mediumOf(path) ?? '', // effective (override or guess); '' = untagged
+      mediums: MEDIUMS
     }
   }
-  setMeta(path: string, m: { genres: string[]; genders: Record<string, Gender> }) {
+  setMeta(path: string, m: { genres: string[]; genders: Record<string, Gender>; medium?: string }) {
     // only persist a gender that DIFFERS from the guess — so opening Edit-details and
     // saving doesn't freeze every character's guess as a permanent override (which
     // would mask future guesser improvements and leave the entry undeletable)
@@ -96,7 +113,10 @@ export class Engine {
     for (const [name, g] of Object.entries(m.genders)) {
       if (g !== guessGender(name)) genders[name] = g
     }
-    this.meta.set(path, { genres: m.genres, genders })
+    // persist the medium only when the user's choice differs from the parsed guess,
+    // for the same reason (don't freeze the guess; keep the entry droppable)
+    const medium = m.medium && m.medium !== this.lib.scriptMedium(path) ? m.medium : undefined
+    this.meta.set(path, { genres: m.genres, genders, medium })
     return { ok: true }
   }
   reindexStatus() {

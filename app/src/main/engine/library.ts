@@ -23,7 +23,26 @@ export function canonicalKey(filename: string): string {
   return (stem.trim() + ext).toLowerCase()
 }
 
-interface ScriptRow { path: string; name: string; mtime: number; sceneCount: number; pinned: boolean }
+interface ScriptRow { path: string; name: string; mtime: number; sceneCount: number; pinned: boolean; medium?: string }
+
+// A deliberately conservative medium guess: only auto-tag 'Commercial' when the
+// document essentially SAYS so — its filename contains "commercial", or the text uses
+// "commercial" as an explicit label ("COMMERCIAL AUDITION", "TV COMMERCIAL", ":30
+// COMMERCIAL"). The bare word in prose is NOT enough (feature scripts say "commercial
+// flight" etc. — verified false positives across the corpus). We never guess
+// TV/Play/Film: audition sides are excerpts and don't reveal those.
+const COMMERCIAL_LABEL_RE =
+  /\bCOMMERCIAL\s+(?:AUDITION|SPOT|SCRIPT|STORYBOARD|BREAKDOWN)\b|\b(?:TV|RADIO|NATIONAL|REGIONAL|:\d\d)\s+COMMERCIAL\b/
+function guessMedium(name: string, scenes: Scene[]): string | undefined {
+  // normalize separators first ("Wawa_Commercial_Sides" → "Wawa Commercial Sides"),
+  // since '_' is a word char and would defeat the \b boundary
+  if (/\bcommercials?\b/i.test(name.replace(/[^a-zA-Z]+/g, ' '))) return 'Commercial'
+  const hay = scenes
+    .map((s) => s.heading + ' ' + s.blocks.map((b) => ('text' in b ? b.text : '')).join(' '))
+    .join(' ')
+    .toUpperCase()
+  return COMMERCIAL_LABEL_RE.test(hay) ? 'Commercial' : undefined
+}
 interface SceneRow {
   path: string; name: string; index: number; heading: string; page: number
   charCount: number; characters: string[]; pairing: string | null; est: number
@@ -120,7 +139,11 @@ export class Library {
     // preserve a user's pin across re-parses — a forced rebuild bypasses the
     // mtime early-return that used to shield it, and the orphan-cleanup pass
     // deletes unpinned scripts that fall outside the indexed folders
-    this.scripts.set(rp, { path: rp, name: basename(rp), mtime, sceneCount: parsed.length, pinned: existing?.pinned ?? false })
+    const name = basename(rp)
+    this.scripts.set(rp, {
+      path: rp, name, mtime, sceneCount: parsed.length, pinned: existing?.pinned ?? false,
+      medium: guessMedium(name, parsed) // conservative auto-tag; undefined unless clearly a commercial
+    })
     for (const s of parsed) {
       this.scenes.push({
         path: rp, name: basename(rp), index: s.index, heading: s.heading, page: s.page,
@@ -177,6 +200,11 @@ export class Library {
   // "N scripts" count the UI shows, so the move doesn't relocate 0-scene junk files
   allPaths(): string[] {
     return [...this.scripts.values()].filter((s) => s.sceneCount > 0).map((s) => s.path)
+  }
+
+  // the conservative parsed medium guess for a script (only ever 'Commercial' or undefined)
+  scriptMedium(path: string): string | undefined {
+    return this.scripts.get(path)?.medium
   }
 
   // distinct character names across a script's scenes (for the Edit-details modal)

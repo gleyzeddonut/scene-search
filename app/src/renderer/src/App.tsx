@@ -27,6 +27,7 @@ export default function App() {
   const [browseSize, setBrowseSize] = useState(0) // 0 = Any
   const [browsePair, setBrowsePair] = useState(0)
   const [browseGenres, setBrowseGenres] = useState<string[]>([])
+  const [browseMediums, setBrowseMediums] = useState<string[]>([])
   const [toast, setToast] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
   const readyRef = useRef(false)
@@ -184,6 +185,8 @@ export default function App() {
               setPair={setBrowsePair}
               genres={browseGenres}
               setGenres={setBrowseGenres}
+              mediums={browseMediums}
+              setMediums={setBrowseMediums}
               refreshKey={refreshKey}
               onPrepare={(s, list) => {
                 setPrepScene(s)

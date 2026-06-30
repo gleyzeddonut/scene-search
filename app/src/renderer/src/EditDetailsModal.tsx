@@ -23,6 +23,8 @@ export function EditDetailsModal({
   const [genres, setGenres] = useState<string[]>([])
   const [cast, setCast] = useState<string[]>([])
   const [genders, setGenders] = useState<Record<string, string>>({})
+  const [medium, setMedium] = useState('')
+  const [mediums, setMediums] = useState<string[]>([])
   const [custom, setCustom] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -33,6 +35,8 @@ export function EditDetailsModal({
         setGenres(m.genres)
         setCast(m.cast.map((c) => c.name))
         setGenders(Object.fromEntries(m.cast.map((c) => [c.name, c.gender])))
+        setMedium(m.medium)
+        setMediums(m.mediums)
       })
       .finally(() => setLoaded(true))
   }, [path])
@@ -47,7 +51,7 @@ export function EditDetailsModal({
   const save = async () => {
     setBusy(true)
     try {
-      await api.setMeta(path, { genres, genders })
+      await api.setMeta(path, { genres, genders, medium: medium || undefined })
       onDone('Saved details')
     } catch {
       setBusy(false)
@@ -64,6 +68,22 @@ export function EditDetailsModal({
           <div className="dnote">Loading…</div>
         ) : (
           <div className="ed-body">
+            <div className="ed-sec">Medium</div>
+            <div className="ed-suggest">
+              <button className={'chip' + (medium === '' ? ' on' : '')} onClick={() => setMedium('')}>
+                None
+              </button>
+              {mediums.map((md) => (
+                <button
+                  key={md}
+                  className={'chip' + (medium === md ? ' on' : '')}
+                  onClick={() => setMedium(md)}
+                >
+                  {md}
+                </button>
+              ))}
+            </div>
+
             <div className="ed-sec">Genres</div>
             <div className="ed-tags">
               {genres.length ? (

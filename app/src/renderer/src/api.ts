@@ -11,6 +11,7 @@ export interface Scene {
   scene_index: number
   est_seconds: number
   genres?: string[] // manual genre tags on the script
+  medium?: string | null // effective medium (manual or guessed), null = untagged
 }
 
 export type SceneBlock =
@@ -83,8 +84,14 @@ interface EngineApi {
   rename: (p: string, name: string) => Promise<{ ok: boolean; path?: string; error?: string }>
   moveAll: (dir: string) => Promise<{ moved: number; skipped: number; failed: number }>
   genres: () => Promise<string[]>
-  getMeta: (p: string) => Promise<{ genres: string[]; cast: { name: string; gender: string }[] }>
-  setMeta: (p: string, m: { genres: string[]; genders: Record<string, string> }) => Promise<{ ok: boolean }>
+  mediums: () => Promise<string[]>
+  getMeta: (
+    p: string
+  ) => Promise<{ genres: string[]; cast: { name: string; gender: string }[]; medium: string; mediums: string[] }>
+  setMeta: (
+    p: string,
+    m: { genres: string[]; genders: Record<string, string>; medium?: string }
+  ) => Promise<{ ok: boolean }>
   open: (p: string) => Promise<unknown>
   reveal: (p: string) => Promise<unknown>
 }
@@ -127,15 +134,19 @@ export const api = {
   reindexStop: () => eng().reindexStop(),
   reindexStatus: () => eng().reindexStatus(),
   stats: () => eng().stats(),
-  scenes: (p: { min_chars?: number; max_chars?: number; pairing?: string; search?: string; genres?: string[] }) =>
-    eng().scenes(p),
+  scenes: (p: {
+    min_chars?: number; max_chars?: number; pairing?: string; search?: string
+    genres?: string[]; mediums?: string[]
+  }) => eng().scenes(p),
   getScene: (path: string, index: number) => eng().scene(path, index),
   addScript: (path: string) => eng().add(path),
   renameScript: (path: string, newName: string) => eng().rename(path, newName),
   moveAll: (dir: string) => eng().moveAll(dir),
   allGenres: () => eng().genres(),
+  allMediums: () => eng().mediums(),
   getMeta: (path: string) => eng().getMeta(path),
-  setMeta: (path: string, m: { genres: string[]; genders: Record<string, string> }) => eng().setMeta(path, m),
+  setMeta: (path: string, m: { genres: string[]; genders: Record<string, string>; medium?: string }) =>
+    eng().setMeta(path, m),
   openFile: (path: string) => eng().open(path),
   revealFile: (path: string) => eng().reveal(path),
   pickFolder: () => window.scripty.pickFolder(),

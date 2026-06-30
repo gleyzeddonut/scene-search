@@ -5,6 +5,7 @@ export type Gender = 'female' | 'male' | 'unknown'
 export interface ScriptMeta {
   genres?: string[]
   genders?: Record<string, Gender> // character name (UPPERCASE) → manual gender
+  medium?: string // TV | Play | Film | Commercial (manual override of the guess)
 }
 
 // Manual, user-set metadata (genre tags, character-gender overrides) for scripts.
@@ -43,12 +44,17 @@ export class Meta {
   gender(path: string, name: string): Gender | undefined {
     return this.data[path]?.genders?.[name]
   }
+  // the manual medium override, or undefined to fall back to the guess
+  medium(path: string): string | undefined {
+    return this.data[path]?.medium
+  }
 
-  set(path: string, m: { genres: string[]; genders: Record<string, Gender> }) {
+  set(path: string, m: { genres: string[]; genders: Record<string, Gender>; medium?: string }) {
     const genres = m.genres.map((g) => g.trim()).filter(Boolean)
     const entry: ScriptMeta = {}
     if (genres.length) entry.genres = [...new Set(genres)]
     if (Object.keys(m.genders).length) entry.genders = m.genders
+    if (m.medium) entry.medium = m.medium
     if (Object.keys(entry).length) this.data[path] = entry
     else delete this.data[path]
     this.save()

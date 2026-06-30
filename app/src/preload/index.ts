@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('scripty', {
     rename: (p: string, name: string) => ipcRenderer.invoke('eng:rename', p, name),
     moveAll: (dir: string) => ipcRenderer.invoke('eng:moveAll', dir),
     genres: () => ipcRenderer.invoke('eng:genres'),
+    mediums: () => ipcRenderer.invoke('eng:mediums'),
     getMeta: (p: string) => ipcRenderer.invoke('eng:getMeta', p),
     setMeta: (p: string, m: unknown) => ipcRenderer.invoke('eng:setMeta', p, m),
     open: (p: string) => ipcRenderer.invoke('eng:open', p),

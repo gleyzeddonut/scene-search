@@ -62,6 +62,8 @@ export function BrowseView({
   setPair,
   genres,
   setGenres,
+  mediums,
+  setMediums,
   refreshKey,
   onPrepare
 }: {
@@ -72,13 +74,23 @@ export function BrowseView({
   setPair: (n: number) => void
   genres: string[]
   setGenres: (g: string[]) => void
+  mediums: string[]
+  setMediums: (m: string[]) => void
   refreshKey: number
   onPrepare: (scene: Scene, scenes: Scene[]) => void
 }) {
   const [openSize, setOpenSize] = useState(false)
   const [openPair, setOpenPair] = useState(false)
   const [openGenre, setOpenGenre] = useState(false)
+  const [openMedium, setOpenMedium] = useState(false)
   const [allGenres, setAllGenres] = useState<string[]>([])
+  const [allMediums, setAllMediums] = useState<string[]>([])
+  const [showPreview, setShowPreview] = useState(localStorage.getItem('browsePreview') !== '0')
+  const togglePreview = () => {
+    const next = !showPreview
+    setShowPreview(next)
+    localStorage.setItem('browsePreview', next ? '1' : '0')
+  }
   const [scenes, setScenes] = useState<Scene[]>([])
   const [selScript, setSelScript] = useState<ScriptGroup | null>(null)
   const [selScene, setSelScene] = useState<Scene | null>(null)
@@ -120,9 +132,10 @@ export function BrowseView({
     return [...map.values()] // api.scenes already returns scripts in name order
   }, [scenes])
 
-  // the genres actually assigned across the library, for the filter rail
+  // the genres actually assigned across the library + the fixed medium list, for the rail
   useEffect(() => {
     api.allGenres().then(setAllGenres).catch(() => {})
+    api.allMediums().then(setAllMediums).catch(() => {})
   }, [refreshKey])
 
   useEffect(() => {
@@ -134,7 +147,8 @@ export function BrowseView({
         max_chars: mx,
         pairing: pairValue || undefined,
         search,
-        genres: genres.length ? genres : undefined
+        genres: genres.length ? genres : undefined,
+        mediums: mediums.length ? mediums : undefined
       })
       .then((r) => {
         if (!active) return // ignore a stale response when filters/search changed
@@ -144,7 +158,7 @@ export function BrowseView({
     return () => {
       active = false
     }
-  }, [size, pair, search, genres, refreshKey])
+  }, [size, pair, search, genres, mediums, refreshKey])
 
   // when the result set changes, select the first script and its earliest scene
   useEffect(() => {
@@ -252,10 +266,12 @@ export function BrowseView({
   }
   const toggleGenre = (g: string) =>
     setGenres(genres.includes(g) ? genres.filter((x) => x !== g) : [...genres, g])
+  const toggleMedium = (m: string) =>
+    setMediums(mediums.includes(m) ? mediums.filter((x) => x !== m) : [...mediums, m])
 
   const sizeChip = size !== 0
   const pairChip = showPairing && pair !== 0
-  const hasChips = sizeChip || pairChip || genres.length > 0
+  const hasChips = sizeChip || pairChip || genres.length > 0 || mediums.length > 0
   const navScenes = selScript?.scenes ?? []
 
   return (
@@ -324,6 +340,27 @@ export function BrowseView({
               </div>
             ))}
         </div>
+
+        <div className="fsection">
+          <div className="fhead" onClick={() => setOpenMedium((v) => !v)}>
+            <span className="flabel">Medium</span>
+            <span className="fright">
+              <span className={'fsummary' + (mediums.length ? ' active' : '')}>
+                {mediums.length ? `${mediums.length} selected` : 'Any'}
+              </span>
+              <span className={'caret' + (openMedium ? ' open' : '')}>›</span>
+            </span>
+          </div>
+          {openMedium && (
+            <div className="chips">
+              {allMediums.map((m) => (
+                <button key={m} className={'chip' + (mediums.includes(m) ? ' on' : '')} onClick={() => toggleMedium(m)}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="listpane">
@@ -349,12 +386,27 @@ export function BrowseView({
                     <span className="x" onClick={() => toggleGenre(g)}>✕</span>
                   </span>
                 ))}
+                {mediums.map((m) => (
+                  <span key={m} className="fchip">
+                    {m}
+                    <span className="x" onClick={() => toggleMedium(m)}>✕</span>
+                  </span>
+                ))}
               </>
             ) : (
               <span>All scripts · no filters applied</span>
             )}
           </div>
-          <span className="result">{scripts.length} script{scripts.length !== 1 ? 's' : ''}</span>
+          <span className="lhead-right">
+            <span className="result">{scripts.length} script{scripts.length !== 1 ? 's' : ''}</span>
+            <button
+              className="prevtoggle"
+              title={showPreview ? 'Hide preview' : 'Show preview'}
+              onClick={togglePreview}
+            >
+              {showPreview ? '⇥ Hide preview' : '⇤ Show preview'}
+            </button>
+          </span>
         </div>
         <div className="colhead">
           <span style={{ flex: 1 }}>Script</span>
@@ -395,6 +447,7 @@ export function BrowseView({
         </div>
       </div>
 
+      {showPreview && (
       <div className="panel">
         {selScene && selScript && (
           <>
@@ -448,6 +501,7 @@ export function BrowseView({
           </>
         )}
       </div>
+      )}
     </>
   )
 }

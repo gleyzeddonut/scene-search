@@ -98,6 +98,7 @@ function registerIpc() {
   ipcMain.handle('eng:rename', onEngine((p: string, name: string) => engine.rename(p, name)))
   ipcMain.handle('eng:moveAll', onEngine((dir: string) => engine.moveAll(dir)))
   ipcMain.handle('eng:genres', onEngine(() => engine.allGenres()))
+  ipcMain.handle('eng:mediums', onEngine(() => engine.mediums()))
   ipcMain.handle('eng:getMeta', onEngine((p: string) => engine.getMeta(p)))
   ipcMain.handle(
     'eng:setMeta',

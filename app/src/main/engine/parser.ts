@@ -4,7 +4,7 @@ import type { Scene, SceneBlock, LayoutLine } from './types'
 // The persisted index records the version it was built with; on startup the
 // engine compares it to this and forces a full re-parse of every file (not just
 // changed ones) so parser improvements actually reach already-indexed scripts.
-export const PARSER_VERSION = 2
+export const PARSER_VERSION = 3
 
 // optional leading scene-number column (incl. "SC. 5.A5" from gutter numbers
 // some PDF extractors place at the start of the heading line)

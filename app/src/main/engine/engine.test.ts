@@ -43,6 +43,27 @@ describe('Engine.add parser-version stamp', () => {
   })
 })
 
+describe('Engine medium', () => {
+  it('auto-tags a clearly-named commercial, leaves a feature untagged, and honors override', async () => {
+    seed(PARSER_VERSION)
+    const eng = new Engine()
+    const com = join(h.userData, 'Acme_Commercial_Sides.fountain')
+    const film = join(h.userData, 'feature.fountain')
+    writeFileSync(com, 'INT. KITCHEN - DAY\n\nMOM\nTry Acme.\n\nKID\nYum!\n')
+    writeFileSync(film, 'INT. OFFICE - DAY\n\nBOSS\nI took a commercial flight.\n\nWORKER\nOk.\n')
+    await eng.add(com)
+    await eng.add(film)
+    // named commercial → guessed Commercial; the feature's prose "commercial" → untagged
+    expect(eng.scenes({ mediums: ['Commercial'] }).scenes.every((s) => s.script_path === com)).toBe(true)
+    expect(eng.scenes({ mediums: ['Commercial'] }).scenes.length).toBeGreaterThan(0)
+    expect(eng.getMeta(film).medium).toBe('') // untagged
+    // a manual override puts the feature under Film
+    eng.setMeta(film, { genres: [], genders: {}, medium: 'Film' })
+    expect(eng.getMeta(film).medium).toBe('Film')
+    expect(eng.scenes({ mediums: ['Film'] }).scenes.every((s) => s.script_path === film)).toBe(true)
+  })
+})
+
 describe('Engine.setMeta', () => {
   it('persists only gender overrides that differ from the guess', async () => {
     seed(PARSER_VERSION)
