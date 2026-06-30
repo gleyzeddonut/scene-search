@@ -28,6 +28,8 @@ interface ScriptGroup {
   name: string
   scenes: Scene[]
   cast: SceneChar[]
+  genres: string[]
+  medium: string | null
 }
 
 function gletter(g: string) {
@@ -114,7 +116,8 @@ export function BrowseView({
     for (const s of scenes) {
       let g = map.get(s.script_path)
       if (!g) {
-        g = { path: s.script_path, name: s.script_name, scenes: [], cast: [] }
+        // genre/medium are per-script, so any of its scenes carries them
+        g = { path: s.script_path, name: s.script_name, scenes: [], cast: [], genres: s.genres ?? [], medium: s.medium ?? null }
         map.set(s.script_path, g)
       }
       g.scenes.push(s)
@@ -410,6 +413,8 @@ export function BrowseView({
         </div>
         <div className="colhead">
           <span style={{ flex: 1 }}>Script</span>
+          <span style={{ width: 96 }}>Genre</span>
+          <span style={{ width: 78 }}>Medium</span>
           <span style={{ width: 64 }}>Cast</span>
           <span style={{ width: 42, textAlign: 'right' }}>Scenes</span>
         </div>
@@ -434,6 +439,19 @@ export function BrowseView({
                   {g.cast.length !== 1 ? 's' : ''}
                 </div>
               </div>
+              <span className="col-genre" title={g.genres.join(', ')}>
+                {g.genres.length ? (
+                  <>
+                    {g.genres[0]}
+                    {g.genres.length > 1 && <span className="more"> +{g.genres.length - 1}</span>}
+                  </>
+                ) : (
+                  <span className="col-dash">—</span>
+                )}
+              </span>
+              <span className="col-medium">
+                {g.medium ? <span className="medchip">{g.medium}</span> : <span className="col-dash">—</span>}
+              </span>
               <div className="cast">
                 {g.cast.slice(0, 3).map((c) => (
                   <div key={c.name} className={'gchip ' + gletter(c.gender)} title={c.name}>

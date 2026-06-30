@@ -43,6 +43,14 @@ export default function App() {
     readyRef.current = true // engine is in-process; always available
     setReady(true)
     window.scripty.onOpenSettings(() => setSettingsOpen(true))
+    // open straight to Browse when the library already has scripts; only land on
+    // Library (the setup screen) for a fresh/empty library
+    api
+      .stats()
+      .then((s) => {
+        if (s.scripts > 0) setSection('browse')
+      })
+      .catch(() => {})
     // from a row's right-click menu
     const offRename = window.scripty.onRenameRequest?.((p) => setRenaming(p))
     const offEdit = window.scripty.onEditDetails?.((p) => setEditing(p))

@@ -119,7 +119,9 @@ function registerIpc() {
     menu.popup({ window: BrowserWindow.fromWebContents(e.sender) ?? undefined })
   })
   ipcMain.handle('pick-folder', async () => {
-    const r = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    // createDirectory adds the macOS "New Folder" button so a destination can be made
+    // right in the picker (e.g. when consolidating scripts into a brand-new folder)
+    const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
     return r.canceled ? null : r.filePaths[0]
   })
   ipcMain.handle('app-version', () => app.getVersion())

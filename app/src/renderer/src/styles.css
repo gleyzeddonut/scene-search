@@ -130,6 +130,11 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 .row .sub{font:400 11.5px/1 'Courier Prime',monospace;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .cast{width:64px;flex:none;display:flex;gap:4px}
 .row .page{width:42px;flex:none;text-align:right;font:500 12px/1 'Courier Prime',monospace;color:var(--text-2)}
+.row .col-genre{width:96px;flex:none;min-width:0;font:500 12px/1.2 'Space Grotesk';color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .col-genre .more{color:var(--text-3)}
+.row .col-medium{width:78px;flex:none;min-width:0;display:flex}
+.medchip{font:600 10.5px/1 'Space Grotesk';color:var(--accent-text);background:var(--accent-soft);border-radius:999px;padding:4px 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.col-dash{color:var(--text-3)}
 .gchip{width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 9.5px/1 'Space Grotesk'}
 .gchip.W{background:var(--w-bg);color:var(--w-fg)}
 .gchip.M{background:var(--m-bg);color:var(--m-fg)}
