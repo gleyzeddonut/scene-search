@@ -61,6 +61,7 @@ interface SceneRow {
 
 interface ReindexOpts {
   ignoreDirs?: string[]
+  ignoreFiles?: Set<string> // resolved paths the user removed — never re-add them
   progress?: (name: string) => void
   shouldCancel?: () => boolean
   onError?: (path: string, err: unknown) => void
@@ -200,7 +201,9 @@ export class Library {
       onError: opts.onError
     })) {
       if (opts.shouldCancel?.()) { cancelled = true; break }
-      present.add(resolve(path))
+      const rp = resolve(path)
+      if (opts.ignoreFiles?.has(rp)) continue // user removed this file — don't re-add it
+      present.add(rp)
       try {
         await this.indexFile(path, opts.force)
       } catch (e) {
@@ -288,6 +291,14 @@ export class Library {
       content: s.content,
       est_seconds: estimateScene(s.dialogue, s.content) // action fallback so it's never 0:00
     }
+  }
+
+  // drop a script and its scenes from the index
+  remove(path: string): boolean {
+    const rp = resolve(path)
+    if (!this.scripts.has(rp)) return false
+    this.deleteScript(rp)
+    return true
   }
 
   async addFile(path: string): Promise<'added' | 'exists' | 'not_script' | 'unreadable'> {

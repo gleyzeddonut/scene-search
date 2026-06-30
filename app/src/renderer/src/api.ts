@@ -83,6 +83,7 @@ interface EngineApi {
   }>
   reindexStop: () => Promise<{ stopped: boolean }>
   add: (p: string) => Promise<{ result: 'added' | 'exists' | 'not_script' | 'unreadable'; name: string }>
+  remove: (p: string) => Promise<{ ok: boolean }>
   rename: (p: string, name: string) => Promise<{ ok: boolean; path?: string; error?: string }>
   moveAll: (dir: string) => Promise<{ moved: number; skipped: number; failed: number }>
   genres: () => Promise<string[]>
@@ -106,6 +107,9 @@ declare global {
       engine: EngineApi
       pathForFile: (file: File) => string
       pickFolder: () => Promise<string | null>
+      pickFiles: () => Promise<string[]>
+      onRemoveRequest: (cb: (p: { path: string; name: string }) => void) => () => void
+      onQuickLookRequest: (cb: (p: { path: string; name: string }) => void) => () => void
       onOpenSettings: (cb: () => void) => void
       exportSides: (html: string, name: string) => Promise<boolean>
       appVersion: () => Promise<string>
@@ -143,6 +147,7 @@ export const api = {
   }) => eng().scenes(p),
   getScene: (path: string, index: number) => eng().scene(path, index),
   addScript: (path: string) => eng().add(path),
+  removeScript: (path: string) => eng().remove(path),
   renameScript: (path: string, newName: string) => eng().rename(path, newName),
   moveAll: (dir: string) => eng().moveAll(dir),
   allGenres: () => eng().genres(),

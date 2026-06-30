@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('scripty', {
     reindexStatus: () => ipcRenderer.invoke('eng:reindexStatus'),
     reindexStop: () => ipcRenderer.invoke('eng:reindexStop'),
     add: (p: string) => ipcRenderer.invoke('eng:add', p),
+    remove: (p: string) => ipcRenderer.invoke('eng:remove', p),
     rename: (p: string, name: string) => ipcRenderer.invoke('eng:rename', p, name),
     moveAll: (dir: string) => ipcRenderer.invoke('eng:moveAll', dir),
     genres: () => ipcRenderer.invoke('eng:genres'),
@@ -36,7 +37,18 @@ contextBridge.exposeInMainWorld('scripty', {
     ipcRenderer.on('edit-details-request', l)
     return () => ipcRenderer.removeListener('edit-details-request', l)
   },
+  onRemoveRequest: (cb: (p: { path: string; name: string }) => void) => {
+    const l = (_e: unknown, p: { path: string; name: string }) => cb(p)
+    ipcRenderer.on('remove-request', l)
+    return () => ipcRenderer.removeListener('remove-request', l)
+  },
+  onQuickLookRequest: (cb: (p: { path: string; name: string }) => void) => {
+    const l = (_e: unknown, p: { path: string; name: string }) => cb(p)
+    ipcRenderer.on('quicklook-request', l)
+    return () => ipcRenderer.removeListener('quicklook-request', l)
+  },
   pickFolder: () => ipcRenderer.invoke('pick-folder') as Promise<string | null>,
+  pickFiles: () => ipcRenderer.invoke('pick-files') as Promise<string[]>,
   onOpenSettings: (cb: () => void) => ipcRenderer.on('open-settings', cb),
   exportSides: (html: string, name: string) => ipcRenderer.invoke('export-sides', html, name),
   appVersion: () => ipcRenderer.invoke('app-version') as Promise<string>,

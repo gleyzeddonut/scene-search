@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import './styles.css'
-import { api, Scene } from './api'
+import { api, Scene, stem } from './api'
 import { AppShell } from './AppShell'
 import { BrowseView } from './BrowseView'
 import { LibraryView } from './LibraryView'
@@ -64,8 +64,14 @@ export default function App() {
       .catch(() => {})
     // from a row's right-click menu
     const offEdit = window.scripty.onEditDetails?.((p) => setEditing(p))
+    const offRemove = window.scripty.onRemoveRequest?.(async (p) => {
+      await api.removeScript(p.path).catch(() => {})
+      showToast(`Removed “${stem(p.name)}”`)
+      setRefreshKey((k) => k + 1) // re-read the library so it disappears
+    })
     return () => {
       offEdit?.()
+      offRemove?.()
     }
   }, [])
 
@@ -120,6 +126,43 @@ export default function App() {
     }
   }, [ready])
 
+  // add a batch of files (from drag-drop OR the + picker), with a summary toast
+  const addFiles = async (items: { path: string; name: string }[]) => {
+    if (!items.length) return
+    const counts = { added: 0, exists: 0, notScript: 0, err: 0 }
+    let last = ''
+    for (const it of items) {
+      last = it.name
+      try {
+        const r = await api.addScript(it.path)
+        if (r.result === 'added') counts.added++
+        else if (r.result === 'exists') counts.exists++
+        else counts.notScript++
+      } catch {
+        counts.err++
+      }
+    }
+    if (items.length === 1) {
+      if (counts.added) showToast(`Added “${last}”`)
+      else if (counts.exists) showToast(`“${last}” has already been added`)
+      else if (counts.err) showToast(`Couldn’t add “${last}” — try reopening Scripty`)
+      else showToast(`“${last}” isn’t a readable script`)
+    } else {
+      const parts: string[] = []
+      if (counts.added) parts.push(`${counts.added} added`)
+      if (counts.exists) parts.push(`${counts.exists} already added`)
+      if (counts.notScript + counts.err) parts.push(`${counts.notScript + counts.err} skipped`)
+      showToast(parts.join(' · '))
+    }
+    if (counts.added) setRefreshKey((k) => k + 1)
+  }
+
+  // the + button: choose one or more files in a native picker, then add them
+  const pickAndAdd = async () => {
+    const paths = await window.scripty.pickFiles()
+    addFiles(paths.map((p) => ({ path: p, name: p.split('/').pop() || p })))
+  }
+
   // drag-and-drop a script file onto the window to add it
   useEffect(() => {
     const onDragOver = (e: DragEvent) => e.preventDefault()
@@ -134,32 +177,7 @@ export default function App() {
         showToast('Couldn’t read the dropped file’s location')
         return
       }
-      const counts = { added: 0, exists: 0, notScript: 0, err: 0 }
-      let last = ''
-      for (const it of items) {
-        last = it.name // File.name is always the basename, so never empty
-        try {
-          const r = await api.addScript(it.path)
-          if (r.result === 'added') counts.added++
-          else if (r.result === 'exists') counts.exists++
-          else counts.notScript++
-        } catch {
-          counts.err++
-        }
-      }
-      if (items.length === 1) {
-        if (counts.added) showToast(`Added “${last}”`)
-        else if (counts.exists) showToast(`“${last}” has already been added`)
-        else if (counts.err) showToast(`Couldn’t add “${last}” — try reopening Scripty`)
-        else showToast(`“${last}” isn’t a readable script`)
-      } else {
-        const parts: string[] = []
-        if (counts.added) parts.push(`${counts.added} added`)
-        if (counts.exists) parts.push(`${counts.exists} already added`)
-        if (counts.notScript + counts.err) parts.push(`${counts.notScript + counts.err} skipped`)
-        showToast(parts.join(' · '))
-      }
-      if (counts.added) setRefreshKey((k) => k + 1)
+      addFiles(items)
     }
     window.addEventListener('dragover', onDragOver)
     window.addEventListener('drop', onDrop)
@@ -194,6 +212,7 @@ export default function App() {
           onSettings={() => setSettingsOpen(true)}
           showPreview={showPreview}
           onTogglePreview={togglePreview}
+          onAdd={pickAndAdd}
         >
           {section === 'browse' && (
             <BrowseView

@@ -17,6 +17,7 @@ export function AppShell(props: {
   onSettings: () => void
   showPreview: boolean
   onTogglePreview: () => void
+  onAdd: () => void
   children: ReactNode
 }) {
   const searchRef = useRef<HTMLInputElement>(null)
@@ -70,6 +71,11 @@ export function AppShell(props: {
           </div>
         </div>
         <div className="toolbar-right">
+          <button className="addbtn" title="Add scripts…" onClick={props.onAdd}>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+              <path d="M8 3v10M3 8h10" />
+            </svg>
+          </button>
           {props.section === 'browse' && (
             <button
               className="prevtoggle"

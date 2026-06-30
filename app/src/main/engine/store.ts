@@ -28,6 +28,11 @@ export class Settings {
   setRoots(v: string[]) { this.setList('roots', v) }
   getIgnored() { return this.getList('ignored') }
   setIgnored(v: string[]) { this.setList('ignored', v) }
+  // files the user removed from the library — skipped on re-index so they don't
+  // reappear when they sit inside a watched folder
+  getHidden() { return this.getList('hidden') ?? [] }
+  hide(path: string) { this.setList('hidden', [...new Set([...this.getHidden(), path])]) }
+  unhide(path: string) { this.setList('hidden', this.getHidden().filter((p) => p !== path)) }
 }
 
 export function ensureDir(dir: string) {

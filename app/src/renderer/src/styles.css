@@ -34,7 +34,9 @@ body{margin:0;font-family:system-ui,-apple-system,sans-serif;color:var(--text);b
 .wordmark{font-weight:700;font-size:14px;line-height:1}
 .brand-sep{font-weight:500;font-size:12px;color:var(--text-3)}
 .toolbar-center{flex:1;display:flex;justify-content:center}
-.toolbar-right{flex:none;display:flex;align-items:center;min-width:0}
+.toolbar-right{flex:none;display:flex;align-items:center;gap:8px;min-width:0}
+.addbtn{flex:none;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid var(--border);background:transparent;color:var(--text-2);border-radius:8px;cursor:pointer;transition:background .12s ease,color .12s ease}
+.addbtn:hover{background:var(--border-soft);color:var(--text)}
 .search{display:flex;align-items:center;gap:8px;width:380px;padding:7px 12px;border-radius:9px;background:var(--field);border:1px solid var(--border)}
 .search-dot{width:13px;height:13px;border-radius:50%;border:1.7px solid var(--text-3);flex:none}
 .search input{flex:1;border:none;outline:none;background:transparent;color:var(--text);font:400 13.5px/1 system-ui,sans-serif}

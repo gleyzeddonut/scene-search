@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mkdtempSync, writeFileSync, copyFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { Library, canonicalKey } from './library'
@@ -88,6 +88,21 @@ describe('Library', () => {
     expect(mw.length).toBe(1)
     expect(mw[0].pairing).toBe('MW')
     expect(lib.query({ pairing: 'WW' }, genderOf).length).toBe(0) // not two women
+  })
+
+  it('remove() drops a script, and reindex skips ignored (removed) files', async () => {
+    const d = tmp()
+    writeFileSync(join(d, 'a.fountain'), 'INT. ROOM - DAY\n\nBOB\nHi.\n')
+    writeFileSync(join(d, 'b.fountain'), 'INT. HALL - DAY\n\nAMY\nYo.\n')
+    const lib = new Library()
+    await lib.reindex([d])
+    expect(lib.query({}).length).toBe(2)
+    // remove a.fountain from the index
+    expect(lib.remove(join(d, 'a.fountain'))).toBe(true)
+    expect(lib.query({}).map((r) => r.heading)).toEqual(['INT. HALL - DAY'])
+    // re-index the same folder, but treat a.fountain as removed → it must NOT come back
+    await lib.reindex([d], { ignoreFiles: new Set([resolve(join(d, 'a.fountain'))]) })
+    expect(lib.query({}).map((r) => r.heading)).toEqual(['INT. HALL - DAY'])
   })
 
   it('drops content-less "SCENE n" labels that precede a real slug', async () => {

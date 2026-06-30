@@ -95,6 +95,7 @@ function registerIpc() {
   ipcMain.handle('eng:reindexStatus', onEngine(() => engine.reindexStatus()))
   ipcMain.handle('eng:reindexStop', onEngine(() => engine.reindexStop()))
   ipcMain.handle('eng:add', onEngine((p: string) => engine.add(p)))
+  ipcMain.handle('eng:remove', onEngine((p: string) => engine.removeScript(p)))
   ipcMain.handle('eng:rename', onEngine((p: string, name: string) => engine.rename(p, name)))
   ipcMain.handle('eng:moveAll', onEngine((dir: string) => engine.moveAll(dir)))
   ipcMain.handle('eng:genres', onEngine(() => engine.allGenres()))
@@ -113,9 +114,11 @@ function registerIpc() {
   // native right-click menu for a script row
   ipcMain.handle('row-menu', (e, p: { path: string; name: string }) => {
     const menu = Menu.buildFromTemplate([
+      { label: 'Quick Look', click: () => e.sender.send('quicklook-request', p) },
       { label: 'Edit details…', click: () => e.sender.send('edit-details-request', p) },
       { type: 'separator' },
-      { label: 'Show in Finder', click: () => shell.showItemInFolder(p.path) }
+      { label: 'Show in Finder', click: () => shell.showItemInFolder(p.path) },
+      { label: 'Remove from library', click: () => e.sender.send('remove-request', p) }
     ])
     menu.popup({ window: BrowserWindow.fromWebContents(e.sender) ?? undefined })
   })
@@ -124,6 +127,14 @@ function registerIpc() {
     // right in the picker (e.g. when consolidating scripts into a brand-new folder)
     const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
     return r.canceled ? null : r.filePaths[0]
+  })
+  // pick one or more script files to add to the library
+  ipcMain.handle('pick-files', async () => {
+    const r = await dialog.showOpenDialog({
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Scripts', extensions: ['pdf', 'docx', 'txt', 'fountain', 'fdx'] }]
+    })
+    return r.canceled ? [] : r.filePaths
   })
   ipcMain.handle('app-version', () => app.getVersion())
   ipcMain.handle('quicklook', (_e, p) => openQuickLook(p))
