@@ -128,7 +128,7 @@ export function PrepareView({
 
       <div className="sides-scroll">
         {eff === 'pdf' ? (
-          <PdfFrame path={active.script_path} page={active.page} nonce={active.scene_index} />
+          <PdfFrame path={active.script_path} page={active.page} top={active.top} nonce={active.scene_index} />
         ) : (
           <div className="sides" id="sides">
             <div className="sides-h">{data.heading}</div>

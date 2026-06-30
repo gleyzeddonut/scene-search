@@ -47,7 +47,9 @@ async function loadPdf(path: string) {
   const require = createRequire(import.meta.url)
   pdfjs.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')
   const data = new Uint8Array(await readFile(path))
-  return pdfjs.getDocument({ data, isEvalSupported: false, useSystemFonts: true }).promise
+  // verbosity 0 (errors only) silences pdf.js font/xref console noise like
+  // "TT: invalid function id" and "Indexing all PDF objects" — they're harmless
+  return pdfjs.getDocument({ data, isEvalSupported: false, useSystemFonts: true, verbosity: 0 }).promise
 }
 
 // Diagonal/tiled watermarks (common on audition sides — an actor-ID stamp like

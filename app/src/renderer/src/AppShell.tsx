@@ -47,8 +47,26 @@ export function AppShell(props: {
               placeholder="Search scenes, characters…"
               value={props.search}
               onChange={(e) => props.onSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && props.search) {
+                  props.onSearch('')
+                }
+              }}
             />
-            <span className="kbd">⌘F</span>
+            {props.search ? (
+              <button
+                className="search-clear"
+                title="Clear search (Esc)"
+                onClick={() => {
+                  props.onSearch('')
+                  searchRef.current?.focus()
+                }}
+              >
+                ✕
+              </button>
+            ) : (
+              <span className="kbd">⌘F</span>
+            )}
           </div>
         </div>
         <div className="toolbar-right">

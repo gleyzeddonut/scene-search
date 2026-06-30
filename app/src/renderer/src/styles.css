@@ -40,6 +40,8 @@ body{margin:0;font-family:'Space Grotesk',-apple-system,sans-serif;color:var(--t
 .search-dot{width:13px;height:13px;border-radius:50%;border:1.7px solid var(--text-3);flex:none}
 .search input{flex:1;border:none;outline:none;background:transparent;color:var(--text);font:400 13.5px/1 'Space Grotesk',sans-serif}
 .kbd{font:600 11px/1 'Space Grotesk';color:var(--text-3);border:1px solid var(--border);border-radius:5px;padding:3px 6px;flex:none}
+.search-clear{flex:none;display:flex;align-items:center;justify-content:center;width:18px;height:18px;border:none;border-radius:50%;background:var(--border-soft);color:var(--text-2);font-size:9px;cursor:pointer;padding:0;transition:background .12s ease,color .12s ease}
+.search-clear:hover{background:var(--border);color:var(--text)}
 .seg{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer}
 .seg span{padding:5px 11px;font:600 12px/1 'Space Grotesk';color:var(--text-3);display:flex;align-items:center}
 .seg span.on{background:var(--accent);color:#fff}
