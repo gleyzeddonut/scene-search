@@ -4,7 +4,7 @@ import type { LayoutLine } from './types'
 
 describe('parseLayout', () => {
   it('classifies elements by indentation', () => {
-    const L = (text: string, x: number): LayoutLine => ({ text, x, page: 1 })
+    const L = (text: string, x: number): LayoutLine => ({ text, x, y: 0, page: 1 })
     const s = parseLayout([
       L('INT. ROOM - DAY', 72),
       L('A man enters.', 72),
@@ -23,12 +23,12 @@ describe('parseLayout', () => {
     ])
   })
   it('does not treat a flush-left ALL-CAPS action line as a character cue', () => {
-    const L = (text: string, x: number): LayoutLine => ({ text, x, page: 1 })
+    const L = (text: string, x: number): LayoutLine => ({ text, x, y: 0, page: 1 })
     const s = parseLayout([L('INT. ROOM - DAY', 72), L('BANG! THE DOOR SLAMS.', 72), L('JOHN', 216), L('Run.', 144)])
     expect(s[0].characters).toEqual(['JOHN']) // not "BANG" etc.
   })
   it('does not treat time-cuts or a quoted dialogue line at the cue indent as a cue', () => {
-    const L = (text: string, x: number): LayoutLine => ({ text, x, page: 1 })
+    const L = (text: string, x: number): LayoutLine => ({ text, x, y: 0, page: 1 })
     const s = parseLayout([
       L('INT. ROOM - DAY', 72),
       L('MOMENTS LATER', 216), // a time cut sitting at the cue indent — not a character

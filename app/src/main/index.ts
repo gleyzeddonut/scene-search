@@ -28,7 +28,7 @@ let spaceTarget: 'pdf' | 'text' | 'other' = 'other'
 // can move anywhere, even onto another display. It loads our renderer (with the
 // preload) and renders the preview through the same byte-read→blob path the main
 // window uses, so the PDF reliably shows.
-type QlPayload = { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }
+type QlPayload = { title: string; path: string; sceneIndex: number; page?: number; top?: number; isPdf: boolean }
 
 function openQuickLook(p: QlPayload) {
   if (!qlWin || qlWin.isDestroyed()) {

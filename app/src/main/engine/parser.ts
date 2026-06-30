@@ -4,7 +4,7 @@ import type { Scene, SceneBlock, LayoutLine } from './types'
 // The persisted index records the version it was built with; on startup the
 // engine compares it to this and forces a full re-parse of every file (not just
 // changed ones) so parser improvements actually reach already-indexed scripts.
-export const PARSER_VERSION = 3
+export const PARSER_VERSION = 4
 
 // optional leading scene-number column (incl. "SC. 5.A5" from gutter numbers
 // some PDF extractors place at the start of the heading line)
@@ -186,6 +186,7 @@ export function parseLayout(rawLines: LayoutLine[]): Scene[] {
         heading: cleanHeading(l.text),
         index: scenes.length + 1,
         page: l.page,
+        topY: l.y, // heading's PDF-points y → lets the preview scroll to it
         characters: [],
         lines: [],
         blocks: []
@@ -322,7 +323,7 @@ function dialogueHeavy(scenes: Scene[]): Scene[] {
 export function parseHeadingless(lines: LayoutLine[]): Scene[] {
   if (!lines.length) return []
   const x = lines.reduce((m, l) => Math.min(m, l.x), Infinity) // reduce, not spread
-  return dialogueHeavy(parseLayout([{ text: 'SCENE 1', x, page: lines[0].page }, ...lines]))
+  return dialogueHeavy(parseLayout([{ text: 'SCENE 1', x, y: lines[0].y, page: lines[0].page }, ...lines]))
 }
 export function parseScenesHeadingless(text: string): Scene[] {
   if (!text.trim()) return []

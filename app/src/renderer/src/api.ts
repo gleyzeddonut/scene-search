@@ -5,6 +5,7 @@ export interface Scene {
   script_name: string
   heading: string
   page: number
+  top?: number // scroll target within the page (PDF points), when known
   char_count: number
   characters: SceneChar[]
   pairing: string | null
@@ -111,8 +112,8 @@ declare global {
       renderDoc: (path: string) => Promise<string | null>
       checkUpdates: () => Promise<void>
       quitAndInstall: () => Promise<void>
-      quickLook: (p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) => Promise<void>
-      quickLookUpdate: (p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) => Promise<void>
+      quickLook: (p: { title: string; path: string; sceneIndex: number; page?: number; top?: number; isPdf: boolean }) => Promise<void>
+      quickLookUpdate: (p: { title: string; path: string; sceneIndex: number; page?: number; top?: number; isPdf: boolean }) => Promise<void>
       quickLookClose: () => Promise<void>
       rowMenu: (p: { path: string; name: string }) => Promise<void>
       onEditDetails: (cb: (p: { path: string; name: string }) => void) => () => void

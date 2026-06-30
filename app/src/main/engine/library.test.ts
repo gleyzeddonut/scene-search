@@ -90,6 +90,20 @@ describe('Library', () => {
     expect(lib.query({ pairing: 'WW' }, genderOf).length).toBe(0) // not two women
   })
 
+  it('drops content-less "SCENE n" labels that precede a real slug', async () => {
+    const d = tmp()
+    // a doc that labels sections AND uses INT./EXT. — the bare labels must not become
+    // empty scenes
+    writeFileSync(join(d, 'a.txt'), 'SCENE 1\n\nINT. ROOM - DAY\n\nBOB\nHi.\n\nSCENE 2\n\nINT. HALL - DAY\n\nAMY\nYo.\n')
+    const lib = new Library()
+    ;(lib as any)._extract = async () =>
+      'SCENE 1\n\nINT. ROOM - DAY\n\nBOB\nHi.\n\nSCENE 2\n\nINT. HALL - DAY\n\nAMY\nYo.\n'
+    await lib.reindex([d])
+    const rows = lib.query({})
+    expect(rows.map((r) => r.heading)).toEqual(['INT. ROOM - DAY', 'INT. HALL - DAY'])
+    expect(rows.map((r) => r.scene_index)).toEqual([1, 2]) // contiguous after the drop
+  })
+
   it('renamePath moves a script and its scenes to the new path in place', async () => {
     const d = tmp(); const f = join(d, 'old.fountain'); writeFileSync(f, SCRIPT)
     const lib = new Library(); await lib.reindex([d])

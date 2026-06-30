@@ -44,9 +44,9 @@ contextBridge.exposeInMainWorld('scripty', {
   renderDoc: (path: string) => ipcRenderer.invoke('render-doc', path) as Promise<string | null>,
   checkUpdates: () => ipcRenderer.invoke('check-updates'),
   quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
-  quickLook: (p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) =>
+  quickLook: (p: { title: string; path: string; sceneIndex: number; page?: number; top?: number; isPdf: boolean }) =>
     ipcRenderer.invoke('quicklook', p),
-  quickLookUpdate: (p: { title: string; path: string; sceneIndex: number; page?: number; isPdf: boolean }) =>
+  quickLookUpdate: (p: { title: string; path: string; sceneIndex: number; page?: number; top?: number; isPdf: boolean }) =>
     ipcRenderer.invoke('quicklook-update', p),
   quickLookClose: () => ipcRenderer.invoke('quicklook-close'),
   setFocusCat: (c: 'pdf' | 'text' | 'other') => ipcRenderer.send('focus-cat', c),

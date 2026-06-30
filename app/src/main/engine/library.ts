@@ -11,6 +11,14 @@ import type { Scene, SceneMatch, SceneBlock } from './types'
 const PAREN_NUM = /\s*\(\d+\)$/
 const COPY = /\s+copy(\s+\d+)?$/i
 
+// Drop scenes with no content at all (no dialogue AND no action) — a bare heading or
+// a "SCENE n" section label sitting right before a real INT./EXT. slug. Scenes with
+// action but no dialogue are kept. Re-number so scene_index stays contiguous (the UI
+// navigates by index).
+function dropEmpty(scenes: Scene[]): Scene[] {
+  return scenes.filter((s) => s.blocks.length > 0).map((s, i) => ({ ...s, index: i + 1 }))
+}
+
 export function canonicalKey(filename: string): string {
   const dot = filename.lastIndexOf('.')
   let stem = dot >= 0 ? filename.slice(0, dot) : filename
@@ -46,7 +54,7 @@ function guessMedium(name: string, scenes: { heading: string; blocks: SceneBlock
   return COMMERCIAL_LABEL_RE.test(hay) ? 'Commercial' : undefined
 }
 interface SceneRow {
-  path: string; name: string; index: number; heading: string; page: number
+  path: string; name: string; index: number; heading: string; page: number; top?: number
   charCount: number; characters: string[]; pairing: string | null; est: number
   dialogue: [string, string][]; content: SceneBlock[]
 }
@@ -91,15 +99,17 @@ export class Library {
   private async parseFile(rp: string): Promise<Scene[]> {
     const ext = extname(rp).toLowerCase()
     try {
-      if (ext === '.fdx') return parseFdx(await readFile(rp, 'utf-8'))
-      if (ext === '.fountain') return parseFountain(await readFile(rp, 'utf-8'))
+      if (ext === '.fdx') return dropEmpty(parseFdx(await readFile(rp, 'utf-8')))
+      if (ext === '.fountain') return dropEmpty(parseFountain(await readFile(rp, 'utf-8')))
       if (ext === '.pdf') {
         const { lines, pageCount } = await extractLayout(rp)
         const layoutText = layoutToText(lines)
         // one extraction, two parses: prefer layout, but never find fewer scenes
-        // than the regex parser (no detection regression)
-        const layout = parseLayout(lines)
-        const regex = parseScenes(layoutText)
+        // than the regex parser (no detection regression). Drop content-less scenes
+        // first — a doc that labels sections "SCENE 1" AND uses INT./EXT. slugs would
+        // otherwise yield an empty scene for each bare label.
+        const layout = dropEmpty(parseLayout(lines))
+        const regex = dropEmpty(parseScenes(layoutText))
         let best = layout.length >= regex.length ? layout : regex
         // sides with dialogue but no slug line at all → synthesize one scene so the
         // content is still searchable (gated to real dialogue, so prose stays empty).
@@ -119,7 +129,7 @@ export class Library {
         return best
       }
       const flat = await this._extract(rp)
-      const scenes = parseScenes(flat)
+      const scenes = dropEmpty(parseScenes(flat))
       return scenes.length ? scenes : parseScenesHeadingless(flat)
     } catch {
       return []
@@ -148,7 +158,7 @@ export class Library {
     })
     for (const s of parsed) {
       this.scenes.push({
-        path: rp, name: basename(rp), index: s.index, heading: s.heading, page: s.page,
+        path: rp, name: basename(rp), index: s.index, heading: s.heading, page: s.page, top: s.topY,
         charCount: s.characters.length, characters: s.characters, pairing: scenePairing(s.characters),
         est: estimateSeconds(sceneWordCount(s.lines)), dialogue: s.lines, content: s.blocks
       })
@@ -255,7 +265,7 @@ export class Library {
     rows = rows.filter((s) => rep.get(foldKey(s)) === s.path)
     rows.sort((a, b) => (a.name === b.name ? a.index - b.index : a.name < b.name ? -1 : 1))
     return rows.map((s) => ({
-      script_path: s.path, script_name: s.name, heading: s.heading, page: s.page,
+      script_path: s.path, script_name: s.name, heading: s.heading, page: s.page, top: s.top,
       char_count: s.charCount, characters: s.characters, pairing: pairingOf(s),
       scene_index: s.index, est_seconds: s.est
     }))

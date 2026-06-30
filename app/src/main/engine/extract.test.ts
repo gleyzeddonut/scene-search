@@ -56,7 +56,7 @@ describe('isRepeatWatermark', () => {
 })
 
 describe('cleanLayout', () => {
-  const L = (text: string, x: number, page: number): LayoutLine => ({ text, x, page })
+  const L = (text: string, x: number, page: number): LayoutLine => ({ text, x, y: 0, page })
 
   it('captures a BEGIN-SCENE delimiter as a heading when no slug is present', () => {
     const out = cleanLayout([L('BEGIN SCENE 1:', 25, 1), L('NICOLE', 250, 1), L('Hey everyone.', 180, 1)])

@@ -277,6 +277,7 @@ export function BrowseView({
     path: s.script_path,
     sceneIndex: s.scene_index,
     page: s.page,
+    top: s.top,
     isPdf: isPdf(s.script_path)
   })
   // toggle the Quick Look pop-out for the selected scene. Debounced because Space can
@@ -602,7 +603,7 @@ export function BrowseView({
               {selScene.pairing && <span className="tag">{PAIR_TAG[selScene.pairing] || selScene.pairing}</span>}
             </div>
             {isPdf(selScene.script_path) ? (
-              <PdfFrame path={selScene.script_path} page={selScene.page} nonce={selScene.scene_index} />
+              <PdfFrame path={selScene.script_path} page={selScene.page} top={selScene.top} nonce={selScene.scene_index} />
             ) : isDocx(selScene.script_path) ? (
               <DocFrame path={selScene.script_path} />
             ) : isPlainText(selScene.script_path) ? (

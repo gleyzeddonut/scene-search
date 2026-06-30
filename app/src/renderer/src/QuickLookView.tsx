@@ -5,7 +5,7 @@ import { DocFrame } from './DocFrame'
 import { TextFrame } from './TextFrame'
 import { api, SceneDetail, sceneBlocks, isDocx, isPlainText } from './api'
 
-type QlScene = { path: string; sceneIndex: number; page?: number; isPdf: boolean; title?: string }
+type QlScene = { path: string; sceneIndex: number; page?: number; top?: number; isPdf: boolean; title?: string }
 
 // Full-window preview inside the pop-out Quick Look window. It renders through the
 // same PdfFrame (byte-read → blob) as the main preview, and follows the list
@@ -35,7 +35,7 @@ export function QuickLookView(initial: QlScene) {
   if (scene.isPdf) {
     return (
       <div className="qlview">
-        <PdfFrame path={scene.path} page={scene.page} nonce={scene.sceneIndex} />
+        <PdfFrame path={scene.path} page={scene.page} top={scene.top} nonce={scene.sceneIndex} />
       </div>
     )
   }

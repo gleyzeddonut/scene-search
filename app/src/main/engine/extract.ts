@@ -72,7 +72,8 @@ export function isRepeatWatermark(s: string): boolean {
 }
 
 // group a page's text items into lines (by rounded y), each tagged with its left x
-function pageLines(content: any): { text: string; x: number }[] {
+// and its baseline y (PDF points, bottom-left origin) for scroll-to-scene
+function pageLines(content: any): { text: string; x: number; y: number }[] {
   const rows = new Map<number, { x: number; s: string }[]>()
   for (const it of content.items as any[]) {
     if (typeof it.str !== 'string') continue
@@ -84,7 +85,7 @@ function pageLines(content: any): { text: string; x: number }[] {
   return ys
     .map((y) => {
       const items = rows.get(y)!.sort((a, b) => a.x - b.x)
-      return { text: items.map((r) => r.s).join('').trimEnd(), x: items.length ? items[0].x : 0 }
+      return { text: items.map((r) => r.s).join('').trimEnd(), x: items.length ? items[0].x : 0, y }
     })
     .filter((ln) => !isRepeatWatermark(ln.text))
 }
@@ -182,17 +183,17 @@ export function cleanLayout(lines: LayoutLine[]): LayoutLine[] {
       // promote a BEGIN marker to a heading only when it's the scene's only
       // delimiter: no slug recently before it AND none just ahead of it
       if (m[1].toUpperCase() === 'BEGIN' && sinceHeading > 6 && !slugAhead(i)) {
-        out.push({ text: `SCENE ${m[2]}`, x: leftX, page: l.page })
+        out.push({ text: `SCENE ${m[2]}`, x: leftX, y: l.y, page: l.page })
         sinceHeading = Infinity
       }
       if (rest) {
-        out.push({ text: rest, x: l.x, page: l.page })
+        out.push({ text: rest, x: l.x, y: l.y, page: l.page })
         sinceHeading++
       }
       continue
     }
 
-    out.push({ text, x: l.x, page: l.page })
+    out.push({ text, x: l.x, y: l.y, page: l.page })
     sinceHeading = SCENE_RE.test(t) ? 0 : sinceHeading + 1
   }
   return out
@@ -209,7 +210,7 @@ export async function extractLayout(path: string): Promise<{ lines: LayoutLine[]
   for (let i = 1; i <= pages; i++) {
     const page = await doc.getPage(i)
     for (const ln of pageLines(await page.getTextContent())) {
-      out.push({ text: ln.text, x: ln.x, page: i })
+      out.push({ text: ln.text, x: ln.x, y: ln.y, page: i })
       chars += ln.text.length
       if (chars >= MAX_CHARS) return { lines: cleanLayout(out), pageCount }
     }
