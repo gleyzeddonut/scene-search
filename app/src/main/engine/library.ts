@@ -1,7 +1,7 @@
 import { stat, readFile } from 'node:fs/promises'
 import { basename, resolve, extname, dirname } from 'node:path'
 import { extractPaginated as realExtract, extractLayout, layoutToText, isSparsePdf, ocrPdf } from './extract'
-import { parseScenes, parseLayout, parseHeadingless, parseScenesHeadingless } from './parser'
+import { parseScenes, parseLayout, parseHeadingless, parseScenesHeadingless, parseColonDialogue } from './parser'
 import { parseFdx, parseFountain } from './formats'
 import { scenePairing, guessGender, pairingFromGenders } from './gender'
 import { sceneWordCount, estimateSeconds, estimateScene, sceneMonologue } from './runtime'
@@ -122,6 +122,8 @@ export class Library {
             (a, b) => ((b[0]?.characters.length ?? 0) > (a[0]?.characters.length ?? 0) ? b : a)
           )
         }
+        // last resort: inline "MOM: dialogue" commercials the other parsers can't see
+        if (best.length === 0) best = parseColonDialogue(layoutText)
         // only when a PDF parsed to nothing AND has essentially no text layer (a true
         // scan/photo) do we OCR it (macOS Vision). Never runs on normal text PDFs.
         if (best.length === 0 && pageCount <= 60 && isSparsePdf(layoutText, pageCount)) {
@@ -132,7 +134,9 @@ export class Library {
       }
       const flat = await this._extract(rp)
       const scenes = dropEmpty(parseScenes(flat))
-      return scenes.length ? scenes : parseScenesHeadingless(flat)
+      if (scenes.length) return scenes
+      const headingless = parseScenesHeadingless(flat)
+      return headingless.length ? headingless : parseColonDialogue(flat)
     } catch {
       return []
     }

@@ -4,7 +4,7 @@ import type { Scene, SceneBlock, LayoutLine } from './types'
 // The persisted index records the version it was built with; on startup the
 // engine compares it to this and forces a full re-parse of every file (not just
 // changed ones) so parser improvements actually reach already-indexed scripts.
-export const PARSER_VERSION = 4
+export const PARSER_VERSION = 5
 
 // optional leading scene-number column (incl. "SC. 5.A5" from gutter numbers
 // some PDF extractors place at the start of the heading line)
@@ -328,4 +328,30 @@ export function parseHeadingless(lines: LayoutLine[]): Scene[] {
 export function parseScenesHeadingless(text: string): Scene[] {
   if (!text.trim()) return []
   return dialogueHeavy(parseScenes('SCENE 1\n' + text))
+}
+
+// Some commercials / AV scripts put the cue inline with a colon ("MOM: Nature.")
+// instead of on its own line, so the normal parsers find no dialogue. As a last resort
+// (only when everything else yielded nothing), rewrite those lines into ordinary
+// cue + dialogue lines and reparse. Only speaker-style names qualify — technical labels
+// (SFX, SUPER, TITLE…) and transitions (CUT TO:) are left as action.
+const COLON_CUE_RE = /^\s*([A-Z][A-Z0-9 .'#/&-]{0,28}):[ \t]+(\S.*?)\s*$/
+const COLON_LABEL_RE =
+  /^(SFX|VFX|FX|MUSIC|MUS|SOT|SUPER|SUPERS|TITLE|CARD|LOGO|TAG|DISCLAIMER|LEGAL|CHYRON|GRAPHIC|TEXT|PACK ?SHOT|NOTE|SETTING|LOCATION|SLATE)$/
+export function parseColonDialogue(text: string): Scene[] {
+  const out: string[] = []
+  let hits = 0
+  for (const line of text.split('\n')) {
+    const m = line.match(COLON_CUE_RE)
+    if (m) {
+      const name = normalizeCharacter(m[1])
+      if (isCueShaped(m[1]) && !isNonCue(name) && !COLON_LABEL_RE.test(name) && !TRANSITION_RE.test(m[1])) {
+        out.push(name, m[2]) // cue on its own line, then the dialogue below it
+        hits++
+        continue
+      }
+    }
+    out.push(line)
+  }
+  return hits >= 2 ? parseScenesHeadingless(out.join('\n')) : [] // need a real exchange
 }

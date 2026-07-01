@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseScenes, parseLayout, parseScenesHeadingless } from './parser'
+import { parseScenes, parseLayout, parseScenesHeadingless, parseColonDialogue } from './parser'
 import type { LayoutLine } from './types'
 
 describe('parseLayout', () => {
@@ -103,5 +103,18 @@ describe('parseScenesHeadingless (sides with no slug line)', () => {
     // caps-y labels that look cue-ish but aren't names — must not become a scene
     expect(parseScenesHeadingless('ISBN 978-1-7773737-0-2\nwww.example.org\n\nDA Y 8 1\nLife is full of distractions.\n')).toEqual([])
     expect(parseScenesHeadingless('Just a paragraph of ordinary prose with no script structure at all.')).toEqual([])
+  })
+})
+
+describe('parseColonDialogue (inline "MOM: line" commercials)', () => {
+  it('recovers dialogue from inline colon cues, ignoring directions', () => {
+    const s = parseColonDialogue(
+      'OPEN ON A FAMILY AT A LOOKOUT.\nSFX: Ambient noise.\nMOM: Nature. This is so good.\nDAD: So good.\nCUT TO: THE CAR.\nSAM: What is good, fam?\n'
+    )
+    expect(s).toHaveLength(1)
+    expect(s[0].characters).toEqual(['MOM', 'DAD', 'SAM']) // not SFX (a label) or CUT TO (a transition)
+  })
+  it('needs a real exchange — a lone colon label is not a scene', () => {
+    expect(parseColonDialogue('NOTE: remember to buy milk.\nJust some ordinary prose here.')).toEqual([])
   })
 })
