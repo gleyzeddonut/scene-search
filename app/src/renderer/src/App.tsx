@@ -200,6 +200,29 @@ export default function App() {
     }
   }, [theme])
 
+  // global "indexing finished" pill: notice a background re-index (which you can start
+  // in Library, then navigate away from) going from running → done, from any tab.
+  const idxRunning = useRef(false)
+  useEffect(() => {
+    const t = setInterval(async () => {
+      if (!readyRef.current) return
+      try {
+        const st = await api.reindexStatus()
+        if (st.running) {
+          idxRunning.current = true
+        } else if (idxRunning.current) {
+          idxRunning.current = false
+          showToast(`Library indexed — ${st.scripts} script${st.scripts !== 1 ? 's' : ''} · ${st.scenes.toLocaleString()} scenes`)
+          setRefreshKey((k) => k + 1) // show the freshly-indexed results
+        }
+      } catch {
+        /* engine briefly busy — try again next tick */
+      }
+    }, 1200)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <>
     {ready && (
