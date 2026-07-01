@@ -199,6 +199,9 @@ body{margin:0;font-family:system-ui,-apple-system,sans-serif;color:var(--text);b
 .scenenav-row.on{background:var(--sel);border-left-color:var(--accent)}
 .sn-h{font:600 12px/1.3 system-ui;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sn-meta{font:500 11px/1 system-ui;color:var(--text-3)}
+.sn-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sn-cast{display:flex;gap:3px;flex:none}
+.sn-cast .gchip{width:16px;height:16px;font-size:8.5px}
 
 /* shared buttons — accent (primary) + ghost (secondary), used app-wide */
 .btn-accent{padding:11px 18px;border-radius:9px;background:var(--accent);color:#fff;font:700 13px/1 system-ui;border:none;cursor:pointer;transition:filter .12s ease}

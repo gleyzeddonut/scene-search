@@ -22,22 +22,23 @@ export function estimateScene(lines: [string, string][], blocks: SceneBlock[]): 
   return words > 0 ? Math.max(1, estimateSeconds(words)) : 0 // any real content → at least 0:01
 }
 
-// a monologue is a scene where only one person speaks, for at least this long
+// a monologue is a scene one voice carries, speaking for at least this long
 export const MONOLOGUE_MIN_SECONDS = 30
+const INTERJECTION_MAX_WORDS = 3 // a brief reply from the reader ("Go on.") is allowed
 
-// A scene is a monologue when exactly one character speaks (a second speaker
-// disqualifies it) and their dialogue runs ≥ MONOLOGUE_MIN_SECONDS. Returns the
-// monologue { who, seconds }, or null.
+// A scene is a monologue when one character carries it: they speak ≥ MONOLOGUE_MIN_SECONDS
+// and nobody else says more than a brief interjection (≤ INTERJECTION_MAX_WORDS) — any real
+// line from a second character makes it a conversation. Returns the monologue, or null.
 export function sceneMonologue(blocks: SceneBlock[]): { who: string; seconds: number } | null {
-  let who = ''
-  let words = 0
-  for (const b of blocks) {
-    if (b.type !== 'cue') continue // action doesn't count as speaking
-    if (who && b.who !== who) return null // a second voice → not a monologue
-    who = b.who
-    words += wc(b.text)
-  }
-  if (!who) return null
-  const seconds = estimateSeconds(words)
-  return seconds >= MONOLOGUE_MIN_SECONDS ? { who, seconds } : null
+  const wordsBy = new Map<string, number>()
+  for (const b of blocks) if (b.type === 'cue') wordsBy.set(b.who, (wordsBy.get(b.who) ?? 0) + wc(b.text))
+  if (!wordsBy.size) return null
+  let who = '' // the character who carries the scene (speaks the most)
+  let max = 0
+  for (const [n, w] of wordsBy) if (w > max) ((max = w), (who = n))
+  const seconds = estimateSeconds(max)
+  if (seconds < MONOLOGUE_MIN_SECONDS) return null
+  for (const b of blocks)
+    if (b.type === 'cue' && b.who !== who && wc(b.text) > INTERJECTION_MAX_WORDS) return null
+  return { who, seconds }
 }

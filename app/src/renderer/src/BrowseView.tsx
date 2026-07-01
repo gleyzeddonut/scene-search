@@ -689,9 +689,20 @@ export function BrowseView({
                       onClick={() => chooseScene(sc)}
                     >
                       <span className="sn-h">{sc.heading}</span>
-                      <span className="sn-meta">
-                        {sizeTag(sc.char_count)}{sc.page ? ` · p.${sc.page}` : ''}
-                      </span>
+                      <div className="sn-bottom">
+                        <span className="sn-meta">
+                          {sizeTag(sc.char_count)}{sc.page ? ` · p.${sc.page}` : ''}
+                        </span>
+                        {sc.characters.length > 0 && (
+                          <span className="sn-cast">
+                            {sc.characters.slice(0, 4).map((c) => (
+                              <span key={c.name} className={'gchip ' + gletter(c.gender)} title={c.name}>
+                                {gletter(c.gender)}
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -42,10 +42,17 @@ describe('runtime', () => {
     ]
     expect(sceneMonologue(b)).toEqual({ who: 'A', seconds: estimateSeconds(70) })
   })
-  it('sceneMonologue: a second speaker disqualifies it — even a one-word reply', () => {
+  it('sceneMonologue: a brief interjection from the reader is allowed', () => {
     const b: SceneBlock[] = [
       { type: 'cue', who: 'A', text: words(70) },
-      { type: 'cue', who: 'B', text: 'Okay.' } // any second voice → not a monologue
+      { type: 'cue', who: 'B', text: 'Go on.' } // ≤3 words → still a monologue
+    ]
+    expect(sceneMonologue(b)).toEqual({ who: 'A', seconds: estimateSeconds(70) })
+  })
+  it('sceneMonologue: a real line from a second character disqualifies it', () => {
+    const b: SceneBlock[] = [
+      { type: 'cue', who: 'A', text: words(70) },
+      { type: 'cue', who: 'B', text: 'that is a real substantial reply here' } // >3 words → conversation
     ]
     expect(sceneMonologue(b)).toBeNull()
   })
