@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { sceneWordCount, estimateSeconds, estimateScene, longestSpeech } from './runtime'
+import { sceneWordCount, estimateSeconds, estimateScene, longestSpeech, sceneMonologue } from './runtime'
 import type { SceneBlock } from './types'
+const words = (n: number) => Array.from({ length: n }, (_, i) => 'w' + i).join(' ')
 
 describe('runtime', () => {
   it('counts words', () => {
@@ -50,5 +51,24 @@ describe('runtime', () => {
       { type: 'cue', who: 'A', text: 'four five' }
     ]
     expect(longestSpeech(b)).toEqual({ who: 'B', words: 6 }) // A's runs are 3 & 2; B's line wins
+  })
+  it('sceneMonologue: one voice carrying the scene qualifies', () => {
+    const b: SceneBlock[] = [
+      { type: 'cue', who: 'A', text: words(70) }, // ~32s
+      { type: 'cue', who: 'B', text: 'I see what you mean there' } // one real reply is allowed
+    ]
+    expect(sceneMonologue(b)).toEqual({ who: 'A', seconds: estimateSeconds(70) })
+  })
+  it('sceneMonologue: a back-and-forth conversation does not (Breakup Season case)', () => {
+    const b: SceneBlock[] = [
+      { type: 'cue', who: 'A', text: words(70) }, // still the longest turn
+      { type: 'cue', who: 'B', text: 'that is one real line here' },
+      { type: 'cue', who: 'C', text: 'and here is another real line' },
+      { type: 'cue', who: 'B', text: 'plus a third substantial reply now' }
+    ]
+    expect(sceneMonologue(b)).toBeNull() // 3 substantial replies → a conversation, not a monologue
+  })
+  it('sceneMonologue: too short is not a monologue', () => {
+    expect(sceneMonologue([{ type: 'cue', who: 'A', text: words(20) }])).toBeNull()
   })
 })

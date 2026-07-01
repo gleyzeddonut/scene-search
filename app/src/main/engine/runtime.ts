@@ -25,6 +25,7 @@ export function estimateScene(lines: [string, string][], blocks: SceneBlock[]): 
 // a scene "has a monologue" when one character speaks uninterrupted for this long
 export const MONOLOGUE_MIN_SECONDS = 30
 const INTERJECTION_MAX_WORDS = 3 // another character's ≤3-word line ("Go on.") doesn't break it
+const MONOLOGUE_MAX_OTHER_LINES = 1 // a monologue is one voice; more real replies = a conversation
 
 // The longest uninterrupted speech by a single character in a scene: their consecutive
 // dialogue, where action beats and tiny interjections from others pass through, but a
@@ -47,4 +48,19 @@ export function longestSpeech(blocks: SceneBlock[]): { who: string; words: numbe
     if (curWords > best.words) best = { who: curWho, words: curWords }
   }
   return best
+}
+
+// A scene counts as a monologue only when one character both delivers a long speech
+// (≥ MONOLOGUE_MIN_SECONDS) AND carries the scene — i.e. the other characters barely
+// reply (≤ MONOLOGUE_MAX_OTHER_LINES substantial lines). This rejects dialogue-heavy
+// scenes where someone merely has the longest turn in a back-and-forth. Returns the
+// monologue { who, seconds }, or null when the scene doesn't qualify.
+export function sceneMonologue(blocks: SceneBlock[]): { who: string; seconds: number } | null {
+  const sp = longestSpeech(blocks)
+  const seconds = estimateSeconds(sp.words)
+  if (seconds < MONOLOGUE_MIN_SECONDS) return null
+  let otherLines = 0
+  for (const b of blocks)
+    if (b.type === 'cue' && b.who !== sp.who && wc(b.text) > INTERJECTION_MAX_WORDS) otherLines++
+  return otherLines <= MONOLOGUE_MAX_OTHER_LINES ? { who: sp.who, seconds } : null
 }

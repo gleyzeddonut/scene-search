@@ -4,7 +4,7 @@ import { extractPaginated as realExtract, extractLayout, layoutToText, isSparseP
 import { parseScenes, parseLayout, parseHeadingless, parseScenesHeadingless } from './parser'
 import { parseFdx, parseFountain } from './formats'
 import { scenePairing, guessGender, pairingFromGenders } from './gender'
-import { sceneWordCount, estimateSeconds, estimateScene, longestSpeech, MONOLOGUE_MIN_SECONDS } from './runtime'
+import { sceneWordCount, estimateSeconds, estimateScene, sceneMonologue } from './runtime'
 import { iterCandidates, SCRIPT_EXTENSIONS } from './scanner'
 import type { Scene, SceneMatch, SceneBlock } from './types'
 
@@ -246,10 +246,10 @@ export class Library {
     if (this.monoCache) return this.monoCache
     const m = new Map<string, { who: string; seconds: number }>()
     for (const s of this.scenes) {
-      const sp = longestSpeech(s.content)
-      const secs = estimateSeconds(sp.words)
+      const mono = sceneMonologue(s.content) // null unless the scene is carried by one voice
+      if (!mono) continue
       const cur = m.get(s.path)
-      if (!cur || secs > cur.seconds) m.set(s.path, { who: sp.who, seconds: secs })
+      if (!cur || mono.seconds > cur.seconds) m.set(s.path, mono)
     }
     return (this.monoCache = m)
   }
@@ -291,7 +291,7 @@ export class Library {
       if (f.minChars != null && size < f.minChars) return false
       if (f.maxChars != null && size > f.maxChars) return false
       if (f.pairing != null && scriptPairing(s.path) !== f.pairing) return false
-      if (f.monologue && (monoByScript.get(s.path)?.seconds ?? 0) < MONOLOGUE_MIN_SECONDS) return false
+      if (f.monologue && !monoByScript.has(s.path)) return false
       return true
     })
     // fold re-download copies: keep the representative (shortest name) per canonical
@@ -318,7 +318,7 @@ export class Library {
         char_count: s.charCount, characters: s.characters, pairing: pairingOf(s),
         scene_index: s.index, est_seconds: estimateScene(s.dialogue, s.content),
         added: row?.added ?? row?.mtime, // creation time; mtime fallback for pre-reindex entries
-        monologue: mono && mono.seconds >= MONOLOGUE_MIN_SECONDS ? mono : null // for the row hint
+        monologue: mono ?? null // present only when the script has a qualifying monologue (row hint)
       }
     })
   }
