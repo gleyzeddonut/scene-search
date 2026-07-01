@@ -59,4 +59,18 @@ describe('runtime', () => {
   it('sceneMonologue: one speaker but too short is not a monologue', () => {
     expect(sceneMonologue([{ type: 'cue', who: 'A', text: words(20) }])).toBeNull()
   })
+  it('sceneMonologue: a recurring inline quoted cue means a hidden second speaker', () => {
+    // Changeling's interrogation: the boy answers as "WALTER", absorbed into YBARRA
+    const b: SceneBlock[] = [
+      { type: 'cue', who: 'YBARRA', text: `${words(60)} "WALTER" I dunno.` },
+      { type: 'cue', who: 'YBARRA', text: `${words(30)} "WALTER" Maybe.` } // "WALTER" recurs → 2 speakers
+    ]
+    expect(sceneMonologue(b)).toBeNull()
+  })
+  it('sceneMonologue: a one-off quoted phrase (a headline) does not disqualify', () => {
+    const b: SceneBlock[] = [
+      { type: 'cue', who: 'HALEY', text: `${words(70)} the sign read "NEVER ENDING DROUGHT".` }
+    ]
+    expect(sceneMonologue(b)?.who).toBe('HALEY') // quoted once → still a monologue
+  })
 })
