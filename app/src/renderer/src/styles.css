@@ -72,6 +72,7 @@ body{margin:0;font-family:system-ui,-apple-system,sans-serif;color:var(--text);b
 .set-sub{font:500 12px/1.3 system-ui;color:var(--text-3);margin-top:3px}
 /* dedicated status line — fixed height so update text never resizes the row */
 .set-status{font:500 12px/1.4 system-ui;color:var(--text-3);min-height:17px;margin-top:8px;white-space:nowrap}
+.set-note{font:500 11.5px/1.5 system-ui;color:var(--text-3);margin-top:18px;padding-top:14px;border-top:1px solid var(--border-soft)}
 .modal-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
 .rename-row{display:flex;align-items:center;gap:8px}
 .rename-input{flex:1;min-width:0;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:var(--field);color:var(--text);font:500 14px/1.2 system-ui;outline:none}

@@ -153,6 +153,12 @@ export function SettingsModal(props: { theme: string; onTheme: (t: string) => vo
           )}
         </div>
 
+        <div className="set-note">
+          Scripts come in every format under the sun, and parsing is still being refined —
+          so a scene, character, or estimate may occasionally look off. If something seems
+          wrong, “Rebuild library” re-parses with the latest improvements.
+        </div>
+
         <div className="modal-foot">
           <button className="ghost" onClick={props.onClose}>Done</button>
         </div>
