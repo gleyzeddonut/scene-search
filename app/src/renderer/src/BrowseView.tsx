@@ -419,7 +419,7 @@ export function BrowseView({
 
   const chooseSize = (i: number) => {
     setSize(i)
-    if (i === 1 || i === 3) setPair(0) // Solo / 3+ have no pairing
+    if (i === 1 || i === 3) setPair(0) // Monologue / Ensemble have no pairing
   }
   const toggleGenre = (g: string) =>
     setGenres(genres.includes(g) ? genres.filter((x) => x !== g) : [...genres, g])
@@ -704,6 +704,9 @@ export function BrowseView({
                       <span className="sn-h">{sc.heading}</span>
                       <div className="sn-bottom">
                         <span className="sn-meta">
+                          {monoActive && selScript.monologue?.scene === sc.scene_index && (
+                            <span className="sn-badge">Monologue · </span>
+                          )}
                           {sizeTag(sc.char_count)}{sc.page ? ` · p.${sc.page}` : ''}
                         </span>
                         {sc.characters.length > 0 && (
