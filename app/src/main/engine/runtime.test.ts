@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sceneWordCount, estimateSeconds, estimateScene, longestSpeech, sceneMonologue } from './runtime'
+import { sceneWordCount, estimateSeconds, estimateScene, sceneMonologue } from './runtime'
 import type { SceneBlock } from './types'
 const words = (n: number) => Array.from({ length: n }, (_, i) => 'w' + i).join(' ')
 
@@ -34,41 +34,22 @@ describe('runtime', () => {
     expect(estimateSeconds(1)).toBe(0) // confirm the rounding that caused the bug
     expect(estimateScene(oneWord, blocks)).toBeGreaterThan(0) // rescued by the full content
   })
-  it('longestSpeech: biggest single-character speech; tiny interjections pass', () => {
+  it('sceneMonologue: one speaker for ≥30s qualifies (action beats are fine)', () => {
     const b: SceneBlock[] = [
-      { type: 'cue', who: 'A', text: 'one two three four five six seven' }, // 7
-      { type: 'action', text: 'a beat' }, // action within a speech is fine
-      { type: 'cue', who: 'B', text: 'Go on.' }, // 2-word interjection → passes
-      { type: 'cue', who: 'A', text: 'eight nine ten' }, // +3 → A run = 10
-      { type: 'cue', who: 'B', text: 'a much longer reply here that keeps going' } // >3 → new run
-    ]
-    expect(longestSpeech(b)).toEqual({ who: 'A', words: 10 })
-  })
-  it('longestSpeech: a substantial interruption breaks the run', () => {
-    const b: SceneBlock[] = [
-      { type: 'cue', who: 'A', text: 'one two three' },
-      { type: 'cue', who: 'B', text: 'this is a real interruption line' }, // 6 words > 3 → breaks
-      { type: 'cue', who: 'A', text: 'four five' }
-    ]
-    expect(longestSpeech(b)).toEqual({ who: 'B', words: 6 }) // A's runs are 3 & 2; B's line wins
-  })
-  it('sceneMonologue: one voice carrying the scene qualifies', () => {
-    const b: SceneBlock[] = [
-      { type: 'cue', who: 'A', text: words(70) }, // ~32s
-      { type: 'cue', who: 'B', text: 'I see what you mean there' } // one real reply is allowed
+      { type: 'cue', who: 'A', text: words(40) },
+      { type: 'action', text: 'she paces the room' },
+      { type: 'cue', who: 'A', text: words(30) } // same speaker, 70 words total → ~32s
     ]
     expect(sceneMonologue(b)).toEqual({ who: 'A', seconds: estimateSeconds(70) })
   })
-  it('sceneMonologue: a back-and-forth conversation does not (Breakup Season case)', () => {
+  it('sceneMonologue: a second speaker disqualifies it — even a one-word reply', () => {
     const b: SceneBlock[] = [
-      { type: 'cue', who: 'A', text: words(70) }, // still the longest turn
-      { type: 'cue', who: 'B', text: 'that is one real line here' },
-      { type: 'cue', who: 'C', text: 'and here is another real line' },
-      { type: 'cue', who: 'B', text: 'plus a third substantial reply now' }
+      { type: 'cue', who: 'A', text: words(70) },
+      { type: 'cue', who: 'B', text: 'Okay.' } // any second voice → not a monologue
     ]
-    expect(sceneMonologue(b)).toBeNull() // 3 substantial replies → a conversation, not a monologue
+    expect(sceneMonologue(b)).toBeNull()
   })
-  it('sceneMonologue: too short is not a monologue', () => {
+  it('sceneMonologue: one speaker but too short is not a monologue', () => {
     expect(sceneMonologue([{ type: 'cue', who: 'A', text: words(20) }])).toBeNull()
   })
 })
