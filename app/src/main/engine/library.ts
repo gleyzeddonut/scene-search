@@ -19,6 +19,16 @@ function dropEmpty(scenes: Scene[]): Scene[] {
   return scenes.filter((s) => s.blocks.length > 0).map((s, i) => ({ ...s, index: i + 1 }))
 }
 
+// Choose between the layout parse and the regex parse of the same PDF: more scenes
+// wins; on a tie, more captured dialogue wins (single-column PDFs give the layout
+// parser no indentation to work with, so it finds the scenes but none of the spoken
+// lines); a full tie keeps the layout parse, which carries topY for scroll-to-scene.
+const dialogueCount = (ss: Scene[]) => ss.reduce((n, s) => n + s.lines.length, 0)
+export function pickParse(layout: Scene[], regex: Scene[]): Scene[] {
+  if (layout.length !== regex.length) return layout.length > regex.length ? layout : regex
+  return dialogueCount(layout) >= dialogueCount(regex) ? layout : regex
+}
+
 export function canonicalKey(filename: string): string {
   const dot = filename.lastIndexOf('.')
   let stem = dot >= 0 ? filename.slice(0, dot) : filename
@@ -112,7 +122,7 @@ export class Library {
         // otherwise yield an empty scene for each bare label.
         const layout = dropEmpty(parseLayout(lines))
         const regex = dropEmpty(parseScenes(layoutText))
-        let best = layout.length >= regex.length ? layout : regex
+        let best = pickParse(layout, regex)
         // sides with dialogue but no slug line at all → synthesize one scene so the
         // content is still searchable (gated to real dialogue, so prose stays empty).
         // try both engines: the text parser is robust when a title page throws off
@@ -122,8 +132,12 @@ export class Library {
             (a, b) => ((b[0]?.characters.length ?? 0) > (a[0]?.characters.length ?? 0) ? b : a)
           )
         }
-        // last resort: inline "MOM: dialogue" commercials the other parsers can't see
-        if (best.length === 0) best = parseColonDialogue(layoutText)
+        // inline "MOM: dialogue" scripts the other parsers can't see — also worth
+        // trying when scenes parsed but NO dialogue did (colon scripts with real slugs)
+        if (best.length === 0 || dialogueCount(best) === 0) {
+          const colon = parseColonDialogue(layoutText)
+          if (dialogueCount(colon) > 0) best = colon
+        }
         // only when a PDF parsed to nothing AND has essentially no text layer (a true
         // scan/photo) do we OCR it (macOS Vision). Never runs on normal text PDFs.
         if (best.length === 0 && pageCount <= 60 && isSparsePdf(layoutText, pageCount)) {
@@ -134,9 +148,11 @@ export class Library {
       }
       const flat = await this._extract(rp)
       const scenes = dropEmpty(parseScenes(flat))
-      if (scenes.length) return scenes
-      const headingless = parseScenesHeadingless(flat)
-      return headingless.length ? headingless : parseColonDialogue(flat)
+      if (scenes.length && dialogueCount(scenes) > 0) return scenes
+      const headingless = scenes.length ? [] : parseScenesHeadingless(flat)
+      if (headingless.length) return headingless
+      const colon = parseColonDialogue(flat)
+      return colon.length ? colon : scenes
     } catch {
       return []
     }

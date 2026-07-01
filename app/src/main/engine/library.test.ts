@@ -3,7 +3,8 @@ import { mkdtempSync, writeFileSync, copyFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { Library, canonicalKey } from './library'
+import { Library, canonicalKey, pickParse } from './library'
+import type { Scene } from './types'
 
 const fixture = (n: string) => fileURLToPath(new URL(`./__fixtures__/${n}`, import.meta.url))
 
@@ -80,6 +81,44 @@ describe('Library', () => {
     await lib.reindex([d])
     expect(lib.scriptCount()).toBe(1)
   })
+  it('pickParse breaks a scene-count tie by dialogue captured', () => {
+    // single-column PDFs give the layout parser no indentation to work with: it finds
+    // the same scene as the regex parser but none of the dialogue — the regex parse
+    // must win the tie
+    const scene = (dlg: [string, string][]): Scene => ({
+      heading: 'INT. ROOM - DAY', index: 1, page: 1,
+      characters: [...new Set(dlg.map(([who]) => who))],
+      lines: dlg,
+      blocks: dlg.map(([who, text]) => ({ type: 'cue' as const, who, text }))
+    })
+    const mute = [scene([])]
+    const talking = [scene([['JOHN', 'Hello.'], ['MARY', 'Hi.']])]
+    expect(pickParse(mute, talking)).toBe(talking)
+    expect(pickParse(talking, mute)).toBe(talking)
+    // more scenes still beats more dialogue
+    expect(pickParse([scene([]), scene([])], talking)).toHaveLength(2)
+    // a true tie keeps the layout parse (it carries topY for scroll-to-scene)
+    const a = [scene([['JOHN', 'Hey.']])]
+    const b = [scene([['MARY', 'Yo.']])]
+    expect(pickParse(a, b)).toBe(a)
+  })
+
+  it('recovers colon dialogue when a heading parsed but no dialogue did', async () => {
+    // a colon-dialogue script WITH a real slug: the normal parse finds the scene but
+    // zero dialogue, which must now trigger the colon-recovery pass
+    const d = tmp()
+    writeFileSync(
+      join(d, 'colon.txt'),
+      'INT. CONFERENCE ROOM - EVENING\n\nLIAM: You must really love this place, huh?\nCHLOE: I loathe rush-hour.\nLIAM: Fair enough.\n'
+    )
+    const lib = new Library()
+    await lib.reindex([d])
+    const m = lib.query({})[0]
+    const s = lib.getScene(m.script_path, m.scene_index)!
+    expect(s.heading).toBe('INT. CONFERENCE ROOM - EVENING')
+    expect(s.lines.map((l) => l.who)).toEqual(['LIAM', 'CHLOE', 'LIAM'])
+  })
+
   it('addFile detects duplicates and rejects non-scripts', async () => {
     const d = tmp(); const f = join(d, 'x.fountain'); writeFileSync(f, SCRIPT)
     const lib = new Library()

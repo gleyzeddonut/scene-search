@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { createRequire } from 'node:module'
-import { SCENE_RE } from './parser'
+import { SCENE_RE, isCueShaped } from './parser'
 import type { LayoutLine } from './types'
 
 export class ExtractionError extends Error {}
@@ -158,6 +158,19 @@ export function cleanLayout(lines: LayoutLine[]): LayoutLine[] {
     return false
   }
 
+  // The character-cue column (modal x-bucket of cue-shaped lines, when it recurs):
+  // a SHORT pure-number line sitting exactly at this column is the cue of a
+  // digit-NAMED character ("3", in a script whose characters are numbers), not a
+  // page/gutter number — those live at the page edges, never at the cue column.
+  const bucket = (x: number) => Math.round(x / 3) * 3
+  const cueBuckets = new Map<number, number>()
+  for (const l of lines) {
+    const t = norm(l)
+    if (t && !PAGENUM_LINE.test(t) && isCueShaped(t)) cueBuckets.set(bucket(l.x), (cueBuckets.get(bucket(l.x)) || 0) + 1)
+  }
+  const cueCol = [...cueBuckets].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1])[0]?.[0]
+  const isDigitCue = (t: string, x: number) => cueCol !== undefined && bucket(x) === cueCol && /^\d{1,2}$/.test(t)
+
   // reduce, not Math.min(...spread) — the spread blows the call-arg limit on very
   // large PDFs (a RangeError that parseFile would swallow into a 0-scene index)
   const leftX = lines.reduce((m, l) => Math.min(m, l.x), Infinity)
@@ -170,8 +183,10 @@ export function cleanLayout(lines: LayoutLine[]): LayoutLine[] {
     if (!t) continue
     // pure-number lines are gutter scene numbers / page numbers ("17 17", "7."). A
     // dialogue line that is solely a bare number doesn't occur in real scripts, and
-    // a position-based exception reintroduced gutter-number pollution, so drop them.
-    if (PAGENUM_LINE.test(t)) continue
+    // a broad position-based exception reintroduced gutter-number pollution, so drop
+    // them — except a short number at the established cue column (a digit-named
+    // character's cue), which no gutter or page number ever occupies.
+    if (PAGENUM_LINE.test(t) && !isDigitCue(t, l.x)) continue
     if (isRunningHeader(t)) continue
 
     const m = t.match(SCENE_MARKER_RE)

@@ -154,6 +154,29 @@ describe('cleanLayout', () => {
     ])
   })
 
+  it('keeps a digit-only character cue at the cue column, still drops page/gutter numbers', () => {
+    const out = cleanLayout([
+      L('INT. BEDROOM - NIGHT', 108, 1),
+      L('MOIRA', 252, 1),
+      L('Get out.', 180, 1),
+      L('3', 252, 1), // a digit-named character's cue — sits exactly at the cue column
+      L('Get out get out!', 180, 1),
+      L('JOHNNY', 252, 1),
+      L('Okay okay.', 180, 1),
+      L('17 17', 54, 2), // gutter scene numbers
+      L('7.', 550, 2) // page number
+    ])
+    expect(out.map((l) => l.text)).toEqual([
+      'INT. BEDROOM - NIGHT',
+      'MOIRA',
+      'Get out.',
+      '3',
+      'Get out get out!',
+      'JOHNNY',
+      'Okay okay.'
+    ])
+  })
+
   it('leaves a real line that merely mentions the casting platform intact', () => {
     const out = cleanLayout([L("You still don't have Actors Access yet?", 180, 1)])
     expect(out.map((l) => l.text)).toEqual(["You still don't have Actors Access yet?"])

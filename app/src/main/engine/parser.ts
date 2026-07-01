@@ -4,11 +4,12 @@ import type { Scene, SceneBlock, LayoutLine } from './types'
 // The persisted index records the version it was built with; on startup the
 // engine compares it to this and forces a full re-parse of every file (not just
 // changed ones) so parser improvements actually reach already-indexed scripts.
-export const PARSER_VERSION = 5
+export const PARSER_VERSION = 6
 
 // optional leading scene-number column (incl. "SC. 5.A5" from gutter numbers
-// some PDF extractors place at the start of the heading line)
-export const SCENE_RE = /^\s*(?:SC\.?\s*)?(?:\d+[\dA-Za-z.]*[.)]?[\s*]+)?(INT\.?\/EXT\.?|EXT\.?\/INT\.?|INT|EXT|I\/E|E\/I)[.\s]/i
+// some PDF extractors place at the start of the heading line), an optional glued
+// opening transition ("FADE IN: INT: CAFÉ"), and the amateur "INT:" colon form
+export const SCENE_RE = /^\s*(?:FADE\s+IN\s*[:.]?\s*)?(?:SC\.?\s*)?(?:\d+[\dA-Za-z.]*[.)]?[\s*]+)?(INT\.?\/EXT\.?|EXT\.?\/INT\.?|INT|EXT|I\/E|E\/I)[.:\s]/i
 const SCENE_NUM_PREFIX = /^\s*(?:SC\.?\s*)?\d+[\dA-Za-z.]*[.)]?[\s*]+/
 // A gutter scene number fused directly onto the END of a word or paren with NO
 // space ("TONYA100", "(YD11)2", "CHEMO45", "CLASS6pt", "LATER31pt1"). The lookbehind
@@ -27,7 +28,7 @@ export const squish = (s: string) => s.split(/\s+/).filter(Boolean).join(' ')
 // asterisk, and the right-gutter scene number (whether spaced after a time-of-day
 // or fused directly onto the last word)
 function cleanHeading(raw: string): string {
-  let h = squish(raw.replace(SCENE_NUM_PREFIX, ''))
+  let h = squish(raw.replace(/^\s*FADE\s+IN\s*[:.]?\s*/i, '').replace(SCENE_NUM_PREFIX, ''))
   h = h.replace(/\s*\*+\s*$/, '') // trailing revision mark(s)
   h = h.replace(TRAILING_FUSED_NUM, '$1')
   return h.trimEnd()
@@ -51,6 +52,7 @@ const NON_CUE_RE = new RegExp(
     '|^(?:' + TOD_CORE + ')\\s+\\d+$' +
     '|^(?:THE\\s+)?END(?:\\s+OF\\s+(?:SCENE|ACT|EPISODE|SHOW))?$' +
     '|^(?:BEGIN|END)\\s+SC(?:ENE)?\\.?\\s*\\d*$|^BACK\\s+TO\\b' +
+    '|^(?:SC|SCENE|EPISODE|EP)\\.?\\s+\\d+[A-Za-z]?$' + // bare scene/episode labels
     '|^OMITTED$|^PAGE\\s+\\d+(?:\\s+OF\\s+\\d+)?$|^\\d+\\s+SCENES?$|^CAST\\s+LIST$|^SET\\s+LIST$'
 )
 function isNonCue(name: string): boolean {
@@ -75,11 +77,17 @@ function isCue(line: string): boolean {
 
 // A line is "cue-shaped" if it reads like a character name: uppercase, short, no
 // sentence-ending punctuation (parentheticals like (V.O.) are stripped first).
-function isCueShaped(t: string): boolean {
+// Exported for cleanLayout's cue-column detection.
+export function isCueShaped(t: string): boolean {
   // drop surrounding quotes first so a quoted line of dialogue ("...LYING!") isn't
   // mistaken for a cue by the trailing-punctuation guard below
   const base = squish(t.replace(PAREN_RE, '')).replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim()
-  if (!base || /[a-z]/.test(base) || !/[A-Z]/.test(base)) return false
+  // real names are at most ~40 chars ("PORT AUTHORITY INFORMATION OFFICER" is 34)
+  // and never contain a 3+ digit run — an ALL-CAPS insert like a sign with a phone
+  // number does ("BURNHAM & ASSOCIATES REALTY 555-0195")
+  if (!base || /[a-z]/.test(base) || base.length > 40 || /\d{3,}/.test(base)) return false
+  // digit-named characters ("3", "1-2") — no letters at all, but a valid speaker
+  if (!/[A-Z]/.test(base)) return /^\d{1,2}(?:-\d{1,2})?$/.test(base)
   if ('.!?'.includes(base[base.length - 1])) return false
   if (isNonCue(base)) return false
   const words = base.split(/\s+/).filter(Boolean)
@@ -125,7 +133,14 @@ export function parseLayout(rawLines: LayoutLine[]): Scene[] {
   const counts = new Map<number, number>()
   for (const l of lines) counts.set(bucket(l.x), (counts.get(bucket(l.x)) || 0) + 1)
   const maxC = Math.max(...counts.values())
-  const base = Math.min(...[...counts].filter(([, c]) => c >= maxC * 0.12).map(([b]) => b))
+  const freqBase = Math.min(...[...counts].filter(([, c]) => c >= maxC * 0.12).map(([b]) => b))
+  // Sides excerpts are mostly dialogue, so the dialogue column can dominate the
+  // frequency count and pull freqBase a full column right of the true margin — which
+  // classifies every spoken line as indent-0 action. Real INT./EXT. slugs sit flush
+  // to the true margin, so when they exist LEFT of freqBase, trust them instead
+  // (median, so one slug with a fused gutter number can't drag the base off).
+  const headXs = lines.filter((l) => SCENE_RE.test(l.text)).map((l) => bucket(l.x)).sort((a, b) => a - b)
+  const base = Math.min(freqBase, headXs.length ? headXs[headXs.length >> 1] : Infinity)
 
   // cue margin = median left-x of indented cue-shaped lines → sets the indent scale
   const cueXs = lines.filter((l) => l.x - base > 24 && isCueShaped(l.text)).map((l) => l.x).sort((a, b) => a - b)
@@ -176,6 +191,7 @@ export function parseLayout(rawLines: LayoutLine[]): Scene[] {
   }
 
   let afterTransition = false
+  const prefix: LayoutLine[] = [] // lines before the first heading (sides often start mid-scene)
   for (const l of lines) {
     const t = l.text.trim()
     const flushLeft = l.x - base < cueIndent * 0.5
@@ -202,7 +218,10 @@ export function parseLayout(rawLines: LayoutLine[]): Scene[] {
       continue
     }
     afterTransition = false
-    if (!current) continue
+    if (!current) {
+      prefix.push(l)
+      continue
+    }
     const role = classify(l)
     if (role === 'CUE') {
       flushDialogue()
@@ -219,6 +238,13 @@ export function parseLayout(rawLines: LayoutLine[]): Scene[] {
   }
   flushDialogue()
   flushAction()
+  // dialogue that PRECEDES the first heading (an excerpt that starts mid-scene) —
+  // recover it as a synthetic leading scene, under the same dialogue-heavy gate as a
+  // fully headingless doc, so a title page or synopsis never becomes a scene
+  if (scenes.length && prefix.length) {
+    const pre = parseHeadingless(prefix, 3)
+    if (pre.length) return [...pre, ...scenes].map((s, i) => ({ ...s, index: i + 1 }))
+  }
   return scenes
 }
 
@@ -233,6 +259,7 @@ export function parseScenes(text: string): Scene[] {
   let skipUntil = 0
   let action: string[] = []
   let afterTransition = false
+  const prefix: string[] = [] // lines before the first heading (sides often start mid-scene)
 
   const flushAction = () => {
     if (current) {
@@ -267,7 +294,10 @@ export function parseScenes(text: string): Scene[] {
       continue
     }
     if (raw.trim()) afterTransition = false
-    if (!current) continue
+    if (!current) {
+      prefix.push(raw)
+      continue
+    }
     if (!raw.trim()) {
       flushAction()
       continue
@@ -302,15 +332,21 @@ export function parseScenes(text: string): Scene[] {
     action.push(raw.trim())
   }
   flushAction()
+  // same mid-scene-start recovery as parseLayout: a dialogue-heavy excerpt before
+  // the first heading becomes a synthetic leading scene; anything else is dropped
+  if (scenes.length && prefix.some((l) => l.trim())) {
+    const pre = parseScenesHeadingless(prefix.join('\n'), 3)
+    if (pre.length) return [...pre, ...scenes].map((s, i) => ({ ...s, index: i + 1 }))
+  }
   return scenes
 }
 
 // Accept a synthesized single scene only if it genuinely reads like dialogue: at
 // least two name-shaped speakers (alphabetic, no digits — so an ISBN or a spaced-out
-// "DA Y 8 1" page label doesn't count) and at least two lines. Keeps prose docs
+// "DA Y 8 1" page label doesn't count) and at least minLines lines. Keeps prose docs
 // (journals, transcripts, ad copy) parsing to nothing.
-function dialogueHeavy(scenes: Scene[]): Scene[] {
-  if (scenes.length !== 1 || scenes[0].lines.length < 2) return []
+function dialogueHeavy(scenes: Scene[], minLines = 2): Scene[] {
+  if (scenes.length !== 1 || scenes[0].lines.length < minLines) return []
   const realNames = scenes[0].characters.filter(
     (c) => !/\d/.test(c) && (c.match(/[A-Za-zÀ-ÿ]/g)?.length ?? 0) >= 2
   )
@@ -320,38 +356,59 @@ function dialogueHeavy(scenes: Scene[]): Scene[] {
 // Fallback for audition sides that have dialogue but NO scene heading at all:
 // prepend a synthetic heading so the whole document parses as one scene, and keep
 // it only if it really reads like dialogue. Returns [] otherwise.
-export function parseHeadingless(lines: LayoutLine[]): Scene[] {
+// minLines: the pre-heading (prefix) recovery passes 3 — a production title page
+// fabricates up to TWO cue/dialogue pairs (show title + draft label), which the
+// whole-document floor of 2 would let through.
+export function parseHeadingless(lines: LayoutLine[], minLines = 2): Scene[] {
   if (!lines.length) return []
   const x = lines.reduce((m, l) => Math.min(m, l.x), Infinity) // reduce, not spread
-  return dialogueHeavy(parseLayout([{ text: 'SCENE 1', x, y: lines[0].y, page: lines[0].page }, ...lines]))
+  return dialogueHeavy(parseLayout([{ text: 'SCENE 1', x, y: lines[0].y, page: lines[0].page }, ...lines]), minLines)
 }
-export function parseScenesHeadingless(text: string): Scene[] {
+export function parseScenesHeadingless(text: string, minLines = 2): Scene[] {
   if (!text.trim()) return []
-  return dialogueHeavy(parseScenes('SCENE 1\n' + text))
+  return dialogueHeavy(parseScenes('SCENE 1\n' + text), minLines)
 }
 
 // Some commercials / AV scripts put the cue inline with a colon ("MOM: Nature.")
 // instead of on its own line, so the normal parsers find no dialogue. As a last resort
-// (only when everything else yielded nothing), rewrite those lines into ordinary
+// (only when everything else yielded no dialogue), rewrite those lines into ordinary
 // cue + dialogue lines and reparse. Only speaker-style names qualify — technical labels
-// (SFX, SUPER, TITLE…) and transitions (CUT TO:) are left as action.
-const COLON_CUE_RE = /^\s*([A-Z][A-Z0-9 .'#/&-]{0,28}):[ \t]+(\S.*?)\s*$/
+// (SFX, SUPER, TITLE…) and transitions (CUT TO:) are left as action. ALL-CAPS names
+// qualify outright; a mixed-case name ("Man: …") must RECUR to count as a speaker, so
+// one-off "Warning: …" prose never reads as dialogue.
+const COLON_CUE_RE = /^\s*([A-Za-z][A-Za-z0-9 .'#/&-]{0,28}):[ \t]+(\S.*?)\s*$/
+const MIXED_NAME_RE = /^[A-Z][A-Za-z'’-]*(?:\s+[A-Z][A-Za-z'’-]*){0,2}$/
 const COLON_LABEL_RE =
-  /^(SFX|VFX|FX|MUSIC|MUS|SOT|SUPER|SUPERS|TITLE|CARD|LOGO|TAG|DISCLAIMER|LEGAL|CHYRON|GRAPHIC|TEXT|PACK ?SHOT|NOTE|SETTING|LOCATION|SLATE)$/
+  /^(SFX|VFX|FX|MUSIC|MUS|SOT|SUPER|SUPERS|TITLE|CARD|LOGO|TAG|DISCLAIMER|LEGAL|CHYRON|GRAPHIC|TEXT|PACK ?SHOT|NOTE|WARNING|REMEMBER|SETTING|LOCATION|SLATE|SYNOPSIS|SCENE|START|END|CHAPTER|PART|ACT|EPISODE)$/
 export function parseColonDialogue(text: string): Scene[] {
+  const lines = text.split('\n')
+  const matches = lines.map((l) => l.match(COLON_CUE_RE))
+  const counts = new Map<string, number>()
+  for (const m of matches) if (m) counts.set(normalizeCharacter(m[1]), (counts.get(normalizeCharacter(m[1])) || 0) + 1)
   const out: string[] = []
   let hits = 0
-  for (const line of text.split('\n')) {
-    const m = line.match(COLON_CUE_RE)
+  for (let i = 0; i < lines.length; i++) {
+    const m = matches[i]
     if (m) {
       const name = normalizeCharacter(m[1])
-      if (isCueShaped(m[1]) && !isNonCue(name) && !COLON_LABEL_RE.test(name) && !TRANSITION_RE.test(m[1])) {
+      const speakerShaped = isCueShaped(m[1]) || (MIXED_NAME_RE.test(m[1].trim()) && (counts.get(name) || 0) >= 2)
+      if (speakerShaped && !isNonCue(name) && !COLON_LABEL_RE.test(name) && !TRANSITION_RE.test(m[1])) {
         out.push(name, m[2]) // cue on its own line, then the dialogue below it
         hits++
         continue
       }
     }
-    out.push(line)
+    out.push(lines[i])
   }
-  return hits >= 2 ? parseScenesHeadingless(out.join('\n')) : [] // need a real exchange
+  if (hits < 2) return [] // need a real exchange
+  const rewritten = out.join('\n')
+  // colon scripts often still use real INT./EXT. slugs — keep them when they exist.
+  // Gated on a genuine slug line: without one, parseScenes can only fabricate a
+  // heading out of an after-transition ALL-CAPS line (a rewritten cue), so go
+  // straight to the synthetic-single-scene path instead.
+  if (lines.some((l) => SCENE_RE.test(l))) {
+    const withHeads = parseScenes(rewritten).filter((s) => s.blocks.length > 0)
+    if (withHeads.some((s) => s.lines.length)) return withHeads.map((s, i) => ({ ...s, index: i + 1 }))
+  }
+  return parseScenesHeadingless(rewritten)
 }

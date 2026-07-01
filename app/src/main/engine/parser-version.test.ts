@@ -16,8 +16,8 @@ import { PARSER_VERSION } from './parser'
 const here = dirname(fileURLToPath(import.meta.url))
 const SOURCES = ['parser.ts', 'extract.ts', 'formats.ts']
 const EXPECTED = {
-  version: 5,
-  hash: 'f095ba381bd86bd1a53d8777fdd3db1b7a8833f6dfdbf041f71834c5326847a4'
+  version: 6,
+  hash: '9ad7b46737f01173bbb4fcac7c9a4eed0ed226b0e02dddcd8a24d95ba6cd512b'
 }
 
 describe('parser version guard', () => {
