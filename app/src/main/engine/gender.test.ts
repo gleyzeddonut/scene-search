@@ -31,8 +31,14 @@ describe('gender', () => {
     expect(scenePairing(['JOHN', 'MARY'])).toBe('MW')
     expect(scenePairing(['JOHN', 'MIKE'])).toBe('MM')
     expect(scenePairing(['MARY', 'EVE'])).toBe('WW')
-    expect(scenePairing(['JOHN', 'ZZQX'])).toBe('has_unknown')
+    expect(scenePairing(['JOHN', 'ZZQX'])).toBe('has_unknown') // one known, one unknown
     expect(scenePairing(['JOHN'])).toBe(null)
-    expect(scenePairing(['A', 'B', 'C'])).toBe(null)
+    expect(scenePairing(['JOHN', 'MIKE', 'MARY'])).toBe(null) // mixed 3-hander, no clean pairing
+  })
+  it('ignores unknown-gender characters when pairing (M+M+U counts as M+M)', () => {
+    expect(scenePairing(['JOHN', 'MIKE', 'ZZQX'])).toBe('MM') // two men + one unknown → M+M
+    expect(scenePairing(['MARY', 'EVE', 'ZZQX'])).toBe('WW')
+    expect(scenePairing(['JOHN', 'MARY', 'ZZQX'])).toBe('MW')
+    expect(scenePairing(['ZZQX', 'QXZZ'])).toBe('has_unknown') // both unknown
   })
 })

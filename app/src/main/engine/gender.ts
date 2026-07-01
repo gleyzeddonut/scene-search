@@ -59,12 +59,17 @@ export function guessGender(name: string): string {
   return g !== 'unknown' ? g : roleGender(name)
 }
 
-// pairing from already-resolved genders (so manual overrides can drive it)
+// Pairing from already-resolved genders (so manual overrides can drive it). Unknown-
+// gender characters are IGNORED, so a scene whose determinable cast is two men still
+// counts as M+M even with extra unknowns (e.g. M+M+U → MM). It needs exactly two known
+// genders — a 2-hander where we couldn't gender someone stays "has_unknown", and a
+// mixed 3+ cast (M+M+W) has no clean two-person pairing.
 export function pairingFromGenders(g: string[]): string | null {
-  if (g.length !== 2) return null
-  if (g.includes('unknown')) return 'has_unknown'
-  if (g[0] === 'male' && g[1] === 'male') return 'MM'
-  if (g[0] === 'female' && g[1] === 'female') return 'WW'
+  if (g.length < 2) return null
+  const known = g.filter((x) => x !== 'unknown')
+  if (known.length !== 2) return g.length === 2 ? 'has_unknown' : null
+  if (known[0] === 'male' && known[1] === 'male') return 'MM'
+  if (known[0] === 'female' && known[1] === 'female') return 'WW'
   return 'MW'
 }
 
