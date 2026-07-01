@@ -6,14 +6,16 @@ import { TextFrame } from './TextFrame'
 import { RowMetaEditor } from './RowMetaEditor'
 import { IconSortUp, IconSortDown, IconChevron } from './icons'
 
-// Semantic size labels (matches the Cue handoff). Values map to char-count range.
-const SIZE: [string, [number, number]][] = [
-  ['Any', [0, 50]],
-  ['Solo', [1, 1]],
-  ['Duet', [2, 2]],
-  ['3+', [3, 50]]
+// Cast-size options. "Monologue" is not a size — it filters scripts that contain a
+// substantial solo speech (server-side); the others map to a total-cast range.
+type SizeOpt = { label: string; range?: [number, number]; mono?: boolean }
+const SIZE: SizeOpt[] = [
+  { label: 'Any', range: [0, 50] },
+  { label: 'Monologue', mono: true },
+  { label: 'Duet', range: [2, 2] },
+  { label: 'Ensemble', range: [3, 50] }
 ]
-const SIZE_CHIP = ['', 'Solo', 'Duet', 'Ensemble']
+const SIZE_CHIP = ['', 'Monologue', 'Duet', 'Ensemble']
 const DUET = 2 // index of the Duet option
 
 const PAIR: [string, string | null][] = [
@@ -33,6 +35,7 @@ interface ScriptGroup {
   genres: string[]
   medium: string | null
   added: number
+  monologue: { who: string; seconds: number } | null
 }
 
 // optional list columns the user can show/hide by right-clicking the header (Script
@@ -97,6 +100,9 @@ function gletter(g: string) {
 }
 function sizeTag(n: number) {
   return n === 1 ? 'Solo' : n === 2 ? 'Duet' : n >= 3 ? 'Ensemble' : 'No dialogue'
+}
+function mmss(s: number) {
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
 function renderBlocks(detail: SceneDetail, dialogueOnly: boolean) {
@@ -193,6 +199,7 @@ export function BrowseView({
 
   // pairing only applies to two-person scenes; show it for Any + Duet, hide for Solo / 3+
   const showPairing = size === 0 || size === DUET
+  const monoActive = !!SIZE[size].mono // the "Monologue" filter is on → show the row hint
   const pairValue = showPairing ? PAIR[pair][1] : null
 
   // group the flat matching-scene list into scripts; a script appears only if it has
@@ -202,8 +209,8 @@ export function BrowseView({
     for (const s of scenes) {
       let g = map.get(s.script_path)
       if (!g) {
-        // genre/medium/added are per-script, so any of its scenes carries them
-        g = { path: s.script_path, name: s.script_name, scenes: [], cast: [], genres: s.genres ?? [], medium: s.medium ?? null, added: s.added ?? 0 }
+        // genre/medium/added/monologue are per-script, so any of its scenes carries them
+        g = { path: s.script_path, name: s.script_name, scenes: [], cast: [], genres: s.genres ?? [], medium: s.medium ?? null, added: s.added ?? 0, monologue: s.monologue ?? null }
         map.set(s.script_path, g)
       }
       g.scenes.push(s)
@@ -231,11 +238,12 @@ export function BrowseView({
 
   useEffect(() => {
     let active = true
-    const [mn, mx] = SIZE[size][1]
+    const opt = SIZE[size]
     api
       .scenes({
-        min_chars: mn,
-        max_chars: mx,
+        min_chars: opt.range?.[0],
+        max_chars: opt.range?.[1],
+        monologue: opt.mono || undefined,
         pairing: pairValue || undefined,
         search,
         genres: genres.length ? genres : undefined,
@@ -436,15 +444,15 @@ export function BrowseView({
           <div className="fhead" onClick={() => setOpenSize((v) => !v)}>
             <span className="flabel">Cast size</span>
             <span className="fright">
-              <span className={'fsummary' + (size !== 0 ? ' active' : '')}>{SIZE[size][0]}</span>
+              <span className={'fsummary' + (size !== 0 ? ' active' : '')}>{SIZE[size].label}</span>
               <span className={'caret' + (openSize ? ' open' : '')}><IconChevron /></span>
             </span>
           </div>
           {openSize && (
             <div className="seg-size">
-              {SIZE.map(([l], i) => (
-                <button key={l} className={i === size ? 'on' : ''} onClick={() => chooseSize(i)}>
-                  {l}
+              {SIZE.map((o, i) => (
+                <button key={o.label} className={i === size ? 'on' : ''} onClick={() => chooseSize(i)}>
+                  {o.label}
                 </button>
               ))}
             </div>
@@ -594,10 +602,16 @@ export function BrowseView({
             >
               <div className="main">
                 <div className="title">{stem(g.name)}</div>
-                <div className="sub">
-                  {g.scenes.length} scene{g.scenes.length !== 1 ? 's' : ''} · {g.cast.length} character
-                  {g.cast.length !== 1 ? 's' : ''}
-                </div>
+                {monoActive && g.monologue ? (
+                  <div className="sub monohint">
+                    Monologue · {g.monologue.who} · {mmss(g.monologue.seconds)}
+                  </div>
+                ) : (
+                  <div className="sub">
+                    {g.scenes.length} scene{g.scenes.length !== 1 ? 's' : ''} · {g.cast.length} character
+                    {g.cast.length !== 1 ? 's' : ''}
+                  </div>
+                )}
               </div>
               {cols.genre && (
                 <span

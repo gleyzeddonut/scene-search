@@ -21,3 +21,30 @@ export function estimateScene(lines: [string, string][], blocks: SceneBlock[]): 
   const words = blocks.reduce((n, b) => n + wc(b.text), 0)
   return words > 0 ? Math.max(1, estimateSeconds(words)) : 0 // any real content → at least 0:01
 }
+
+// a scene "has a monologue" when one character speaks uninterrupted for this long
+export const MONOLOGUE_MIN_SECONDS = 30
+const INTERJECTION_MAX_WORDS = 3 // another character's ≤3-word line ("Go on.") doesn't break it
+
+// The longest uninterrupted speech by a single character in a scene: their consecutive
+// dialogue, where action beats and tiny interjections from others pass through, but a
+// substantial line from another character ends the run. Returns the speaker + word count.
+export function longestSpeech(blocks: SceneBlock[]): { who: string; words: number } {
+  let best = { who: '', words: 0 }
+  let curWho = ''
+  let curWords = 0
+  for (const b of blocks) {
+    if (b.type !== 'cue') continue // action within a speech is fine
+    const w = wc(b.text)
+    if (b.who === curWho) {
+      curWords += w
+    } else if (curWho && w <= INTERJECTION_MAX_WORDS) {
+      continue // tiny interjection from another character — passes without breaking
+    } else {
+      curWho = b.who
+      curWords = w
+    }
+    if (curWords > best.words) best = { who: curWho, words: curWords }
+  }
+  return best
+}

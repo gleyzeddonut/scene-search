@@ -4,7 +4,7 @@ import { extractPaginated as realExtract, extractLayout, layoutToText, isSparseP
 import { parseScenes, parseLayout, parseHeadingless, parseScenesHeadingless } from './parser'
 import { parseFdx, parseFountain } from './formats'
 import { scenePairing, guessGender, pairingFromGenders } from './gender'
-import { sceneWordCount, estimateSeconds, estimateScene } from './runtime'
+import { sceneWordCount, estimateSeconds, estimateScene, longestSpeech, MONOLOGUE_MIN_SECONDS } from './runtime'
 import { iterCandidates, SCRIPT_EXTENSIONS } from './scanner'
 import type { Scene, SceneMatch, SceneBlock } from './types'
 
@@ -93,6 +93,7 @@ export class Library {
     // rather than throwing — a throw here would leave the engine half-built
     this.scripts = new Map((Array.isArray(data?.scripts) ? data.scripts : []).map((s) => [s.path, s]))
     this.scenes = Array.isArray(data?.scenes) ? data.scenes : []
+    this.monoCache = null
   }
 
   // dispatch by format: structured markup (fdx/fountain) parses natively; everything
@@ -167,11 +168,13 @@ export class Library {
         est: estimateSeconds(sceneWordCount(s.lines)), dialogue: s.lines, content: s.blocks
       })
     }
+    this.monoCache = null // scenes changed
   }
 
   private deleteScript(rp: string) {
     this.scripts.delete(rp)
     this.scenes = this.scenes.filter((s) => s.path !== rp)
+    this.monoCache = null
   }
 
   // a file was renamed on disk — move its row + scenes to the new path in place,
@@ -179,6 +182,7 @@ export class Library {
   renamePath(oldPath: string, newPath: string) {
     const row = this.scripts.get(oldPath)
     if (!row) return
+    this.monoCache = null // path key changes
     const name = basename(newPath)
     this.scripts.delete(oldPath)
     for (const s of this.scenes)
@@ -235,10 +239,25 @@ export class Library {
     return [...seen]
   }
 
+  // each script's biggest monologue (longest single-character speech across its scenes),
+  // as { who, seconds }. Cached; the cache is cleared whenever the index changes.
+  private monoCache: Map<string, { who: string; seconds: number }> | null = null
+  scriptMonologues(): Map<string, { who: string; seconds: number }> {
+    if (this.monoCache) return this.monoCache
+    const m = new Map<string, { who: string; seconds: number }>()
+    for (const s of this.scenes) {
+      const sp = longestSpeech(s.content)
+      const secs = estimateSeconds(sp.words)
+      const cur = m.get(s.path)
+      if (!cur || secs > cur.seconds) m.set(s.path, { who: sp.who, seconds: secs })
+    }
+    return (this.monoCache = m)
+  }
+
   // genderOf(path, name) resolves a character's gender (lets manual overrides drive
   // the W/M chips and the W+M/W+W/M+M pairing); defaults to the name-based guess
   query(
-    f: { minChars?: number; maxChars?: number; pairing?: string | null },
+    f: { minChars?: number; maxChars?: number; pairing?: string | null; monologue?: boolean },
     genderOf: (path: string, name: string) => string = (_p, n) => guessGender(n)
   ): SceneMatch[] {
     // Size + pairing are SCRIPT-level now that Browse lists whole scripts (not scenes):
@@ -264,11 +283,15 @@ export class Library {
       if (p === undefined) scCache.set(s, (p = pairingFromGenders(s.characters.map((n) => genderOf(s.path, n)))))
       return p
     }
+    // each script's longest monologue (its biggest single-character speech across all
+    // scenes) — for the "Monologue" filter and the row hint (who + duration)
+    const monoByScript = this.scriptMonologues()
     let rows = this.scenes.filter((s) => {
       const size = (castByScript.get(s.path) || []).length
       if (f.minChars != null && size < f.minChars) return false
       if (f.maxChars != null && size > f.maxChars) return false
       if (f.pairing != null && scriptPairing(s.path) !== f.pairing) return false
+      if (f.monologue && (monoByScript.get(s.path)?.seconds ?? 0) < MONOLOGUE_MIN_SECONDS) return false
       return true
     })
     // fold re-download copies: keep the representative (shortest name) per canonical
@@ -289,11 +312,13 @@ export class Library {
     rows.sort((a, b) => (a.name === b.name ? a.index - b.index : a.name < b.name ? -1 : 1))
     return rows.map((s) => {
       const row = this.scripts.get(s.path)
+      const mono = monoByScript.get(s.path)
       return {
         script_path: s.path, script_name: s.name, heading: s.heading, page: s.page, top: s.top,
         char_count: s.charCount, characters: s.characters, pairing: pairingOf(s),
         scene_index: s.index, est_seconds: estimateScene(s.dialogue, s.content),
-        added: row?.added ?? row?.mtime // creation time; mtime fallback for pre-reindex entries
+        added: row?.added ?? row?.mtime, // creation time; mtime fallback for pre-reindex entries
+        monologue: mono && mono.seconds >= MONOLOGUE_MIN_SECONDS ? mono : null // for the row hint
       }
     })
   }

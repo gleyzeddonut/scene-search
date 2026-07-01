@@ -14,6 +14,7 @@ export interface Scene {
   genres?: string[] // manual genre tags on the script
   medium?: string | null // effective medium (manual or guessed), null = untagged
   added?: number // file creation/added time (ms epoch), for the Date added sort
+  monologue?: { who: string; seconds: number } | null // biggest solo speech, for the Monologue hint
 }
 
 export type SceneBlock =
@@ -143,7 +144,7 @@ export const api = {
   stats: () => eng().stats(),
   scenes: (p: {
     min_chars?: number; max_chars?: number; pairing?: string; search?: string
-    genres?: string[]; mediums?: string[]
+    genres?: string[]; mediums?: string[]; monologue?: boolean
   }) => eng().scenes(p),
   getScene: (path: string, index: number) => eng().scene(path, index),
   addScript: (path: string) => eng().add(path),

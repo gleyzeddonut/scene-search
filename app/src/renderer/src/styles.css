@@ -135,6 +135,7 @@ body{margin:0;font-family:system-ui,-apple-system,sans-serif;color:var(--text);b
 .row .main{flex:1;min-width:0}
 .row .title{font:600 14px/1.2 system-ui;color:var(--text);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .sub{font:400 11.5px/1 'Courier Prime',monospace;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .sub.monohint{color:var(--accent-text);font-weight:500}
 .row .cast{width:64px;flex:none;display:flex;gap:4px}
 .row .page{width:42px;flex:none;text-align:right;font:500 12px/1 'Courier Prime',monospace;color:var(--text-2)}
 .row .col-genre{width:96px;flex:none;min-width:0;font:500 12px/1.2 system-ui;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sceneWordCount, estimateSeconds, estimateScene } from './runtime'
+import { sceneWordCount, estimateSeconds, estimateScene, longestSpeech } from './runtime'
 import type { SceneBlock } from './types'
 
 describe('runtime', () => {
@@ -32,5 +32,23 @@ describe('runtime', () => {
     ]
     expect(estimateSeconds(1)).toBe(0) // confirm the rounding that caused the bug
     expect(estimateScene(oneWord, blocks)).toBeGreaterThan(0) // rescued by the full content
+  })
+  it('longestSpeech: biggest single-character speech; tiny interjections pass', () => {
+    const b: SceneBlock[] = [
+      { type: 'cue', who: 'A', text: 'one two three four five six seven' }, // 7
+      { type: 'action', text: 'a beat' }, // action within a speech is fine
+      { type: 'cue', who: 'B', text: 'Go on.' }, // 2-word interjection → passes
+      { type: 'cue', who: 'A', text: 'eight nine ten' }, // +3 → A run = 10
+      { type: 'cue', who: 'B', text: 'a much longer reply here that keeps going' } // >3 → new run
+    ]
+    expect(longestSpeech(b)).toEqual({ who: 'A', words: 10 })
+  })
+  it('longestSpeech: a substantial interruption breaks the run', () => {
+    const b: SceneBlock[] = [
+      { type: 'cue', who: 'A', text: 'one two three' },
+      { type: 'cue', who: 'B', text: 'this is a real interruption line' }, // 6 words > 3 → breaks
+      { type: 'cue', who: 'A', text: 'four five' }
+    ]
+    expect(longestSpeech(b)).toEqual({ who: 'B', words: 6 }) // A's runs are 3 & 2; B's line wins
   })
 })
