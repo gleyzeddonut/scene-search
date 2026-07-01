@@ -54,6 +54,9 @@ export function isPlainText(path: string): boolean {
 // a filename without its extension ("Heat.pdf" → "Heat")
 export const stem = (name: string): string => name.replace(/\.[^.]+$/, '')
 
+// seconds → "m:ss" (shared by Browse's monologue hint and Prepare's estimate)
+export const mmss = (s: number): string => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+
 export type UpdatePhase =
   | 'idle'
   | 'checking'

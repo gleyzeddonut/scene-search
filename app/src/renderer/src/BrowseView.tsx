@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { api, Scene, SceneChar, SceneDetail, sceneBlocks, isPdf, isDocx, isPlainText, stem } from './api'
+import { api, Scene, SceneChar, SceneDetail, sceneBlocks, isPdf, isDocx, isPlainText, stem, mmss } from './api'
 import { PdfFrame } from './PdfFrame'
 import { DocFrame } from './DocFrame'
 import { TextFrame } from './TextFrame'
@@ -15,7 +15,6 @@ const SIZE: SizeOpt[] = [
   { label: 'Duet', range: [2, 2] },
   { label: 'Ensemble', range: [3, 50] }
 ]
-const SIZE_CHIP = ['', 'Monologue', 'Duet', 'Ensemble']
 const DUET = 2 // index of the Duet option
 
 const PAIR: [string, string | null][] = [
@@ -100,9 +99,6 @@ function gletter(g: string) {
 }
 function sizeTag(n: number) {
   return n === 1 ? 'Solo' : n === 2 ? 'Duet' : n >= 3 ? 'Ensemble' : 'No dialogue'
-}
-function mmss(s: number) {
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
 function renderBlocks(detail: SceneDetail, dialogueOnly: boolean) {
@@ -546,7 +542,7 @@ export function BrowseView({
               <>
                 {sizeChip && (
                   <span className="fchip">
-                    {SIZE_CHIP[size]}
+                    {SIZE[size].label}
                     <span className="x" onClick={() => chooseSize(0)}>✕</span>
                   </span>
                 )}

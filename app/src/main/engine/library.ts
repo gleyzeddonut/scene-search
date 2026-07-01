@@ -288,14 +288,15 @@ export class Library {
       return p
     }
     // each script's longest monologue (its biggest single-character speech across all
-    // scenes) — for the "Monologue" filter and the row hint (who + duration)
-    const monoByScript = this.scriptMonologues()
+    // scenes) — for the "Monologue" filter and the row hint. Only the Monologue filter
+    // reads it, so skip the scan (and the per-row payload) for every other query.
+    const monoByScript = f.monologue ? this.scriptMonologues() : null
     let rows = this.scenes.filter((s) => {
       const size = (castByScript.get(s.path) || []).length
       if (f.minChars != null && size < f.minChars) return false
       if (f.maxChars != null && size > f.maxChars) return false
       if (f.pairing != null && scriptPairing(s.path) !== f.pairing) return false
-      if (f.monologue && !monoByScript.has(s.path)) return false
+      if (monoByScript && !monoByScript.has(s.path)) return false // non-null only when f.monologue
       return true
     })
     // fold re-download copies: keep the representative (shortest name) per canonical
@@ -316,13 +317,12 @@ export class Library {
     rows.sort((a, b) => (a.name === b.name ? a.index - b.index : a.name < b.name ? -1 : 1))
     return rows.map((s) => {
       const row = this.scripts.get(s.path)
-      const mono = monoByScript.get(s.path)
       return {
         script_path: s.path, script_name: s.name, heading: s.heading, page: s.page, top: s.top,
         char_count: s.charCount, characters: s.characters, pairing: pairingOf(s),
         scene_index: s.index, est_seconds: estimateScene(s.dialogue, s.content),
         added: row?.added ?? row?.mtime, // creation time; mtime fallback for pre-reindex entries
-        monologue: mono ?? null // present only when the script has a qualifying monologue (row hint)
+        monologue: monoByScript?.get(s.path) ?? null // set only under the Monologue filter (row hint)
       }
     })
   }

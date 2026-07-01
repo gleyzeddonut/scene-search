@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react'
-import { api, Scene, SceneDetail, sceneBlocks, isPdf, stem } from './api'
+import { api, Scene, SceneDetail, sceneBlocks, isPdf, stem, mmss } from './api'
 import { PdfFrame } from './PdfFrame'
-
-function mmss(s: number) {
-  const m = Math.floor(s / 60)
-  return `${m}:${String(s % 60).padStart(2, '0')}`
-}
 
 
 export function PrepareView({
