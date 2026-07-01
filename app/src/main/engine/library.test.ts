@@ -25,12 +25,21 @@ describe('Library', () => {
     expect(lib.scriptCount()).toBe(1)
     expect(lib.sceneCount()).toBe(2)
   })
-  it('query filters by char count', async () => {
-    const d = tmp(); writeFileSync(join(d, 'a.fountain'), SCRIPT)
+  it('query filters by SCRIPT cast size, not per-scene', async () => {
+    const d = tmp()
+    // 3-character script (NEIL, EADY across one scene; VINCE in another) → an Ensemble,
+    // even though its first scene is a 2-hander
+    writeFileSync(join(d, 'ensemble.fountain'), SCRIPT)
+    // a genuine two-character script
+    writeFileSync(join(d, 'duo.fountain'), 'INT. CAR - DAY\n\nSAM\nHi.\n\nPAT\nHey.\n')
     const lib = new Library(); await lib.reindex([d])
-    const two = lib.query({ minChars: 2, maxChars: 2 })
-    expect(two.map((m) => m.heading)).toEqual(['INT. DINER - DAY'])
-    expect(two[0].scene_index).toBe(1)
+    // Duet = a 2-cast script → only duo, NOT the ensemble's 2-hander scene
+    const duet = lib.query({ minChars: 2, maxChars: 2 })
+    expect(new Set(duet.map((m) => m.script_name))).toEqual(new Set(['duo.fountain']))
+    // 3+ = the ensemble script (all its scenes)
+    const ens = lib.query({ minChars: 3 })
+    expect(new Set(ens.map((m) => m.script_name))).toEqual(new Set(['ensemble.fountain']))
+    expect(ens.length).toBe(2)
   })
   it('getScene returns content blocks', async () => {
     const d = tmp(); writeFileSync(join(d, 'a.fountain'), 'INT. OFFICE - DAY\n\nMICHAEL\nSit.\n')

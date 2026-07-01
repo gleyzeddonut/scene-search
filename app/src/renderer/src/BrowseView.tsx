@@ -434,7 +434,7 @@ export function BrowseView({
       <div className="rail">
         <div className="fsection">
           <div className="fhead" onClick={() => setOpenSize((v) => !v)}>
-            <span className="flabel">Scene size</span>
+            <span className="flabel">Cast size</span>
             <span className="fright">
               <span className={'fsummary' + (size !== 0 ? ' active' : '')}>{SIZE[size][0]}</span>
               <span className={'caret' + (openSize ? ' open' : '')}><IconChevron /></span>

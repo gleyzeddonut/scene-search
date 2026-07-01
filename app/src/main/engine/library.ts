@@ -241,17 +241,34 @@ export class Library {
     f: { minChars?: number; maxChars?: number; pairing?: string | null },
     genderOf: (path: string, name: string) => string = (_p, n) => guessGender(n)
   ): SceneMatch[] {
-    const pcache = new Map<SceneRow, string | null>() // compute each scene's pairing once
+    // Size + pairing are SCRIPT-level now that Browse lists whole scripts (not scenes):
+    // a script's cast is the distinct speaking characters across ALL of its scenes, so
+    // "Duet" means a two-person script, not a script that merely contains a 2-hander scene.
+    const castByScript = new Map<string, string[]>()
+    const seen = new Map<string, Set<string>>()
+    for (const s of this.scenes) {
+      let set = seen.get(s.path)
+      if (!set) { seen.set(s.path, (set = new Set())); castByScript.set(s.path, []) }
+      for (const c of s.characters) if (!set.has(c)) { set.add(c); castByScript.get(s.path)!.push(c) }
+    }
+    const spCache = new Map<string, string | null>()
+    const scriptPairing = (path: string) => {
+      let p = spCache.get(path)
+      if (p === undefined) spCache.set(path, (p = pairingFromGenders((castByScript.get(path) || []).map((n) => genderOf(path, n)))))
+      return p
+    }
+    // scene-level pairing is still shown per-scene in the preview/navigator tag
+    const scCache = new Map<SceneRow, string | null>()
     const pairingOf = (s: SceneRow) => {
-      if (pcache.has(s)) return pcache.get(s)!
-      const p = pairingFromGenders(s.characters.map((n) => genderOf(s.path, n)))
-      pcache.set(s, p)
+      let p = scCache.get(s)
+      if (p === undefined) scCache.set(s, (p = pairingFromGenders(s.characters.map((n) => genderOf(s.path, n)))))
       return p
     }
     let rows = this.scenes.filter((s) => {
-      if (f.minChars != null && s.charCount < f.minChars) return false
-      if (f.maxChars != null && s.charCount > f.maxChars) return false
-      if (f.pairing != null && pairingOf(s) !== f.pairing) return false
+      const size = (castByScript.get(s.path) || []).length
+      if (f.minChars != null && size < f.minChars) return false
+      if (f.maxChars != null && size > f.maxChars) return false
+      if (f.pairing != null && scriptPairing(s.path) !== f.pairing) return false
       return true
     })
     // fold re-download copies: keep the representative (shortest name) per canonical
