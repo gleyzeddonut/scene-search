@@ -11,10 +11,13 @@ export function estimateSeconds(words: number): number {
   return Math.round((words / WPM) * 60)
 }
 
-// Scene runtime estimate: from the spoken dialogue, but fall back to the action when a
-// scene has no dialogue — so an action-only scene reads as ~its length, not 0:00.
+// Scene runtime estimate: from the spoken dialogue. Falls back to the whole scene's
+// word count (dialogue + action) when there's no dialogue OR when the dialogue is so
+// short it rounds to 0 seconds (a one-word line like "Damn.") — so a scene with real
+// content never reads 0:00.
 export function estimateScene(lines: [string, string][], blocks: SceneBlock[]): number {
-  const dialogue = sceneWordCount(lines)
-  if (dialogue > 0) return estimateSeconds(dialogue)
-  return estimateSeconds(blocks.reduce((n, b) => n + wc(b.text), 0))
+  const est = estimateSeconds(sceneWordCount(lines))
+  if (est > 0) return est
+  const words = blocks.reduce((n, b) => n + wc(b.text), 0)
+  return words > 0 ? Math.max(1, estimateSeconds(words)) : 0 // any real content → at least 0:01
 }

@@ -23,4 +23,14 @@ describe('runtime', () => {
     expect(estimateScene([], actionOnly)).toBe(estimateSeconds(6))
     expect(estimateScene([], actionOnly)).toBeGreaterThan(0)
   })
+  it('a one-word line does not read 0:00 when the scene has action', () => {
+    // "Molly?" is 1 word → estimateSeconds(1) rounds to 0; the action must rescue it
+    const oneWord: [string, string][] = [['A', 'Molly?']]
+    const blocks: SceneBlock[] = [
+      { type: 'action', text: 'The light dimly flashes as she pushes the heavy door open and steps inside' },
+      { type: 'cue', who: 'A', text: 'Molly?' }
+    ]
+    expect(estimateSeconds(1)).toBe(0) // confirm the rounding that caused the bug
+    expect(estimateScene(oneWord, blocks)).toBeGreaterThan(0) // rescued by the full content
+  })
 })
