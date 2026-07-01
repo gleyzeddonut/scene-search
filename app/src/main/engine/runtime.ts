@@ -22,8 +22,10 @@ export function estimateScene(lines: [string, string][], blocks: SceneBlock[]): 
   return words > 0 ? Math.max(1, estimateSeconds(words)) : 0 // any real content → at least 0:01
 }
 
-// a monologue is a scene one voice carries, speaking for at least this long
-export const MONOLOGUE_MIN_SECONDS = 30
+// a monologue is a scene one voice carries, speaking for at least this long. 45s (not
+// 30) keeps out short single-speaker beats — dictation, a phone "Come in", an intro —
+// that aren't audition monologues; real ones in practice run well past this.
+export const MONOLOGUE_MIN_SECONDS = 45
 const INTERJECTION_MAX_WORDS = 3 // a brief reply from the reader ("Go on.") is allowed
 // some scripts write a speaker's cue in quotes inline (the boy answers as "WALTER"),
 // which the layout can absorb into another character's dialogue — turning a two-hander

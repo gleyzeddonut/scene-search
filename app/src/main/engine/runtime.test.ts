@@ -34,24 +34,24 @@ describe('runtime', () => {
     expect(estimateSeconds(1)).toBe(0) // confirm the rounding that caused the bug
     expect(estimateScene(oneWord, blocks)).toBeGreaterThan(0) // rescued by the full content
   })
-  it('sceneMonologue: one speaker for ≥30s qualifies (action beats are fine)', () => {
+  it('sceneMonologue: one speaker past the length floor qualifies (action beats are fine)', () => {
     const b: SceneBlock[] = [
-      { type: 'cue', who: 'A', text: words(40) },
+      { type: 'cue', who: 'A', text: words(60) },
       { type: 'action', text: 'she paces the room' },
-      { type: 'cue', who: 'A', text: words(30) } // same speaker, 70 words total → ~32s
+      { type: 'cue', who: 'A', text: words(40) } // same speaker, 100 words → ~46s ≥ 45
     ]
-    expect(sceneMonologue(b)).toEqual({ who: 'A', seconds: estimateSeconds(70) })
+    expect(sceneMonologue(b)).toEqual({ who: 'A', seconds: estimateSeconds(100) })
   })
   it('sceneMonologue: a brief interjection from the reader is allowed', () => {
     const b: SceneBlock[] = [
-      { type: 'cue', who: 'A', text: words(70) },
+      { type: 'cue', who: 'A', text: words(100) },
       { type: 'cue', who: 'B', text: 'Go on.' } // ≤3 words → still a monologue
     ]
-    expect(sceneMonologue(b)).toEqual({ who: 'A', seconds: estimateSeconds(70) })
+    expect(sceneMonologue(b)).toEqual({ who: 'A', seconds: estimateSeconds(100) })
   })
   it('sceneMonologue: a real line from a second character disqualifies it', () => {
     const b: SceneBlock[] = [
-      { type: 'cue', who: 'A', text: words(70) },
+      { type: 'cue', who: 'A', text: words(100) },
       { type: 'cue', who: 'B', text: 'that is a real substantial reply here' } // >3 words → conversation
     ]
     expect(sceneMonologue(b)).toBeNull()
@@ -62,14 +62,14 @@ describe('runtime', () => {
   it('sceneMonologue: a recurring inline quoted cue means a hidden second speaker', () => {
     // Changeling's interrogation: the boy answers as "WALTER", absorbed into YBARRA
     const b: SceneBlock[] = [
-      { type: 'cue', who: 'YBARRA', text: `${words(60)} "WALTER" I dunno.` },
+      { type: 'cue', who: 'YBARRA', text: `${words(100)} "WALTER" I dunno.` },
       { type: 'cue', who: 'YBARRA', text: `${words(30)} "WALTER" Maybe.` } // "WALTER" recurs → 2 speakers
     ]
     expect(sceneMonologue(b)).toBeNull()
   })
   it('sceneMonologue: a one-off quoted phrase (a headline) does not disqualify', () => {
     const b: SceneBlock[] = [
-      { type: 'cue', who: 'HALEY', text: `${words(70)} the sign read "NEVER ENDING DROUGHT".` }
+      { type: 'cue', who: 'HALEY', text: `${words(100)} the sign read "NEVER ENDING DROUGHT".` }
     ]
     expect(sceneMonologue(b)?.who).toBe('HALEY') // quoted once → still a monologue
   })
