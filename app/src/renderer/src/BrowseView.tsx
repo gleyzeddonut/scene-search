@@ -35,7 +35,7 @@ interface ScriptGroup {
   genres: string[]
   medium: string | null
   added: number
-  monologue: { who: string; seconds: number } | null
+  monologue: { who: string; seconds: number; scene: number } | null
 }
 
 // optional list columns the user can show/hide by right-clicking the header (Script
@@ -284,7 +284,7 @@ export function BrowseView({
     } else {
       const first = sorted[0] || null
       setSelScript(first)
-      setSelScene(first?.scenes[0] || null)
+      setSelScene(first ? defaultScene(first) : null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scripts])
@@ -355,9 +355,22 @@ export function BrowseView({
   )
 
   // pick a script (and reset to its earliest scene)
+  // when a filter is active, land the preview on the scene that matches it: the
+  // monologue scene for "Monologue", a 2-hander for "Duet", a 3+ scene for "Ensemble"
+  const defaultScene = (g: ScriptGroup): Scene | null => {
+    const opt = SIZE[size]
+    if (opt.mono && g.monologue)
+      return g.scenes.find((s) => s.scene_index === g.monologue!.scene) || g.scenes[0] || null
+    if (opt.range && size !== 0) {
+      const [mn, mx] = opt.range
+      const hit = g.scenes.find((s) => s.char_count >= mn && s.char_count <= mx)
+      if (hit) return hit
+    }
+    return g.scenes[0] || null
+  }
   const chooseScript = (g: ScriptGroup) => {
     setSelScript(g)
-    const sc = g.scenes[0] || null
+    const sc = defaultScene(g)
     setSelScene(sc)
     if (qlOpen && sc) window.scripty.quickLookUpdate(qlPayload(sc))
   }

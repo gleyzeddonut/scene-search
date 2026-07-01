@@ -14,7 +14,7 @@ export interface Scene {
   genres?: string[] // manual genre tags on the script
   medium?: string | null // effective medium (manual or guessed), null = untagged
   added?: number // file creation/added time (ms epoch), for the Date added sort
-  monologue?: { who: string; seconds: number } | null // biggest solo speech, for the Monologue hint
+  monologue?: { who: string; seconds: number; scene: number } | null // biggest solo speech + its scene index
 }
 
 export type SceneBlock =

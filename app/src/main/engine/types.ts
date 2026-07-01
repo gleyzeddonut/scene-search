@@ -29,7 +29,7 @@ export interface SceneMatch {
   scene_index: number
   est_seconds: number
   added?: number // file creation/added time (ms epoch)
-  monologue?: { who: string; seconds: number } | null // script's biggest solo speech (≥ threshold)
+  monologue?: { who: string; seconds: number; scene: number } | null // biggest solo speech + its scene index
 }
 
 export interface Folders {

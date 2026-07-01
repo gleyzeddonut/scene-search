@@ -241,15 +241,15 @@ export class Library {
 
   // each script's biggest monologue (longest single-character speech across its scenes),
   // as { who, seconds }. Cached; the cache is cleared whenever the index changes.
-  private monoCache: Map<string, { who: string; seconds: number }> | null = null
-  scriptMonologues(): Map<string, { who: string; seconds: number }> {
+  private monoCache: Map<string, { who: string; seconds: number; scene: number }> | null = null
+  scriptMonologues(): Map<string, { who: string; seconds: number; scene: number }> {
     if (this.monoCache) return this.monoCache
-    const m = new Map<string, { who: string; seconds: number }>()
+    const m = new Map<string, { who: string; seconds: number; scene: number }>()
     for (const s of this.scenes) {
       const mono = sceneMonologue(s.content) // null unless the scene is carried by one voice
       if (!mono) continue
       const cur = m.get(s.path)
-      if (!cur || mono.seconds > cur.seconds) m.set(s.path, mono)
+      if (!cur || mono.seconds > cur.seconds) m.set(s.path, { ...mono, scene: s.index })
     }
     return (this.monoCache = m)
   }
