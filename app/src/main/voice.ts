@@ -6,6 +6,12 @@ import { existsSync, readdirSync } from 'fs'
 // The ~90 MB quantized model downloads once into userData and is cached there;
 // generation runs in-process (~2-3× realtime on Apple silicon), and the renderer
 // receives WAV bytes to play. No network after the first download.
+//
+// PARKED: while Read-with-me is disabled, kokoro-js lives in devDependencies so
+// its ~120 MB of ML runtime stays OUT of the packaged app — the dynamic imports
+// below then fail fast (status 'error'), which nothing reaches with the UI off.
+// To re-enable: move kokoro-js to dependencies and restore the electron-builder
+// asarUnpack for onnxruntime-node (see electron-builder.yml).
 
 type KokoroStatus = 'none' | 'cached' | 'loading' | 'ready' | 'error'
 

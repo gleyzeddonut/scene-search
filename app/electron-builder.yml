@@ -10,9 +10,11 @@ directories:
 files:
   - out/**/*
   - package.json
-# native onnxruntime binaries (Kokoro TTS) must live outside the asar to load
-asarUnpack:
-  - "**/node_modules/onnxruntime-node/**"
+# NOTE (Read-with-me voice stack, currently parked): when re-enabling Kokoro TTS,
+# move kokoro-js back to "dependencies" AND restore:
+#   asarUnpack:
+#     - "**/node_modules/onnxruntime-node/**"
+# (native onnx binaries can't load from inside the asar)
 extraResources:
   - from: resources/scripty-ocr # universal macOS OCR helper (built by build_app.sh)
     to: scripty-ocr
