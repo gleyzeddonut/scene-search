@@ -335,6 +335,16 @@ export function BrowseView({
   // Space from main (PDF preview had focus and swallowed it) → toggle Quick Look
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => window.scripty.onMainSpace?.(toggleQuickLook), [qlOpen, selScene])
+  // "Prepare scene" from a row's right-click menu. The row's onContextMenu already ran
+  // chooseScript, so the selection is the right-clicked script and its default scene.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(
+    () =>
+      window.scripty.onPrepareRequest?.(() => {
+        if (selScene && selScript) onPrepare(selScene, selScript.scenes)
+      }),
+    [selScene, selScript]
+  )
   // "Quick Look" from a row's right-click menu → open it for the just-selected scene.
   // Only open when closed: the row's onContextMenu already ran chooseScript, which
   // updates an already-open pop-out in place, so re-opening here would reload+flash it.
@@ -534,16 +544,6 @@ export function BrowseView({
           )}
         </div>
 
-        {/* pinned to the rail's bottom, so preparing works even with the preview hidden */}
-        <div className="rail-foot">
-          <button
-            className="prepare"
-            disabled={!selScene || !selScript}
-            onClick={() => selScene && selScript && onPrepare(selScene, selScript.scenes)}
-          >
-            Prepare scene →
-          </button>
-        </div>
       </div>
 
       <div className="listpane">
@@ -731,6 +731,11 @@ export function BrowseView({
                 </div>
               </div>
             )}
+            <div className="dbtns">
+              <button className="prepare" onClick={() => onPrepare(selScene, selScript.scenes)}>
+                Prepare scene →
+              </button>
+            </div>
           </>
         )}
       </div>

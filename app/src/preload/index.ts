@@ -50,6 +50,11 @@ contextBridge.exposeInMainWorld('scripty', {
     ipcRenderer.on('quicklook-request', l)
     return () => ipcRenderer.removeListener('quicklook-request', l)
   },
+  onPrepareRequest: (cb: (p: { path: string; name: string }) => void) => {
+    const l = (_e: unknown, p: { path: string; name: string }) => cb(p)
+    ipcRenderer.on('prepare-request', l)
+    return () => ipcRenderer.removeListener('prepare-request', l)
+  },
   pickFolder: () => ipcRenderer.invoke('pick-folder') as Promise<string | null>,
   pickFiles: () => ipcRenderer.invoke('pick-files') as Promise<string[]>,
   onOpenSettings: (cb: () => void) => ipcRenderer.on('open-settings', cb),

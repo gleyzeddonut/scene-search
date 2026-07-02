@@ -135,6 +135,7 @@ function registerIpc() {
   // native right-click menu for a script row
   ipcMain.handle('row-menu', (e, p: { path: string; name: string }) => {
     const menu = Menu.buildFromTemplate([
+      { label: 'Prepare scene', click: () => e.sender.send('prepare-request', p) },
       { label: 'Quick Look', click: () => e.sender.send('quicklook-request', p) },
       { label: 'Edit details…', click: () => e.sender.send('edit-details-request', p) },
       { type: 'separator' },

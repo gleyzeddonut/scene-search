@@ -146,6 +146,7 @@ declare global {
       pickFiles: () => Promise<string[]>
       onRemoveRequest: (cb: (p: { path: string; name: string }) => void) => () => void
       onQuickLookRequest: (cb: (p: { path: string; name: string }) => void) => () => void
+      onPrepareRequest: (cb: (p: { path: string; name: string }) => void) => () => void
       onOpenSettings: (cb: () => void) => void
       exportSides: (html: string, name: string) => Promise<boolean>
       appVersion: () => Promise<string>
