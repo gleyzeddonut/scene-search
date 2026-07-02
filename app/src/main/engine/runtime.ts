@@ -32,10 +32,14 @@ const INTERJECTION_MAX_WORDS = 3 // a brief reply from the reader ("Go on.") is 
 // into a fake monologue. A quoted ALL-CAPS name that RECURS is that hidden second voice.
 const QUOTED_NAME_RE = /["'“”]([A-Z][A-Z0-9 .'\-]*[A-Z])["'“”]/g
 
-// A scene is a monologue when one character carries it: they speak ≥ MONOLOGUE_MIN_SECONDS
-// and nobody else says more than a brief interjection (≤ INTERJECTION_MAX_WORDS) — any real
-// line from a second character makes it a conversation. Returns the monologue, or null.
-export function sceneMonologue(blocks: SceneBlock[]): { who: string; seconds: number } | null {
+// A scene is a monologue when one character carries it: they speak ≥ minSeconds
+// (user-configurable; defaults to MONOLOGUE_MIN_SECONDS) and nobody else says more
+// than a brief interjection (≤ INTERJECTION_MAX_WORDS) — any real line from a second
+// character makes it a conversation. Returns the monologue, or null.
+export function sceneMonologue(
+  blocks: SceneBlock[],
+  minSeconds: number = MONOLOGUE_MIN_SECONDS
+): { who: string; seconds: number } | null {
   const wordsBy = new Map<string, number>()
   for (const b of blocks) if (b.type === 'cue') wordsBy.set(b.who, (wordsBy.get(b.who) ?? 0) + wc(b.text))
   if (!wordsBy.size) return null
@@ -43,7 +47,7 @@ export function sceneMonologue(blocks: SceneBlock[]): { who: string; seconds: nu
   let max = 0
   for (const [n, w] of wordsBy) if (w > max) ((max = w), (who = n))
   const seconds = estimateSeconds(max)
-  if (seconds < MONOLOGUE_MIN_SECONDS) return null
+  if (seconds < minSeconds) return null
   for (const b of blocks)
     if (b.type === 'cue' && b.who !== who && wc(b.text) > INTERJECTION_MAX_WORDS) return null
   // reject a two-hander that got flattened via inline quoted cues (see QUOTED_NAME_RE)

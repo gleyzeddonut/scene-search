@@ -24,6 +24,24 @@ export class Settings {
     this.data[k] = v.map(String)
     this.save()
   }
+  // scalar prefs (numbers/bools) — always read with a default so a missing or
+  // hand-edited/corrupt value can never poison behavior
+  getNum(k: string, dflt: number): number {
+    const v = this.data[k]
+    return typeof v === 'number' && Number.isFinite(v) ? v : dflt
+  }
+  setNum(k: string, v: number) {
+    this.data[k] = v
+    this.save()
+  }
+  getBool(k: string, dflt: boolean): boolean {
+    const v = this.data[k]
+    return typeof v === 'boolean' ? v : dflt
+  }
+  setBool(k: string, v: boolean) {
+    this.data[k] = v
+    this.save()
+  }
   getRoots() { return this.getList('roots') }
   setRoots(v: string[]) { this.setList('roots', v) }
   getIgnored() { return this.getList('ignored') }

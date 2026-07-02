@@ -112,6 +112,41 @@ describe('Engine remove + re-add', () => {
   })
 })
 
+describe('Engine prefs', () => {
+  it('defaults, persists across launches, and drives the monologue filter', async () => {
+    seed(PARSER_VERSION)
+    const eng = new Engine()
+    expect(eng.prefs()).toEqual({ monologueMin: 45, autoDownload: true })
+    // ~87 words ≈ 40s: below the default 45s monologue floor, above a 30s one
+    const speech = Array.from({ length: 87 }, (_, i) => 'w' + i).join(' ')
+    const f = join(h.userData, 'solo.fountain')
+    writeFileSync(f, `INT. STAGE - NIGHT\n\nEVA\n${speech}\n`)
+    await eng.add(f)
+    expect(eng.scenes({ monologue: true }).scenes.length).toBe(0)
+    eng.setPref('monologueMin', 30)
+    expect(eng.scenes({ monologue: true }).scenes.length).toBe(1)
+    eng.setPref('autoDownload', false)
+    // a fresh Engine over the same settings file sees the persisted values
+    expect(new Engine().prefs()).toEqual({ monologueMin: 30, autoDownload: false })
+  })
+})
+
+describe('Engine removed files', () => {
+  it('lists removed files so Settings can restore them', async () => {
+    seed(PARSER_VERSION)
+    const eng = new Engine()
+    const f = join(h.userData, 'r.fountain')
+    writeFileSync(f, 'INT. ROOM - DAY\n\nBOB\nHi.\n\nAMY\nYo.\n')
+    await eng.add(f)
+    expect(eng.hiddenFiles()).toEqual([])
+    eng.removeScript(f)
+    expect(eng.hiddenFiles()).toEqual([f])
+    await eng.add(f) // restore = re-add (un-hides)
+    expect(eng.hiddenFiles()).toEqual([])
+    expect(eng.scenes({}).scenes.length).toBe(1)
+  })
+})
+
 describe('Engine partial meta setters', () => {
   it('setGenres and setMedium each preserve the other field', async () => {
     seed(PARSER_VERSION)

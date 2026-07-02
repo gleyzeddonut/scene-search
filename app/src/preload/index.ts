@@ -29,7 +29,10 @@ contextBridge.exposeInMainWorld('scripty', {
     setGenres: (p: string, g: string[]) => ipcRenderer.invoke('eng:setGenres', p, g),
     setMedium: (p: string, md: string) => ipcRenderer.invoke('eng:setMedium', p, md),
     open: (p: string) => ipcRenderer.invoke('eng:open', p),
-    reveal: (p: string) => ipcRenderer.invoke('eng:reveal', p)
+    reveal: (p: string) => ipcRenderer.invoke('eng:reveal', p),
+    prefs: () => ipcRenderer.invoke('eng:prefs'),
+    setPref: (k: string, v: number | boolean) => ipcRenderer.invoke('eng:setPref', k, v),
+    hidden: () => ipcRenderer.invoke('eng:hidden')
   },
   rowMenu: (p: { path: string; name: string }) => ipcRenderer.invoke('row-menu', p),
   onEditDetails: (cb: (p: { path: string; name: string }) => void) => {
@@ -55,7 +58,9 @@ contextBridge.exposeInMainWorld('scripty', {
   readFile: (path: string) => ipcRenderer.invoke('read-file', path) as Promise<Uint8Array>,
   renderDoc: (path: string) => ipcRenderer.invoke('render-doc', path) as Promise<string | null>,
   checkUpdates: () => ipcRenderer.invoke('check-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
   quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
+  setAlwaysOnTop: (v: boolean) => ipcRenderer.invoke('set-always-on-top', v),
   quickLook: (p: { title: string; path: string; sceneIndex: number; page?: number; top?: number; isPdf: boolean }) =>
     ipcRenderer.invoke('quicklook', p),
   quickLookUpdate: (p: { title: string; path: string; sceneIndex: number; page?: number; top?: number; isPdf: boolean }) =>

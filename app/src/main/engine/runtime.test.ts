@@ -34,6 +34,13 @@ describe('runtime', () => {
     expect(estimateSeconds(1)).toBe(0) // confirm the rounding that caused the bug
     expect(estimateScene(oneWord, blocks)).toBeGreaterThan(0) // rescued by the full content
   })
+  it('sceneMonologue honors a custom minimum length', () => {
+    // 87 words ≈ 40s at 130wpm: under the default 45s floor, over a 30s one
+    const b: SceneBlock[] = [{ type: 'cue', who: 'EVA', text: words(87) }]
+    expect(sceneMonologue(b)).toBe(null)
+    expect(sceneMonologue(b, 30)).toEqual({ who: 'EVA', seconds: 40 })
+    expect(sceneMonologue(b, 60)).toBe(null)
+  })
   it('sceneMonologue: one speaker past the length floor qualifies (action beats are fine)', () => {
     const b: SceneBlock[] = [
       { type: 'cue', who: 'A', text: words(60) },

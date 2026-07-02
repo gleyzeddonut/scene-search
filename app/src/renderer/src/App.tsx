@@ -52,6 +52,8 @@ export default function App() {
     readyRef.current = true // engine is in-process; always available
     setReady(true)
     window.scripty.onOpenSettings(() => setSettingsOpen(true))
+    // re-apply the persisted "keep window on top" choice (main resets per launch)
+    if (localStorage.getItem('alwaysOnTop') === '1') window.scripty.setAlwaysOnTop?.(true).catch(() => {})
     // open straight to Browse when the library already has scripts; only land on
     // Library (the setup screen) for a fresh/empty library
     api

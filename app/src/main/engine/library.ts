@@ -4,7 +4,7 @@ import { extractPaginated as realExtract, extractLayout, layoutToText, isSparseP
 import { parseScenes, parseLayout, parseHeadingless, parseScenesHeadingless, parseColonDialogue } from './parser'
 import { parseFdx, parseFountain } from './formats'
 import { scenePairing, guessGender, pairingFromGenders } from './gender'
-import { sceneWordCount, estimateSeconds, estimateScene, sceneMonologue } from './runtime'
+import { sceneWordCount, estimateSeconds, estimateScene, sceneMonologue, MONOLOGUE_MIN_SECONDS } from './runtime'
 import { iterCandidates, SCRIPT_EXTENSIONS } from './scanner'
 import type { Scene, SceneMatch, SceneBlock } from './types'
 
@@ -260,24 +260,27 @@ export class Library {
   }
 
   // each script's biggest monologue (longest single-character speech across its scenes),
-  // as { who, seconds }. Cached; the cache is cleared whenever the index changes.
+  // as { who, seconds }. Cached per length floor; the cache is cleared whenever the
+  // index changes, and recomputed when the floor differs from the cached one.
   private monoCache: Map<string, { who: string; seconds: number; scene: number }> | null = null
-  scriptMonologues(): Map<string, { who: string; seconds: number; scene: number }> {
-    if (this.monoCache) return this.monoCache
+  private monoCacheMin = 0
+  scriptMonologues(minSeconds: number = MONOLOGUE_MIN_SECONDS): Map<string, { who: string; seconds: number; scene: number }> {
+    if (this.monoCache && this.monoCacheMin === minSeconds) return this.monoCache
     const m = new Map<string, { who: string; seconds: number; scene: number }>()
     for (const s of this.scenes) {
-      const mono = sceneMonologue(s.content) // null unless the scene is carried by one voice
+      const mono = sceneMonologue(s.content, minSeconds) // null unless the scene is carried by one voice
       if (!mono) continue
       const cur = m.get(s.path)
       if (!cur || mono.seconds > cur.seconds) m.set(s.path, { ...mono, scene: s.index })
     }
+    this.monoCacheMin = minSeconds
     return (this.monoCache = m)
   }
 
   // genderOf(path, name) resolves a character's gender (lets manual overrides drive
   // the W/M chips and the W+M/W+W/M+M pairing); defaults to the name-based guess
   query(
-    f: { minChars?: number; maxChars?: number; pairing?: string | null; monologue?: boolean },
+    f: { minChars?: number; maxChars?: number; pairing?: string | null; monologue?: boolean; monologueMin?: number },
     genderOf: (path: string, name: string) => string = (_p, n) => guessGender(n)
   ): SceneMatch[] {
     // Size + pairing are SCRIPT-level now that Browse lists whole scripts (not scenes):
@@ -306,7 +309,7 @@ export class Library {
     // each script's longest monologue (its biggest single-character speech across all
     // scenes) — for the "Monologue" filter and the row hint. Only the Monologue filter
     // reads it, so skip the scan (and the per-row payload) for every other query.
-    const monoByScript = f.monologue ? this.scriptMonologues() : null
+    const monoByScript = f.monologue ? this.scriptMonologues(f.monologueMin) : null
     let rows = this.scenes.filter((s) => {
       const size = (castByScript.get(s.path) || []).length
       if (f.minChars != null && size < f.minChars) return false

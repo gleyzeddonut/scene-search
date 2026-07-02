@@ -533,6 +533,17 @@ export function BrowseView({
             </div>
           )}
         </div>
+
+        {/* pinned to the rail's bottom, so preparing works even with the preview hidden */}
+        <div className="rail-foot">
+          <button
+            className="prepare"
+            disabled={!selScene || !selScript}
+            onClick={() => selScene && selScript && onPrepare(selScene, selScript.scenes)}
+          >
+            Prepare scene →
+          </button>
+        </div>
       </div>
 
       <div className="listpane">
@@ -720,12 +731,6 @@ export function BrowseView({
                 </div>
               </div>
             )}
-
-            <div className="dbtns">
-              <button className="prepare" onClick={() => onPrepare(selScene, selScript.scenes)}>
-                Prepare scene →
-              </button>
-            </div>
           </>
         )}
       </div>

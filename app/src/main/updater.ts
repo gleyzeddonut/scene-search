@@ -25,7 +25,7 @@ function send(msg: UpdateMsg): void {
 
 export function setupUpdater(getWindow: () => BrowserWindow | null): void {
   getWin = getWindow
-  autoUpdater.autoDownload = true // keep delivering updates in the background
+  autoUpdater.autoDownload = true // default; the persisted pref is applied at engine-ready
   autoUpdater.autoInstallOnAppQuit = true
 
   autoUpdater.on('checking-for-update', () => send({ phase: 'checking' }))
@@ -53,8 +53,25 @@ export function setupUpdater(getWindow: () => BrowserWindow | null): void {
     if (r.response === 0) autoUpdater.quitAndInstall()
   })
   autoUpdater.on('error', () => send({ phase: 'error' }))
+}
 
+// whether an available update downloads immediately (the "Download updates
+// automatically" setting). Applied before the startup check so a user who turned
+// it off never gets a surprise background download.
+export function setAutoDownload(v: boolean): void {
+  autoUpdater.autoDownload = v
+}
+
+// the deferred launch check — runs once the engine (and with it the persisted
+// autoDownload pref) is ready
+export function startupCheck(): void {
   if (app.isPackaged) autoUpdater.checkForUpdates().catch(() => send({ phase: 'error' }))
+}
+
+// manual download, for when automatic downloads are off and an update is available
+export function downloadUpdate(): void {
+  send({ phase: 'downloading', pct: 0, version: pendingVersion })
+  autoUpdater.downloadUpdate().catch(() => send({ phase: 'error' }))
 }
 
 export function checkForUpdatesManual(): void {

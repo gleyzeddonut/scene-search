@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell, nativeTheme } from 'electron'
 import { join } from 'path'
 import { Engine } from './engine/engine'
-import { setupUpdater, checkForUpdatesManual, quitAndInstall } from './updater'
+import { setupUpdater, checkForUpdatesManual, quitAndInstall, setAutoDownload, startupCheck, downloadUpdate } from './updater'
 
 const HELP_URL = 'https://github.com/gleyzeddonut/scene-search'
 let engine: Engine
@@ -120,6 +120,16 @@ function registerIpc() {
   )
   ipcMain.handle('eng:setGenres', onEngine((p: string, g: string[]) => engine.setGenres(p, g)))
   ipcMain.handle('eng:setMedium', onEngine((p: string, md: string) => engine.setMedium(p, md)))
+  ipcMain.handle('eng:prefs', onEngine(() => engine.prefs()))
+  ipcMain.handle(
+    'eng:setPref',
+    onEngine((k: 'monologueMin' | 'autoDownload', v: number | boolean) => {
+      const prefs = engine.setPref(k, v)
+      if (k === 'autoDownload') setAutoDownload(prefs.autoDownload) // apply live
+      return prefs
+    })
+  )
+  ipcMain.handle('eng:hidden', onEngine(() => engine.hiddenFiles()))
   ipcMain.handle('eng:open', (_e, p: string) => { shell.openPath(p); return { ok: true } })
   ipcMain.handle('eng:reveal', (_e, p: string) => { shell.showItemInFolder(p); return { ok: true } })
   // native right-click menu for a script row
@@ -153,7 +163,14 @@ function registerIpc() {
   ipcMain.handle('quicklook-close', () => closeQuickLook())
   ipcMain.on('focus-cat', (_e, c: 'pdf' | 'text' | 'other') => { spaceTarget = c })
   ipcMain.handle('check-updates', () => checkForUpdatesManual())
+  ipcMain.handle('download-update', () => downloadUpdate())
   ipcMain.handle('quit-and-install', () => quitAndInstall())
+  // 'floating' keeps the window above normal windows without covering full-screen
+  // spaces — for running lines beside another app (a self-tape monitor, Zoom)
+  ipcMain.handle('set-always-on-top', (_e, v: boolean) => {
+    mainWindow?.setAlwaysOnTop(!!v, 'floating')
+    return { ok: true }
+  })
   ipcMain.handle('read-file', async (_e, p: string) => {
     const { readFile } = await import('fs/promises')
     return readFile(p) // Buffer → Uint8Array in the renderer
@@ -265,6 +282,14 @@ function createWindow() {
     } finally {
       resolveEngineReady()
     }
+    // apply the persisted auto-download pref BEFORE the launch update check, so a
+    // user who turned automatic downloads off never gets a surprise background one
+    try {
+      setAutoDownload(engine?.prefs().autoDownload ?? true)
+    } catch {
+      /* default (on) stands */
+    }
+    startupCheck()
   }
   // show only once the renderer has painted (the splash), so the window appears
   // already branded instead of blank; fall back after 1.5s in case the event lags.

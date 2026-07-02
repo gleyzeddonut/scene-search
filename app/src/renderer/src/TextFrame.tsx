@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
+import { getScriptScale, onScriptScale } from './api'
 
 // Shows a plain-text script (.txt/.fountain) as its REAL file content — the parsed
 // preview drops anything outside a recognized scene (title pages, notes), so for
 // full fidelity we read the raw bytes and render them verbatim, like Finder. Goes
 // in a sandboxed iframe (no scripts) so the text can't be interpreted as markup.
-const PAGE_CSS = `
+// The iframe can't see the parent's CSS vars, so the text-size setting is baked in.
+const pageCss = (scale: number) => `
   :root { color-scheme: light dark }
   html, body { margin: 0 }
   body {
-    font: 13px/1.6 'Courier Prime', ui-monospace, monospace;
+    font: ${13 * scale}px/1.6 'Courier Prime', ui-monospace, monospace;
     color: #1a1a1a; background: #fff; padding: 36px 42px;
   }
   @media (prefers-color-scheme: dark) { body { color: #e6e6ea; background: #1d1e23 } }
@@ -20,6 +22,8 @@ const escapeHtml = (s: string) =>
 export function TextFrame({ path }: { path: string }) {
   const [text, setText] = useState<string | null>(null)
   const [err, setErr] = useState(false)
+  const [scale, setScale] = useState(getScriptScale())
+  useEffect(() => onScriptScale(() => setScale(getScriptScale())), [])
 
   useEffect(() => {
     let alive = true
@@ -43,8 +47,8 @@ export function TextFrame({ path }: { path: string }) {
         ? ''
         : `<!doctype html><html><head><meta charset="utf-8">` +
           `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">` +
-          `<style>${PAGE_CSS}</style></head><body><pre>${escapeHtml(text)}</pre></body></html>`,
-    [text]
+          `<style>${pageCss(scale)}</style></head><body><pre>${escapeHtml(text)}</pre></body></html>`,
+    [text, scale]
   )
 
   if (err) return <div className="dnote">Couldn’t open this file.</div>

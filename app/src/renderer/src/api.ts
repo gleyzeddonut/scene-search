@@ -57,6 +57,30 @@ export const stem = (name: string): string => name.replace(/\.[^.]+$/, '')
 // seconds → "m:ss" (shared by Browse's monologue hint and Prepare's estimate)
 export const mmss = (s: number): string => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
+// Script preview text size (1 = normal), persisted in localStorage. Applied as the
+// --script-scale CSS var; a same-window 'scripty-scale' event and the cross-window
+// 'storage' event keep the main window, Quick Look pop-out, and iframes in sync.
+export const getScriptScale = (): number => {
+  const v = parseFloat(localStorage.getItem('scriptScale') || '1')
+  return Number.isFinite(v) && v >= 0.5 && v <= 2 ? v : 1
+}
+export const setScriptScale = (v: number): void => {
+  localStorage.setItem('scriptScale', String(v))
+  window.dispatchEvent(new Event('scripty-scale'))
+}
+export const applyScriptScale = (): void => {
+  document.documentElement.style.setProperty('--script-scale', String(getScriptScale()))
+}
+// subscribe to scale changes from this window (Settings) or another (main ↔ Quick Look)
+export const onScriptScale = (cb: () => void): (() => void) => {
+  window.addEventListener('scripty-scale', cb)
+  window.addEventListener('storage', cb)
+  return () => {
+    window.removeEventListener('scripty-scale', cb)
+    window.removeEventListener('storage', cb)
+  }
+}
+
 export type UpdatePhase =
   | 'idle'
   | 'checking'
@@ -103,6 +127,14 @@ interface EngineApi {
   setMedium: (p: string, md: string) => Promise<{ medium: string | null }>
   open: (p: string) => Promise<unknown>
   reveal: (p: string) => Promise<unknown>
+  prefs: () => Promise<Prefs>
+  setPref: (k: 'monologueMin' | 'autoDownload', v: number | boolean) => Promise<Prefs>
+  hidden: () => Promise<string[]>
+}
+
+export interface Prefs {
+  monologueMin: number
+  autoDownload: boolean
 }
 
 declare global {
@@ -120,7 +152,9 @@ declare global {
       readFile: (path: string) => Promise<Uint8Array>
       renderDoc: (path: string) => Promise<string | null>
       checkUpdates: () => Promise<void>
+      downloadUpdate: () => Promise<void>
       quitAndInstall: () => Promise<void>
+      setAlwaysOnTop: (v: boolean) => Promise<{ ok: boolean }>
       quickLook: (p: { title: string; path: string; sceneIndex: number; page?: number; top?: number; isPdf: boolean }) => Promise<void>
       quickLookUpdate: (p: { title: string; path: string; sceneIndex: number; page?: number; top?: number; isPdf: boolean }) => Promise<void>
       quickLookClose: () => Promise<void>
@@ -163,6 +197,9 @@ export const api = {
   setMedium: (path: string, medium: string) => eng().setMedium(path, medium),
   openFile: (path: string) => eng().open(path),
   revealFile: (path: string) => eng().reveal(path),
+  prefs: () => eng().prefs(),
+  setPref: (k: 'monologueMin' | 'autoDownload', v: number | boolean) => eng().setPref(k, v),
+  hiddenFiles: () => eng().hidden(),
   pickFolder: () => window.scripty.pickFolder(),
   exportSides: (elementId: string, name: string) => {
     const el = document.getElementById(elementId)

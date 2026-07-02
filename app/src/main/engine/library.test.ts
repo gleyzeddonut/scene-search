@@ -103,6 +103,21 @@ describe('Library', () => {
     expect(pickParse(a, b)).toBe(a)
   })
 
+  it('the monologue filter honors a per-query minimum length', async () => {
+    // ~87 words ≈ 40s at 130wpm — a monologue at a 30s floor, not at the default 45s
+    const speech = Array.from({ length: 87 }, (_, i) => 'w' + i).join(' ')
+    const d = tmp()
+    writeFileSync(join(d, 'solo.fountain'), `INT. STAGE - NIGHT\n\nEVA\n${speech}\n`)
+    const lib = new Library()
+    await lib.reindex([d])
+    expect(lib.query({ monologue: true })).toHaveLength(0)
+    const rows = lib.query({ monologue: true, monologueMin: 30 })
+    expect(rows).toHaveLength(1)
+    expect(rows[0].monologue?.who).toBe('EVA')
+    // and back again — the cache must not serve the 30s scan to a 45s query
+    expect(lib.query({ monologue: true })).toHaveLength(0)
+  })
+
   it('recovers colon dialogue when a heading parsed but no dialogue did', async () => {
     // a colon-dialogue script WITH a real slug: the normal parse finds the scene but
     // zero dialogue, which must now trigger the colon-recovery pass
