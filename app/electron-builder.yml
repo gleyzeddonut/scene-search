@@ -10,6 +10,9 @@ directories:
 files:
   - out/**/*
   - package.json
+# native onnxruntime binaries (Kokoro TTS) must live outside the asar to load
+asarUnpack:
+  - "**/node_modules/onnxruntime-node/**"
 extraResources:
   - from: resources/scripty-ocr # universal macOS OCR helper (built by build_app.sh)
     to: scripty-ocr

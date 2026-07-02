@@ -2,6 +2,8 @@ import { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell, nativeTh
 import { join } from 'path'
 import { Engine } from './engine/engine'
 import { setupUpdater, checkForUpdatesManual, quitAndInstall, setAutoDownload, startupCheck, downloadUpdate } from './updater'
+import { registerVoice } from './voice'
+import { registerEleven } from './eleven'
 
 const HELP_URL = 'https://github.com/gleyzeddonut/scene-search'
 let engine: Engine
@@ -19,6 +21,13 @@ function onEngine<A extends unknown[], R>(fn: (...a: A) => R) {
 }
 let mainWindow: BrowserWindow | null = null
 let qlWin: BrowserWindow | null = null // the Quick Look pop-out (a real OS window)
+// the "keep window on top" setting; Quick Look must always outrank the main window
+let alwaysOnTop = false
+function applyOnTop(): void {
+  mainWindow?.setAlwaysOnTop(alwaysOnTop, 'floating')
+  // one sub-level above the main window, so toggling on-top never buries the pop-out
+  if (qlWin && !qlWin.isDestroyed()) qlWin.setAlwaysOnTop(alwaysOnTop, 'floating', 1)
+}
 // what currently has keyboard focus in the main window, reported by the renderer:
 // 'pdf' = the embedded PDF preview (which otherwise eats Space to scroll), 'text' =
 // a search/input field, 'other' = normal DOM. Lets us reclaim Space only over the PDF.
@@ -45,6 +54,9 @@ function openQuickLook(p: QlPayload) {
     height: 900,
     title: p.title,
     show: false,
+    // a child of the main window always stacks above it (Finder-style Quick Look),
+    // even when "keep window on top" floats the main window over everything else
+    parent: mainWindow ?? undefined,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1d1e23' : '#fdfdfe',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -71,6 +83,7 @@ function openQuickLook(p: QlPayload) {
   })
   qlWin.once('ready-to-show', () => qlWin?.showInactive()) // show only once painted — no grey flash
   qlWin.setTitle(p.title)
+  applyOnTop() // a pop-out opened while "keep on top" is active floats above the main window
   const search = '?quicklook=' + encodeURIComponent(JSON.stringify(p))
   if (process.env['ELECTRON_RENDERER_URL']) {
     qlWin.loadURL(process.env['ELECTRON_RENDERER_URL'] + search)
@@ -167,9 +180,11 @@ function registerIpc() {
   ipcMain.handle('download-update', () => downloadUpdate())
   ipcMain.handle('quit-and-install', () => quitAndInstall())
   // 'floating' keeps the window above normal windows without covering full-screen
-  // spaces — for running lines beside another app (a self-tape monitor, Zoom)
+  // spaces — for running lines beside another app (a self-tape monitor, Zoom).
+  // Quick Look is raised one sub-level higher so it always stays on top of the app.
   ipcMain.handle('set-always-on-top', (_e, v: boolean) => {
-    mainWindow?.setAlwaysOnTop(!!v, 'floating')
+    alwaysOnTop = !!v
+    applyOnTop()
     return { ok: true }
   })
   ipcMain.handle('read-file', async (_e, p: string) => {
@@ -255,6 +270,14 @@ function createWindow() {
   }
 
   registerIpc() // handlers await engineReady, so it's safe to register before the engine exists
+  registerVoice(() => mainWindow)
+  registerEleven(() => {
+    try {
+      return engine?.prefs().elevenKey ?? ''
+    } catch {
+      return ''
+    }
+  })
   buildMenu()
 
   mainWindow = new BrowserWindow({
@@ -282,6 +305,14 @@ function createWindow() {
       console.error('Engine failed to initialize:', err)
     } finally {
       resolveEngineReady()
+    }
+    // an index built by an older parser must actually re-parse ON LAUNCH — the
+    // stale flag alone only decorated the Library tab, so parser upgrades never
+    // reached users who didn't manually rebuild (progress still shows in Library)
+    try {
+      if (engine?.reindexStatus().stale) engine.reindex()
+    } catch {
+      /* the Library tab's manual refresh remains available */
     }
     // apply the persisted auto-download pref BEFORE the launch update check, so a
     // user who turned automatic downloads off never gets a surprise background one

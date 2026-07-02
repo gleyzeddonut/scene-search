@@ -178,6 +178,10 @@ export function BrowseView({
   const [scenes, setScenes] = useState<Scene[]>([])
   const [selScript, setSelScript] = useState<ScriptGroup | null>(null)
   const [selScene, setSelScene] = useState<Scene | null>(null)
+  // whether the selected scene was EXPLICITLY picked (scene navigator / arrow keys).
+  // Only then do the preview and Quick Look scroll to it — selecting a script shows
+  // the top of the file, like Finder would.
+  const [sceneJump, setSceneJump] = useState(false)
   const [detail, setDetail] = useState<SceneDetail | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const navRef = useRef<HTMLDivElement>(null)
@@ -277,10 +281,12 @@ export function BrowseView({
     if (g) {
       setSelScript(g)
       setSelScene(g.scenes.find((s) => s.scene_index === restore!.index) || g.scenes[0] || null)
+      setSceneJump(true) // coming back from Prepare — land on the scene you prepared
     } else {
       const first = sorted[0] || null
       setSelScript(first)
       setSelScene(first ? defaultScene(first) : null)
+      setSceneJump(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scripts])
@@ -309,12 +315,13 @@ export function BrowseView({
     }
   }, [selScene])
 
-  const qlPayload = (s: Scene) => ({
+  const qlPayload = (s: Scene, jump = sceneJump) => ({
     title: stem(s.script_name),
     path: s.script_path,
     sceneIndex: s.scene_index,
-    page: s.page,
-    top: s.top,
+    // scroll to the scene only when it was explicitly picked; otherwise open at the top
+    page: jump ? s.page : undefined,
+    top: jump ? s.top : undefined,
     isPdf: isPdf(s.script_path)
   })
   // toggle the Quick Look pop-out for the selected scene. Debounced because Space can
@@ -334,7 +341,7 @@ export function BrowseView({
   }
   // Space from main (PDF preview had focus and swallowed it) → toggle Quick Look
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => window.scripty.onMainSpace?.(toggleQuickLook), [qlOpen, selScene])
+  useEffect(() => window.scripty.onMainSpace?.(toggleQuickLook), [qlOpen, selScene, sceneJump])
   // "Prepare scene" from a row's right-click menu. The row's onContextMenu already ran
   // chooseScript, so the selection is the right-clicked script and its default scene.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -357,7 +364,7 @@ export function BrowseView({
           setQlOpen(true)
         }
       }),
-    [selScene, qlOpen]
+    [selScene, qlOpen, sceneJump]
   )
 
   // pick a script (and reset to its earliest scene)
@@ -378,12 +385,14 @@ export function BrowseView({
     setSelScript(g)
     const sc = defaultScene(g)
     setSelScene(sc)
-    if (qlOpen && sc) window.scripty.quickLookUpdate(qlPayload(sc))
+    setSceneJump(false) // a script pick shows the top of the file
+    if (qlOpen && sc) window.scripty.quickLookUpdate(qlPayload(sc, false))
   }
-  // pick a scene within the current script
+  // pick a scene within the current script (navigator click / ←→ keys) → jump to it
   const chooseScene = (sc: Scene) => {
     setSelScene(sc)
-    if (qlOpen) window.scripty.quickLookUpdate(qlPayload(sc))
+    setSceneJump(true)
+    if (qlOpen) window.scripty.quickLookUpdate(qlPayload(sc, true))
   }
 
   // keyboard, Finder-style: ↑/↓ move between scripts, ←/→ step scenes within the
@@ -412,8 +421,11 @@ export function BrowseView({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
+    // sceneJump matters: re-clicking the already-selected scene changes ONLY the
+    // jump flag, and Space must open Quick Look with the fresh payload, not a
+    // stale top-of-file one (the close-reopen-fixes-it bug)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sorted, selScript, selScene, qlOpen])
+  }, [sorted, selScript, selScene, qlOpen, sceneJump])
 
   // keep the keyboard-selected rows visible
   useEffect(() => {
@@ -684,7 +696,12 @@ export function BrowseView({
               {selScene.pairing && <span className="tag">{PAIR_TAG[selScene.pairing] || selScene.pairing}</span>}
             </div>
             {isPdf(selScene.script_path) ? (
-              <PdfFrame path={selScene.script_path} page={selScene.page} top={selScene.top} nonce={selScene.scene_index} />
+              <PdfFrame
+                path={selScene.script_path}
+                page={sceneJump ? selScene.page : undefined}
+                top={sceneJump ? selScene.top : undefined}
+                nonce={selScene.scene_index}
+              />
             ) : isDocx(selScene.script_path) ? (
               <DocFrame path={selScene.script_path} />
             ) : isPlainText(selScene.script_path) ? (

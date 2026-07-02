@@ -48,8 +48,12 @@ export function PdfFrame({
   // #toolbar=0&navpanes=0 hides Chromium's PDF toolbar + side panel. Always pin a
   // page; when we know the scene heading's y (top), use view=FitH so the scene starts
   // near the top of the view instead of the page top (it's often mid/bottom of a page).
-  // A per-scene token forces a fresh scroll on each selection.
-  const view = top != null ? `&view=FitH,${Math.round(top + 24)}` : ''
+  // Chromium reads `view=FitH,<v>` as a scroll offset DOWN from the page top, in
+  // screen pixels at 100% zoom (PDF points × 96/72) — NOT the spec's from-bottom
+  // points, which only named destinations get. `top` is the heading's baseline in
+  // points from the page TOP; back off ~12pt for the heading's own text height so
+  // the slug sits flush at the top of the view. A per-scene token forces a fresh scroll.
+  const view = top != null ? `&view=FitH,${Math.max(0, Math.round((top - 12) * (96 / 72)))}` : ''
   const target = url
     ? url + `#toolbar=0&navpanes=0&page=${page || 1}${view}${nonce != null ? `&n=${nonce}` : ''}`
     : ''
@@ -77,7 +81,12 @@ export function PdfFrame({
       {[0, 1].map((i) =>
         srcs[i] ? (
           <iframe
-            key={i}
+            // keyed by src: the targets differ only in their #fragment, and changing
+            // an existing iframe's src to a fragment-only variation is a SAME-document
+            // navigation — the PDF plugin neither reloads nor re-applies the scroll
+            // params, freezing each buffer at its first-loaded position. A fresh
+            // element per target forces a real load (the double-buffer hides it).
+            key={`${i}:${srcs[i]}`}
             src={srcs[i]}
             title="Script PDF"
             className="pdfframe"

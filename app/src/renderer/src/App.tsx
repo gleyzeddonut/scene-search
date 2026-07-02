@@ -54,6 +54,21 @@ export default function App() {
     window.scripty.onOpenSettings(() => setSettingsOpen(true))
     // re-apply the persisted "keep window on top" choice (main resets per launch)
     if (localStorage.getItem('alwaysOnTop') === '1') window.scripty.setAlwaysOnTop?.(true).catch(() => {})
+    // Space must never re-trigger the last clicked button/control (e.g. re-toggling
+    // Show preview) — it's reserved for Quick Look / the reader. Mouse clicks drop
+    // focus from the control; keyboard (Tab) navigation still focuses normally.
+    // Selects must NOT blur on click (that closes their native dropdown as it
+    // opens) — they blur after a choice is made instead.
+    const dropFocus = (e: MouseEvent) => {
+      const el = (e.target as HTMLElement | null)?.closest?.('button, [role="switch"]')
+      if (el instanceof HTMLElement) el.blur()
+    }
+    const dropSelectFocus = (e: Event) => {
+      const el = e.target as HTMLElement | null
+      if (el?.tagName === 'SELECT') el.blur()
+    }
+    window.addEventListener('click', dropFocus)
+    window.addEventListener('change', dropSelectFocus)
     // open straight to Browse when the library already has scripts; only land on
     // Library (the setup screen) for a fresh/empty library
     api
@@ -74,6 +89,8 @@ export default function App() {
     return () => {
       offEdit?.()
       offRemove?.()
+      window.removeEventListener('click', dropFocus)
+      window.removeEventListener('change', dropSelectFocus)
     }
   }, [])
 

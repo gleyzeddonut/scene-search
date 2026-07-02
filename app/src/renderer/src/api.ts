@@ -128,14 +128,19 @@ interface EngineApi {
   open: (p: string) => Promise<unknown>
   reveal: (p: string) => Promise<unknown>
   prefs: () => Promise<Prefs>
-  setPref: (k: 'monologueMin' | 'autoDownload', v: number | boolean) => Promise<Prefs>
+  setPref: (k: 'monologueMin' | 'autoDownload' | 'elevenKey', v: number | boolean | string) => Promise<Prefs>
   hidden: () => Promise<string[]>
 }
 
 export interface Prefs {
   monologueMin: number
   autoDownload: boolean
+  elevenKey: string
 }
+
+export type ElevenResult =
+  | { ok: true; bytes: Uint8Array }
+  | { ok: false; error: 'no_key' | 'quota' | 'auth' | 'network' }
 
 declare global {
   interface Window {
@@ -152,6 +157,12 @@ declare global {
       appVersion: () => Promise<string>
       readFile: (path: string) => Promise<Uint8Array>
       renderDoc: (path: string) => Promise<string | null>
+      elevenSay: (text: string, voice: string) => Promise<ElevenResult>
+      elevenVoices: () => Promise<{ id: string; name: string }[]>
+      kokoroStatus: () => Promise<'none' | 'cached' | 'loading' | 'ready' | 'error'>
+      kokoroLoad: () => Promise<'none' | 'cached' | 'loading' | 'ready' | 'error'>
+      kokoroSay: (text: string, voice: string, speed: number) => Promise<Uint8Array>
+      onKokoroProgress: (cb: (pct: number) => void) => () => void
       checkUpdates: () => Promise<void>
       downloadUpdate: () => Promise<void>
       quitAndInstall: () => Promise<void>
@@ -199,7 +210,7 @@ export const api = {
   openFile: (path: string) => eng().open(path),
   revealFile: (path: string) => eng().reveal(path),
   prefs: () => eng().prefs(),
-  setPref: (k: 'monologueMin' | 'autoDownload', v: number | boolean) => eng().setPref(k, v),
+  setPref: (k: 'monologueMin' | 'autoDownload' | 'elevenKey', v: number | boolean | string) => eng().setPref(k, v),
   hiddenFiles: () => eng().hidden(),
   pickFolder: () => window.scripty.pickFolder(),
   exportSides: (elementId: string, name: string) => {

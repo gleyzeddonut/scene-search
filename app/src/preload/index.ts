@@ -62,6 +62,16 @@ contextBridge.exposeInMainWorld('scripty', {
   appVersion: () => ipcRenderer.invoke('app-version') as Promise<string>,
   readFile: (path: string) => ipcRenderer.invoke('read-file', path) as Promise<Uint8Array>,
   renderDoc: (path: string) => ipcRenderer.invoke('render-doc', path) as Promise<string | null>,
+  elevenSay: (text: string, voice: string) => ipcRenderer.invoke('eleven-say', text, voice),
+  elevenVoices: () => ipcRenderer.invoke('eleven-voices'),
+  kokoroStatus: () => ipcRenderer.invoke('kokoro-status'),
+  kokoroLoad: () => ipcRenderer.invoke('kokoro-load'),
+  kokoroSay: (text: string, voice: string, speed: number) => ipcRenderer.invoke('kokoro-say', text, voice, speed),
+  onKokoroProgress: (cb: (pct: number) => void) => {
+    const l = (_e: unknown, pct: number) => cb(pct)
+    ipcRenderer.on('kokoro-progress', l)
+    return () => ipcRenderer.removeListener('kokoro-progress', l)
+  },
   checkUpdates: () => ipcRenderer.invoke('check-updates'),
   downloadUpdate: () => ipcRenderer.invoke('download-update'),
   quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),

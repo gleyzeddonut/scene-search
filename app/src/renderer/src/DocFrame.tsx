@@ -1,15 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getScriptScale, onScriptScale } from './api'
 
 // Renders a .docx as its real document content: mammoth converts it to HTML in the
 // main process; we drop that into a sandboxed iframe (no scripts) styled like a
 // page, so the preview shows the actual document rather than the parsed scenes.
-// The iframe can't see the parent's CSS vars, so the text-size setting is baked in.
-const pageCss = (scale: number) => `
+const PAGE_CSS = `
   :root { color-scheme: light dark }
   html, body { margin: 0 }
   body {
-    font: ${15 * scale}px/1.6 'Times New Roman', Georgia, serif;
+    font: 15px/1.6 'Times New Roman', Georgia, serif;
     color: #1a1a1a; background: #fff;
     padding: 40px 46px; max-width: 760px; margin: 0 auto;
   }
@@ -27,8 +25,6 @@ const pageCss = (scale: number) => `
 export function DocFrame({ path }: { path: string }) {
   const [html, setHtml] = useState<string | null>(null)
   const [err, setErr] = useState(false)
-  const [scale, setScale] = useState(getScriptScale())
-  useEffect(() => onScriptScale(() => setScale(getScriptScale())), [])
 
   useEffect(() => {
     let alive = true
@@ -56,8 +52,8 @@ export function DocFrame({ path }: { path: string }) {
         ? ''
         : `<!doctype html><html><head><meta charset="utf-8">` +
           `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">` +
-          `<style>${pageCss(scale)}</style></head><body>${html}</body></html>`,
-    [html, scale]
+          `<style>${PAGE_CSS}</style></head><body>${html}</body></html>`,
+    [html]
   )
 
   if (err) return <div className="dnote">Couldn’t open this document.</div>
