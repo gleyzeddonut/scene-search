@@ -1,6 +1,6 @@
 {
   "name": "scripty",
-  "version": "1.9.2",
+  "version": "1.10.0",
   "description": "Scripty",
   "author": "Daniel Gleyzer",
   "main": "./out/main/index.js",
