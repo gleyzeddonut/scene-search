@@ -48,11 +48,20 @@ it.skipIf(!OUT)('corpus diagnostic sweep', async () => {
       let dlgLines = 0
       let zeroDlgScenes = 0
       let emptyCueTexts = 0
+      let parenGlue = 0 // dialogue starting with a parenthetical → likely regex-glued
+      let hugeLines = 0 // single dialogue "line" over 120 words → likely absorbed action
+      let maxLineWords = 0
       for (const s of best) {
         for (const c of s.characters) chars.add(c)
         dlgLines += s.lines.length
         if (!s.lines.length) zeroDlgScenes++
         for (const b of s.blocks) if (b.type === 'cue' && !b.text.trim()) emptyCueTexts++
+        for (const [, t] of s.lines) {
+          if (/^\(/.test(t)) parenGlue++
+          const w = t.split(/\s+/).length
+          if (w > maxLineWords) maxLineWords = w
+          if (w > 120) hugeLines++
+        }
       }
       Object.assign(row, {
         pageCount,
@@ -63,6 +72,9 @@ it.skipIf(!OUT)('corpus diagnostic sweep', async () => {
         dlgLines,
         zeroDlgScenes,
         emptyCueTexts,
+        parenGlue,
+        hugeLines,
+        maxLineWords,
         characters: [...chars],
         junkChars: [...chars].filter((c) => JUNK_NAME.test(c)),
         headings: best.map((s) => s.heading).slice(0, 60),

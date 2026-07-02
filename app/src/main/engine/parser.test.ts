@@ -43,6 +43,26 @@ describe('parseLayout', () => {
     expect(s[0].characters).toEqual(['SKYLAR', 'WILL'])
     expect(s[0].lines).toHaveLength(13)
   })
+  it('a numbered slug in the left gutter does not drag the base off the action margin', () => {
+    const L = (text: string, x: number): LayoutLine => ({ text, x, y: 0, page: 1 })
+    // production script: the slug's scene-number column starts at x=100, ~33pt left
+    // of the true action margin (133) — anchoring the base there would push action
+    // lines over the dialogue threshold and glue them into the previous speech
+    const lines = [L('6 INT. COFFEE SHOP - MORNING6', 100)]
+    for (let i = 0; i < 9; i++) lines.push(L(`Action beat number ${i} plays out in the shop.`, 133))
+    lines.push(
+      L('VINCENT', 254),
+      L('Meet me after close.', 190),
+      L('She blows him a kiss. He gives her a wave and shuts', 133),
+      L('his laptop. A smile of accomplishment takes over.', 133),
+      L('BARISTA', 254),
+      L('Anything else?', 190)
+    )
+    const s = parseLayout(lines)
+    expect(s[0].characters).toEqual(['VINCENT', 'BARISTA'])
+    expect(s[0].lines[0]).toEqual(['VINCENT', 'Meet me after close.']) // no glued action
+    expect(s[0].blocks.filter((b) => b.type === 'action').length).toBeGreaterThanOrEqual(2)
+  })
   it('supports digit-named characters at the cue indent ("3", "1-2")', () => {
     const L = (text: string, x: number): LayoutLine => ({ text, x, y: 0, page: 1 })
     const s = parseLayout([
@@ -114,6 +134,26 @@ describe('parseScenes', () => {
   it('handles a leading scene-number column (production scripts)', () => {
     const s = parseScenes('SC. 5.A5 EXT. TURNER’S STOOP - DAY\n\nNORA\nHi.\n\n5.12 INT. CELLAR - LATER\n\nSAM\nYo.\n')
     expect(s.map((x) => x.heading)).toEqual(['EXT. TURNER’S STOOP - DAY', 'INT. CELLAR - LATER'])
+  })
+  it('a dotless INT/EXT is a slug only when the line is ALL-CAPS', () => {
+    // real scripts write "INT KITCHEN - DAY" without the dot — but prose acronyms
+    // ("INT EQ PY means WAIVE INTEREST…" in a financial statement) are not scenes
+    const s = parseScenes('INT KITCHEN - DAY\n\nMOM\nDinner!\n')
+    expect(s.map((x) => x.heading)).toEqual(['INT KITCHEN - DAY'])
+    expect(parseScenes('INT EQ PY means WAIVE INTEREST, EQUAL PAYMENT; WV INT LOW PMT\nJust ledger prose here.\n')).toEqual([])
+    // the dotted form still allows mixed case ("INT. Hospital Room.")
+    expect(parseScenes('INT. Hospital Room.\n\nDEBBY\nHey.\n')[0].heading).toBe('INT. Hospital Room.')
+  })
+  it('recognizes slug-less headings with qualified time-of-day endings', () => {
+    // TV scripts without INT./EXT. mark scenes as "LOCATION - THAT NIGHT" etc.
+    const s = parseScenes(
+      'INT. APARTMENT - DAY\n\nJANEY\nHi.\n\n30TH STREET STATION - NEXT DAY\n\nLEO\nOver here!\n\nELLIOT AND NANCY’S BEDROOM - LATER THAT NIGHT\n\nNANCY\nGoodnight.\n'
+    )
+    expect(s.map((x) => x.heading)).toEqual([
+      'INT. APARTMENT - DAY',
+      '30TH STREET STATION - NEXT DAY',
+      'ELLIOT AND NANCY’S BEDROOM - LATER THAT NIGHT'
+    ])
   })
   it('recognizes colon-form slugs and slugs glued to FADE IN:', () => {
     // amateur scripts write "INT:" for "INT." and glue the opening transition on
@@ -193,6 +233,16 @@ describe('parseScenesHeadingless (sides with no slug line)', () => {
     const s = parseScenesHeadingless('GLORIA\nBum bum bum... death.\n\nALEX\nStop.\n\nSAM\nWho shuffled?\n')
     expect(s).toHaveLength(1)
     expect(s[0].characters).toEqual(['GLORIA', 'ALEX', 'SAM'])
+  })
+  it('does not fabricate a scene from a doc of enormous "lines" (a bill, a ledger)', () => {
+    // a credit-card statement parses to caps-y labels each "speaking" hundreds of
+    // words of ledger text — real spoken lines are short, so that shape is rejected
+    const blob = (s: string) => Array(80).fill(s).join(' ')
+    const doc =
+      `MINIMUM INTEREST CHARGE\n${blob('Balance 49.68 payment 2.00 late fee')}\n\n` +
+      `JESSICA ALBANO\n${blob('Purchases 111.32 credits 0.00 interest')}\n\n` +
+      `PO BOX 650964\n9 SIEBEN DR\n`
+    expect(parseScenesHeadingless(doc)).toEqual([])
   })
   it('returns nothing for prose with no real dialogue (a journal, a transcript)', () => {
     // caps-y labels that look cue-ish but aren't names — must not become a scene

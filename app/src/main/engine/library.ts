@@ -20,13 +20,19 @@ function dropEmpty(scenes: Scene[]): Scene[] {
 }
 
 // Choose between the layout parse and the regex parse of the same PDF: more scenes
-// wins; on a tie, more captured dialogue wins (single-column PDFs give the layout
-// parser no indentation to work with, so it finds the scenes but none of the spoken
-// lines); a full tie keeps the layout parse, which carries topY for scroll-to-scene.
+// wins; on a tie, the layout parse is preferred (it separates action/parentheticals
+// from speech and carries topY for scroll-to-scene) UNLESS the regex parse captured
+// substantially more dialogue — single-column PDFs give the layout parser no
+// indentation to work with, so it can find the scenes but none of the spoken lines.
+// The 1.2× margin matters: the regex parse glues action into speeches (it has no
+// layout info), so a small dialogue-count edge is usually that glue, not recovery.
 const dialogueCount = (ss: Scene[]) => ss.reduce((n, s) => n + s.lines.length, 0)
 export function pickParse(layout: Scene[], regex: Scene[]): Scene[] {
-  if (layout.length !== regex.length) return layout.length > regex.length ? layout : regex
-  return dialogueCount(layout) >= dialogueCount(regex) ? layout : regex
+  // regex found DRAMATICALLY more scenes → the layout margins failed on this PDF
+  if (regex.length > layout.length * 1.15 + 0.5) return regex
+  if (layout.length > regex.length) return layout
+  // equal or near-tie: layout wins unless regex captured substantially more dialogue
+  return dialogueCount(regex) > dialogueCount(layout) * 1.2 ? regex : layout
 }
 
 export function canonicalKey(filename: string): string {

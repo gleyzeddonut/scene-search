@@ -42,6 +42,14 @@ export class Settings {
     this.data[k] = v
     this.save()
   }
+  getStr(k: string, dflt: string): string {
+    const v = this.data[k]
+    return typeof v === 'string' ? v : dflt
+  }
+  setStr(k: string, v: string) {
+    this.data[k] = v
+    this.save()
+  }
   getRoots() { return this.getList('roots') }
   setRoots(v: string[]) { this.setList('roots', v) }
   getIgnored() { return this.getList('ignored') }

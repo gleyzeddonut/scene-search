@@ -226,8 +226,14 @@ export async function extractLayout(path: string): Promise<{ lines: LayoutLine[]
   let chars = 0
   for (let i = 1; i <= pages; i++) {
     const page = await doc.getPage(i)
+    // pdf.js reports y in PDF user space (origin at the crop box's BOTTOM-left).
+    // Store y as points from the page TOP instead: Chromium's viewer interprets a
+    // `view=FitH,<y>` URL param as an offset scrolled DOWN from the page top (the
+    // spec's bottom-origin transform is only applied to named destinations), so a
+    // top-origin y is what scroll-to-scene actually needs.
+    const cropTop = ((page.view as number[] | undefined)?.[3] as number) || 0
     for (const ln of pageLines(await page.getTextContent())) {
-      out.push({ text: ln.text, x: ln.x, y: ln.y, page: i })
+      out.push({ text: ln.text, x: ln.x, y: cropTop - ln.y, page: i })
       chars += ln.text.length
       if (chars >= MAX_CHARS) return { lines: cleanLayout(out), pageCount }
     }

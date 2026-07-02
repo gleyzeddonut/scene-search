@@ -3,7 +3,7 @@ export type SceneBlock = { type: 'action'; text: string } | { type: 'cue'; who: 
 export interface LayoutLine {
   text: string
   x: number // left edge of the line, in PDF points
-  y: number // text baseline, in PDF points (bottom-left origin, y increases upward)
+  y: number // text baseline, in PDF points measured DOWN from the page top (matches the viewer's FitH origin)
   page: number
 }
 
@@ -11,7 +11,7 @@ export interface Scene {
   heading: string
   index: number
   page: number
-  topY?: number // heading's PDF-points y (layout parse only) — to scroll the preview to it
+  topY?: number // heading baseline, points from the page TOP (layout parse only) — scroll target
   characters: string[]
   lines: [string, string][]
   blocks: SceneBlock[]

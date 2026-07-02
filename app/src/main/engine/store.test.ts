@@ -27,6 +27,14 @@ describe('store', () => {
     s.setNum('monologueMin', NaN)
     expect(new Settings(p).getNum('monologueMin', 45)).toBe(45)
   })
+  it('string prefs default when unset and persist', () => {
+    const d = mkdtempSync(join(tmpdir(), 'st-'))
+    const p = join(d, 'settings.json')
+    const s = new Settings(p)
+    expect(s.getStr('elevenKey', '')).toBe('')
+    s.setStr('elevenKey', 'xi-123')
+    expect(new Settings(p).getStr('elevenKey', '')).toBe('xi-123')
+  })
   it('index round-trips', () => {
     const d = mkdtempSync(join(tmpdir(), 'st-'))
     expect(loadIndex(d)).toBe(null)

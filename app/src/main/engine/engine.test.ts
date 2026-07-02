@@ -116,7 +116,7 @@ describe('Engine prefs', () => {
   it('defaults, persists across launches, and drives the monologue filter', async () => {
     seed(PARSER_VERSION)
     const eng = new Engine()
-    expect(eng.prefs()).toEqual({ monologueMin: 45, autoDownload: true })
+    expect(eng.prefs()).toEqual({ monologueMin: 45, autoDownload: true, elevenKey: '' })
     // ~87 words ≈ 40s: below the default 45s monologue floor, above a 30s one
     const speech = Array.from({ length: 87 }, (_, i) => 'w' + i).join(' ')
     const f = join(h.userData, 'solo.fountain')
@@ -126,8 +126,9 @@ describe('Engine prefs', () => {
     eng.setPref('monologueMin', 30)
     expect(eng.scenes({ monologue: true }).scenes.length).toBe(1)
     eng.setPref('autoDownload', false)
+    eng.setPref('elevenKey', '  xi-abc  ') // stored trimmed
     // a fresh Engine over the same settings file sees the persisted values
-    expect(new Engine().prefs()).toEqual({ monologueMin: 30, autoDownload: false })
+    expect(new Engine().prefs()).toEqual({ monologueMin: 30, autoDownload: false, elevenKey: 'xi-abc' })
   })
 })
 

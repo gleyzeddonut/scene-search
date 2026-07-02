@@ -101,6 +101,18 @@ describe('Library', () => {
     const a = [scene([['JOHN', 'Hey.']])]
     const b = [scene([['MARY', 'Yo.']])]
     expect(pickParse(a, b)).toBe(a)
+    // a SMALL dialogue edge is glue (the regex parse absorbs action/parentheticals
+    // into speeches), not real recovery — layout keeps the tie unless regex finds
+    // substantially more
+    const dlg = (n: number): [string, string][] => Array.from({ length: n }, (_, i) => ['JOHN', 'line ' + i])
+    expect(pickParse([scene(dlg(100))], [scene(dlg(110))])).toEqual([scene(dlg(100))])
+    expect(pickParse([scene(dlg(10))], [scene(dlg(30))])).toEqual([scene(dlg(30))])
+    // a NEAR-tie on scenes (regex +1 of many) is still a tie — layout's clean
+    // action/dialogue separation wins over a marginal scene-count edge
+    const scenes = (n: number, d: number) => Array.from({ length: n }, () => scene(dlg(d)))
+    expect(pickParse(scenes(9, 10), scenes(10, 10))).toHaveLength(9)
+    // but a catastrophic layout miss (found a fraction of the slugs) → regex
+    expect(pickParse(scenes(1, 5), scenes(8, 5))).toHaveLength(8)
   })
 
   it('the monologue filter honors a per-query minimum length', async () => {

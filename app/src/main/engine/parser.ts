@@ -4,13 +4,14 @@ import type { Scene, SceneBlock, LayoutLine } from './types'
 // The persisted index records the version it was built with; on startup the
 // engine compares it to this and forces a full re-parse of every file (not just
 // changed ones) so parser improvements actually reach already-indexed scripts.
-export const PARSER_VERSION = 6
+export const PARSER_VERSION = 8
 
 // optional leading scene-number column (incl. "SC. 5.A5" from gutter numbers
 // some PDF extractors place at the start of the heading line), an optional glued
 // opening transition ("FADE IN: INT: CAFÉ"), and the amateur "INT:" colon form
 export const SCENE_RE = /^\s*(?:FADE\s+IN\s*[:.]?\s*)?(?:SC\.?\s*)?(?:\d+[\dA-Za-z.]*[.)]?[\s*]+)?(INT\.?\/EXT\.?|EXT\.?\/INT\.?|INT|EXT|I\/E|E\/I)[.:\s]/i
-const SCENE_NUM_PREFIX = /^\s*(?:SC\.?\s*)?\d+[\dA-Za-z.]*[.)]?[\s*]+/
+// (the ordinal lookahead spares real location names like "30TH STREET STATION")
+const SCENE_NUM_PREFIX = /^\s*(?:SC\.?\s*)?(?!\d+(?:ST|ND|RD|TH)\b)\d+[\dA-Za-z.]*[.)]?[\s*]+/i
 // A gutter scene number fused directly onto the END of a word or paren with NO
 // space ("TONYA100", "(YD11)2", "CHEMO45", "CLASS6pt", "LATER31pt1"). The lookbehind
 // requires a word-char before the fused letter, so a standalone unit label
@@ -95,10 +96,12 @@ export function isCueShaped(t: string): boolean {
 }
 
 // the absolute words above, plus the relative/transition times a slug can also end
-// with ("- CONTINUOUS", "- MOMENTS LATER"). Built from TOD_CORE so the word list
-// lives in one place; "SAME TIME" precedes "SAME" so the longer match wins.
+// with ("- CONTINUOUS", "- MOMENTS LATER"), plus qualified forms TV scripts use
+// ("- THAT NIGHT", "- NEXT DAY", "- LATER THAT NIGHT"). Built from TOD_CORE so the
+// word list lives in one place; "SAME TIME" precedes "SAME" so the longer match wins.
 const TIME_OF_DAY_RE = new RegExp(
-  '(?:--?|–|—)\\s*(' + TOD_CORE + '|CONTINUOUS|LATER|MOMENTS LATER|SAME TIME|SAME|MAGIC HOUR)\\s*$',
+  '(?:--?|–|—)\\s*(?:(?:LATER\\s+)?(?:THE\\s+)?(?:NEXT|THAT|SAME)\\s+(?:' + TOD_CORE + ')' +
+    '|' + TOD_CORE + '|CONTINUOUS|LATER|MOMENTS LATER|SAME TIME|SAME|MAGIC HOUR)\\s*$',
   'i'
 )
 const isAllCaps = (t: string) => /[A-Z]/.test(t) && !/[a-z]/.test(t.replace(PAREN_RE, ''))
@@ -112,7 +115,12 @@ const SCENE_LABEL_RE = /^(?:BEGIN\s+)?SCENE\s+\d+[A-Za-z]?:?$/i
 function isHeading(text: string, afterTransition: boolean): boolean {
   const t = text.trim()
   if (!t) return false
-  if (SCENE_RE.test(text)) return true
+  // A dotless "INT/EXT " slug (shorthand some scripts use) must be a caps-y line —
+  // prose acronyms ("INT EQ PY means WAIVE INTEREST…" in a financial doc) are not
+  // scenes. The dotted/colon forms (INT. / INT:) may be any case ("INT. Hospital Room.").
+  if (SCENE_RE.test(text)) {
+    return /(?:\b(?:INT|EXT)[.:]|\bI\/E\b|\bE\/I\b|INT\.?\/EXT|EXT\.?\/INT)/i.test(text) || isAllCaps(t)
+  }
   if (SCENE_LABEL_RE.test(t)) return true
   if (!isAllCaps(t)) return false
   if (TIME_OF_DAY_RE.test(t)) return true
@@ -137,10 +145,13 @@ export function parseLayout(rawLines: LayoutLine[]): Scene[] {
   // Sides excerpts are mostly dialogue, so the dialogue column can dominate the
   // frequency count and pull freqBase a full column right of the true margin — which
   // classifies every spoken line as indent-0 action. Real INT./EXT. slugs sit flush
-  // to the true margin, so when they exist LEFT of freqBase, trust them instead
-  // (median, so one slug with a fused gutter number can't drag the base off).
+  // to the true margin, so when they sit a full COLUMN left of freqBase (~48pt+),
+  // trust them instead (median, so one stray can't drag the base off). A smaller gap
+  // is a production slug's scene-number column (~30pt), NOT a wrong freqBase —
+  // anchoring there pushes real action over the dialogue threshold.
   const headXs = lines.filter((l) => SCENE_RE.test(l.text)).map((l) => bucket(l.x)).sort((a, b) => a - b)
-  const base = Math.min(freqBase, headXs.length ? headXs[headXs.length >> 1] : Infinity)
+  const headBase = headXs.length ? headXs[headXs.length >> 1] : Infinity
+  const base = headBase <= freqBase - 48 ? headBase : freqBase
 
   // cue margin = median left-x of indented cue-shaped lines → sets the indent scale
   const cueXs = lines.filter((l) => l.x - base > 24 && isCueShaped(l.text)).map((l) => l.x).sort((a, b) => a - b)
@@ -202,7 +213,7 @@ export function parseLayout(rawLines: LayoutLine[]): Scene[] {
         heading: cleanHeading(l.text),
         index: scenes.length + 1,
         page: l.page,
-        topY: l.y, // heading's PDF-points y → lets the preview scroll to it
+        topY: l.y, // heading baseline, points from the page top → preview scroll target
         characters: [],
         lines: [],
         blocks: []
@@ -347,6 +358,11 @@ export function parseScenes(text: string): Scene[] {
 // (journals, transcripts, ad copy) parsing to nothing.
 function dialogueHeavy(scenes: Scene[], minLines = 2): Scene[] {
   if (scenes.length !== 1 || scenes[0].lines.length < minLines) return []
+  // spoken lines are short; a bill/ledger "reads" as caps-y labels each followed by
+  // a few-hundred-word blob — require at least half the lines to be speech-length
+  const lines = scenes[0].lines
+  const short = lines.filter(([, t]) => t.split(/\s+/).length <= 60).length
+  if (short < lines.length / 2) return []
   const realNames = scenes[0].characters.filter(
     (c) => !/\d/.test(c) && (c.match(/[A-Za-zÀ-ÿ]/g)?.length ?? 0) >= 2
   )
