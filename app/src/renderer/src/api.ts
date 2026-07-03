@@ -15,6 +15,7 @@ export interface Scene {
   medium?: string | null // effective medium (manual or guessed), null = untagged
   added?: number // file creation/added time (ms epoch), for the Date added sort
   monologue?: { who: string; seconds: number; scene: number } | null // biggest solo speech + its scene index
+  folded_into?: string | null // path of the duplicate-group representative this row folds under
 }
 
 export type SceneBlock =
@@ -128,13 +129,17 @@ interface EngineApi {
   open: (p: string) => Promise<unknown>
   reveal: (p: string) => Promise<unknown>
   prefs: () => Promise<Prefs>
-  setPref: (k: 'monologueMin' | 'autoDownload' | 'elevenKey', v: number | boolean | string) => Promise<Prefs>
+  setPref: (k: 'monologueMin' | 'autoDownload' | 'foldDuplicates' | 'elevenKey', v: number | boolean | string) => Promise<Prefs>
   hidden: () => Promise<string[]>
+  join: (paths: string[]) => Promise<{ rep: string; joined: number }>
+  unjoin: (p: string) => Promise<{ ok: boolean }>
+  promote: (p: string) => Promise<{ ok: boolean }>
 }
 
 export interface Prefs {
   monologueMin: number
   autoDownload: boolean
+  foldDuplicates: boolean
   elevenKey: string
 }
 
@@ -152,6 +157,7 @@ declare global {
       onRemoveRequest: (cb: (p: { path: string; name: string }) => void) => () => void
       onQuickLookRequest: (cb: (p: { path: string; name: string }) => void) => () => void
       onPrepareRequest: (cb: (p: { path: string; name: string }) => void) => () => void
+      onUnjoinRequest: (cb: (p: { path: string; name: string }) => void) => () => void
       onOpenSettings: (cb: () => void) => void
       exportSides: (html: string, name: string) => Promise<boolean>
       appVersion: () => Promise<string>
@@ -170,7 +176,8 @@ declare global {
       quickLook: (p: { title: string; path: string; sceneIndex: number; page?: number; top?: number; isPdf: boolean }) => Promise<void>
       quickLookUpdate: (p: { title: string; path: string; sceneIndex: number; page?: number; top?: number; isPdf: boolean }) => Promise<void>
       quickLookClose: () => Promise<void>
-      rowMenu: (p: { path: string; name: string }) => Promise<void>
+      rowMenu: (p: { path: string; name: string; stacked?: boolean }) => Promise<void>
+      onPromoteRequest: (cb: (p: { path: string; name: string }) => void) => () => void
       onEditDetails: (cb: (p: { path: string; name: string }) => void) => () => void
       setFocusCat: (c: 'pdf' | 'text' | 'other') => void
       onMainSpace: (cb: () => void) => () => void
@@ -210,8 +217,12 @@ export const api = {
   openFile: (path: string) => eng().open(path),
   revealFile: (path: string) => eng().reveal(path),
   prefs: () => eng().prefs(),
-  setPref: (k: 'monologueMin' | 'autoDownload' | 'elevenKey', v: number | boolean | string) => eng().setPref(k, v),
+  setPref: (k: 'monologueMin' | 'autoDownload' | 'foldDuplicates' | 'elevenKey', v: number | boolean | string) =>
+    eng().setPref(k, v),
   hiddenFiles: () => eng().hidden(),
+  joinScripts: (paths: string[]) => eng().join(paths),
+  unjoinScript: (path: string) => eng().unjoin(path),
+  promoteScript: (path: string) => eng().promote(path),
   pickFolder: () => window.scripty.pickFolder(),
   exportSides: (elementId: string, name: string) => {
     const el = document.getElementById(elementId)

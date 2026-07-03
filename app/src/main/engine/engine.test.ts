@@ -116,7 +116,7 @@ describe('Engine prefs', () => {
   it('defaults, persists across launches, and drives the monologue filter', async () => {
     seed(PARSER_VERSION)
     const eng = new Engine()
-    expect(eng.prefs()).toEqual({ monologueMin: 45, autoDownload: true, elevenKey: '' })
+    expect(eng.prefs()).toEqual({ monologueMin: 45, autoDownload: true, foldDuplicates: true, elevenKey: '' })
     // ~87 words ≈ 40s: below the default 45s monologue floor, above a 30s one
     const speech = Array.from({ length: 87 }, (_, i) => 'w' + i).join(' ')
     const f = join(h.userData, 'solo.fountain')
@@ -128,7 +128,52 @@ describe('Engine prefs', () => {
     eng.setPref('autoDownload', false)
     eng.setPref('elevenKey', '  xi-abc  ') // stored trimmed
     // a fresh Engine over the same settings file sees the persisted values
-    expect(new Engine().prefs()).toEqual({ monologueMin: 30, autoDownload: false, elevenKey: 'xi-abc' })
+    eng.setPref('foldDuplicates', false)
+    expect(new Engine().prefs()).toEqual({ monologueMin: 30, autoDownload: false, foldDuplicates: false, elevenKey: 'xi-abc' })
+  })
+})
+
+describe('Engine manual joins', () => {
+  it('join folds highlighted scripts under the shortest name; unjoin separates', async () => {
+    seed(PARSER_VERSION)
+    const eng = new Engine()
+    const a = join(h.userData, 'Annie Boys Reshoot.fountain')
+    const b = join(h.userData, 'Annie.fountain')
+    writeFileSync(a, SCRIPT)
+    writeFileSync(b, SCRIPT)
+    await eng.add(a)
+    await eng.add(b)
+    expect(eng.scenes({}).scenes.filter((s) => !s.folded_into).length).toBe(2) // 2 scripts × 1 scene
+    eng.joinDuplicates([a, b]) // rep = shortest name → Annie.fountain
+    const rows = eng.scenes({}).scenes
+    expect(rows.filter((r) => !r.folded_into).every((r) => r.script_path === b)).toBe(true)
+    expect(rows.filter((r) => r.script_path === a).every((r) => r.folded_into === b)).toBe(true)
+    // persists across launches
+    expect(new Engine().scenes({}).scenes.filter((r) => !r.folded_into).every((r) => r.script_path === b)).toBe(true)
+    eng.unjoinDuplicate(a)
+    expect(eng.scenes({}).scenes.every((r) => !r.folded_into)).toBe(true)
+  })
+})
+
+describe('Engine promote in stack', () => {
+  it('moves a stacked script to the top (an automatic stack becomes a manual one)', async () => {
+    seed(PARSER_VERSION)
+    const eng = new Engine()
+    const a = join(h.userData, 'Annie.fountain') // shortest name → automatic top
+    const b = join(h.userData, 'Annie (1).fountain')
+    writeFileSync(a, SCRIPT)
+    writeFileSync(b, SCRIPT)
+    await eng.add(a)
+    await eng.add(b)
+    const top = () => new Set(eng.scenes({}).scenes.filter((r) => !r.folded_into).map((r) => r.script_path))
+    expect(top()).toEqual(new Set([a]))
+    eng.promoteDuplicate(b) // user says: b on top
+    expect(top()).toEqual(new Set([b]))
+    expect(eng.scenes({}).scenes.filter((r) => r.script_path === a).every((r) => r.folded_into === b)).toBe(true)
+    // survives relaunch, and promoting the other back works
+    expect(new Engine().scenes({}).scenes.filter((r) => !r.folded_into).every((r) => r.script_path === b)).toBe(true)
+    eng.promoteDuplicate(a)
+    expect(top()).toEqual(new Set([a]))
   })
 })
 

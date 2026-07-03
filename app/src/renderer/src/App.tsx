@@ -288,7 +288,14 @@ export default function App() {
           )}
         </AppShell>
         {settingsOpen && (
-          <SettingsModal theme={theme} onTheme={setTheme} onClose={() => setSettingsOpen(false)} />
+          <SettingsModal
+            theme={theme}
+            onTheme={setTheme}
+            onClose={() => {
+              setSettingsOpen(false)
+              setRefreshKey((k) => k + 1) // settings can change what Browse shows (fold, monologue floor)
+            }}
+          />
         )}
         {editing && (
           <EditDetailsModal

@@ -55,7 +55,7 @@ describe('Library', () => {
     writeFileSync(join(d, 'Wedding (1).fountain'), SCRIPT)
     const lib = new Library(); await lib.reindex([d])
     expect(lib.scriptCount()).toBe(2)
-    const rows = lib.query({ minChars: 1 })
+    const rows = lib.query({ minChars: 1 }).filter((r) => !r.folded_into) // visible rows
     expect(rows.length).toBe(2)
     expect(rows.every((r) => !r.script_name.includes('(1)'))).toBe(true)
   })
@@ -146,6 +146,44 @@ describe('Library', () => {
     expect(s.lines.map((l) => l.who)).toEqual(['LIAM', 'CHLOE', 'LIAM'])
   })
 
+  it('manual joins fold arbitrary scripts together (and win over auto-folding)', async () => {
+    const d = tmp()
+    writeFileSync(join(d, 'Heat.fountain'), SCRIPT)
+    writeFileSync(join(d, 'Totally Different.fountain'), SCRIPT)
+    const lib = new Library()
+    await lib.reindex([d])
+    const heat = resolve(join(d, 'Heat.fountain'))
+    const other = resolve(join(d, 'Totally Different.fountain'))
+    // no join: both scripts visible
+    const visible = (rs: ReturnType<typeof lib.query>) =>
+      new Set(rs.filter((r) => !r.folded_into).map((r) => r.script_path))
+    expect(visible(lib.query({})).size).toBe(2)
+    // manual join: the member folds under its designated rep
+    const joins = { [other]: heat }
+    const rows = lib.query({ joins })
+    expect(visible(rows)).toEqual(new Set([heat]))
+    expect(rows.filter((r) => r.script_path === other).every((r) => r.folded_into === heat)).toBe(true)
+    // foldGroup includes manual members, so removing the rep takes them too
+    expect(new Set(lib.foldGroup(heat, joins))).toEqual(new Set([heat, other]))
+  })
+
+  it('turning automatic stacking off keeps manual stacks', async () => {
+    const d = tmp()
+    writeFileSync(join(d, 'Wedding.fountain'), SCRIPT)
+    writeFileSync(join(d, 'Wedding (1).fountain'), SCRIPT) // automatic duplicate
+    writeFileSync(join(d, 'Other.fountain'), SCRIPT) // manually stacked below
+    const lib = new Library()
+    await lib.reindex([d])
+    const rep = resolve(join(d, 'Wedding.fountain'))
+    const joins = { [resolve(join(d, 'Other.fountain'))]: rep }
+    const rows = lib.query({ foldDuplicates: false, joins })
+    const visible = new Set(rows.filter((r) => !r.folded_into).map((r) => r.script_path))
+    // the manual member stays stacked; the "(1)" auto duplicate becomes its own row
+    expect(visible).toEqual(new Set([rep, resolve(join(d, 'Wedding (1).fountain'))]))
+    // and removal grouping honors the same rule: no auto-group, manual group intact
+    expect(new Set(lib.foldGroup(rep, joins, false))).toEqual(new Set([rep, resolve(join(d, 'Other.fountain'))]))
+  })
+
   it('addFile detects duplicates and rejects non-scripts', async () => {
     const d = tmp(); const f = join(d, 'x.fountain'); writeFileSync(f, SCRIPT)
     const lib = new Library()
@@ -171,13 +209,13 @@ describe('Library', () => {
     writeFileSync(join(d, 'Heat (1).fountain'), 'INT. A - DAY\n\nNEIL\nHi.\n')
     const lib = new Library()
     await lib.reindex([d])
-    expect(lib.query({}).length).toBe(1) // Browse folds the duplicates to one row
+    expect(lib.query({}).filter((r) => !r.folded_into).length).toBe(1) // one VISIBLE row
     const group = lib.foldGroup(join(d, 'Heat.fountain'))
     expect(new Set(group)).toEqual(
       new Set([resolve(join(d, 'Heat.fountain')), resolve(join(d, 'Heat (1).fountain'))])
     )
     group.forEach((p) => lib.remove(p))
-    expect(lib.query({}).length).toBe(0) // no twin promoted back into view
+    expect(lib.query({}).filter((r) => !r.folded_into).length).toBe(0) // no twin promoted back into view
   })
 
   it('remove() drops a script, and reindex skips ignored (removed) files', async () => {
@@ -223,9 +261,50 @@ describe('Library', () => {
     expect(lib.getScene(oldPath, idx)).toBeNull() // and gone from the old one
   })
 
-  it('canonicalKey strips copy suffixes', () => {
+  it('canonicalKey strips copy and edit-style suffixes', () => {
     expect(canonicalKey('Heat (1).pdf')).toBe('heat.pdf')
     expect(canonicalKey('Heat copy.pdf')).toBe('heat.pdf')
+    // duplicate-ish variants of the same sides fold together
+    expect(canonicalKey('Heat edits.pdf')).toBe('heat.pdf')
+    expect(canonicalKey('Heat edited.pdf')).toBe('heat.pdf')
+    expect(canonicalKey('Heat - FINAL.pdf')).toBe('heat.pdf')
+    expect(canonicalKey('Heat_v2.pdf')).toBe('heat.pdf')
+    expect(canonicalKey('Heat (edits) (1).pdf')).toBe('heat.pdf')
+    expect(canonicalKey('Heat revised draft.pdf')).toBe('heat.pdf')
+    // real-world messiness: trailing spaces before the extension, and a numbered
+    // edit round ("edit 2", even with doubled spaces)
+    expect(canonicalKey('annie boys edit .pdf')).toBe('annie boys.pdf')
+    expect(canonicalKey('annie boys edit  2.pdf')).toBe('annie boys.pdf')
+    expect(canonicalKey('annie boys (2).pdf')).toBe('annie boys.pdf')
+    // a bare trailing number is a SEQUEL, not an edit round — untouched
+    expect(canonicalKey('Heat 2.pdf')).toBe('heat 2.pdf')
+    // words that merely CONTAIN a suffix word, or lead with one, are untouched
+    expect(canonicalKey('The Final Girl.pdf')).toBe('the final girl.pdf')
+    expect(canonicalKey('Draft Day.pdf')).toBe('draft day.pdf')
+    expect(canonicalKey('Copyright.pdf')).toBe('copyright.pdf')
+  })
+
+  it('query annotates folded duplicates instead of hiding them, gated by the pref', async () => {
+    const d = tmp()
+    writeFileSync(join(d, 'Wedding.fountain'), SCRIPT)
+    writeFileSync(join(d, 'Wedding (1).fountain'), SCRIPT)
+    writeFileSync(join(d, 'Wedding edits.fountain'), SCRIPT)
+    const lib = new Library()
+    await lib.reindex([d])
+    // folding on (default): every row is returned; the duplicates carry folded_into
+    const rows = lib.query({ minChars: 1 })
+    const rep = resolve(join(d, 'Wedding.fountain'))
+    const visible = rows.filter((r) => !r.folded_into)
+    expect(new Set(visible.map((r) => r.script_name))).toEqual(new Set(['Wedding.fountain']))
+    const twins = rows.filter((r) => r.folded_into)
+    expect(new Set(twins.map((r) => r.script_name))).toEqual(
+      new Set(['Wedding (1).fountain', 'Wedding edits.fountain'])
+    )
+    expect(twins.every((r) => r.folded_into === rep)).toBe(true)
+    // folding off: nothing is annotated
+    const flat = lib.query({ minChars: 1, foldDuplicates: false })
+    expect(flat.every((r) => !r.folded_into)).toBe(true)
+    expect(new Set(flat.map((r) => r.script_name)).size).toBe(3)
   })
 
   // bug_003 regression: a forced rebuild must not silently unpin a dragged-in

@@ -163,6 +163,16 @@ export function SettingsModal(props: { theme: string; onTheme: (t: string) => vo
               </div>
               <div className="set-row">
                 <div>
+                  <div className="set-label">Automatic stacking</div>
+                  <div className="set-sub">Duplicates like “Name (1)” or “Name edits” stack into one row. Stacks you made yourself always stay.</div>
+                </div>
+                <Switch
+                  on={!prefs || prefs.foldDuplicates}
+                  onChange={(v) => api.setPref('foldDuplicates', v).then(setPrefs).catch(() => {})}
+                />
+              </div>
+              <div className="set-row">
+                <div>
                   <div className="set-label">Keep window on top</div>
                   <div className="set-sub">Float above other apps.</div>
                 </div>

@@ -50,6 +50,19 @@ export class Settings {
     this.data[k] = v
     this.save()
   }
+  // string→string maps (e.g. manual duplicate joins: member path → representative)
+  getMap(k: string): Record<string, string> {
+    const v = this.data[k]
+    const out: Record<string, string> = {}
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      for (const [key, val] of Object.entries(v)) if (typeof val === 'string') out[key] = val
+    }
+    return out
+  }
+  setMap(k: string, v: Record<string, string>) {
+    this.data[k] = v
+    this.save()
+  }
   getRoots() { return this.getList('roots') }
   setRoots(v: string[]) { this.setList('roots', v) }
   getIgnored() { return this.getList('ignored') }

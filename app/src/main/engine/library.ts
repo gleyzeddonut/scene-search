@@ -10,6 +10,12 @@ import type { Scene, SceneMatch, SceneBlock } from './types'
 
 const PAREN_NUM = /\s*\(\d+\)$/
 const COPY = /\s+copy(\s+\d+)?$/i
+// duplicate-ish TRAILING tokens ("Heat edits", "Heat - FINAL", "Heat_v2", numbered
+// rounds like "edit 2") — only at the end, so titles that merely start with one
+// ("Draft Day", "The Final Girl") and words that contain one ("Copyright") are
+// untouched; a bare trailing number is a sequel and never strips on its own
+const EDIT_SUFFIX = /[\s_-]+(?:(?:edit(?:s|ed)?|final|draft|rev(?:ised)?|updated)(?:[\s_-]+\d{1,2})?|v\d+|version[\s_-]*\d+)$/i
+const PAREN_WORD = /\s*\((edit(?:s|ed)?|final|draft|rev(?:ised)?|updated|copy|v\d+)\)$/i
 
 // Drop scenes with no content at all (no dialogue AND no action) — a bare heading or
 // a "SCENE n" section label sitting right before a real INT./EXT. slug. Scenes with
@@ -42,7 +48,9 @@ export function canonicalKey(filename: string): string {
   let prev: string | null = null
   while (prev !== stem) {
     prev = stem
-    stem = stem.replace(PAREN_NUM, '').replace(COPY, '')
+    // trim first: real filenames have stray spaces before the extension
+    // ("annie boys edit .pdf"), which would otherwise defeat the $-anchored suffixes
+    stem = stem.trim().replace(PAREN_NUM, '').replace(COPY, '').replace(EDIT_SUFFIX, '').replace(PAREN_WORD, '')
   }
   return (stem.trim() + ext).toLowerCase()
 }
@@ -286,7 +294,11 @@ export class Library {
   // genderOf(path, name) resolves a character's gender (lets manual overrides drive
   // the W/M chips and the W+M/W+W/M+M pairing); defaults to the name-based guess
   query(
-    f: { minChars?: number; maxChars?: number; pairing?: string | null; monologue?: boolean; monologueMin?: number },
+    f: {
+      minChars?: number; maxChars?: number; pairing?: string | null
+      monologue?: boolean; monologueMin?: number; foldDuplicates?: boolean
+      joins?: Record<string, string> // manual duplicate groups: member path → rep path
+    },
     genderOf: (path: string, name: string) => string = (_p, n) => guessGender(n)
   ): SceneMatch[] {
     // Size + pairing are SCRIPT-level now that Browse lists whole scripts (not scenes):
@@ -324,21 +336,39 @@ export class Library {
       if (monoByScript && !monoByScript.has(s.path)) return false // non-null only when f.monologue
       return true
     })
-    // fold re-download copies: keep the representative (shortest name) per canonical
-    // key, scoped to the FOLDER — a re-download ("Heat (1).pdf") sits beside its
-    // original, whereas two distinct scripts that merely share a name in different
-    // folders must both stay visible
-    const foldKey = (s: SceneRow) => dirname(s.path) + '\0' + canonicalKey(s.name)
+    // fold duplicate copies ("Heat (1)", "Heat edits"): pick the representative
+    // (shortest name) per canonical key, scoped to the FOLDER — a re-download sits
+    // beside its original, whereas two distinct scripts that merely share a name in
+    // different folders must both stay visible. Duplicates are ANNOTATED with
+    // folded_into (not dropped), so the UI can expand them under a chevron.
+    // Manual stacks (joins) ALWAYS apply — they're the user's explicit organization
+    // and win over the name-based rule. The foldDuplicates pref gates only the
+    // AUTOMATIC name-based stacking; with it off, un-joined duplicates stand alone.
+    const foldOn = f.foldDuplicates !== false
+    const joins = f.joins ?? {}
+    const joinReps = new Set(Object.values(joins))
+    const foldKey = (s: SceneRow) => {
+      const jr = joins[s.path] ?? (joinReps.has(s.path) ? s.path : null)
+      if (jr) return 'join:' + jr
+      return foldOn ? dirname(s.path) + '\0' + canonicalKey(s.name) : 'solo:' + s.path
+    }
     const rep = new Map<string, string>()
     const repName = new Map<string, string>()
     for (const s of rows) {
       const key = foldKey(s)
+      if (key.startsWith('join:')) {
+        rep.set(key, key.slice(5)) // the designated top, not the shortest name
+        continue
+      }
       if (!repName.has(key) || s.name.length < repName.get(key)!.length) {
         rep.set(key, s.path)
         repName.set(key, s.name)
       }
     }
-    rows = rows.filter((s) => rep.get(foldKey(s)) === s.path)
+    const foldedInto = (s: SceneRow): string | null => {
+      const r = rep.get(foldKey(s))
+      return r && r !== s.path ? r : null
+    }
     rows.sort((a, b) => (a.name === b.name ? a.index - b.index : a.name < b.name ? -1 : 1))
     return rows.map((s) => {
       const row = this.scripts.get(s.path)
@@ -347,7 +377,8 @@ export class Library {
         char_count: s.charCount, characters: s.characters, pairing: pairingOf(s),
         scene_index: s.index, est_seconds: estimateScene(s.dialogue, s.content),
         added: row?.added ?? row?.mtime, // creation time; mtime fallback for pre-reindex entries
-        monologue: monoByScript?.get(s.path) ?? null // set only under the Monologue filter (row hint)
+        monologue: monoByScript?.get(s.path) ?? null, // set only under the Monologue filter (row hint)
+        folded_into: foldedInto(s) // duplicate of this path — hidden behind its chevron
       }
     })
   }
@@ -372,17 +403,22 @@ export class Library {
     return true
   }
 
-  // every indexed path that folds together with `path` in the Browse list (same folder
-  // + canonical key — i.e. re-download duplicates). Removing the visible representative
-  // must take its hidden twins too, or query() just promotes a twin back into view.
-  foldGroup(path: string): string[] {
+  // every indexed path that folds together with `path` in the Browse list (manual
+  // join group, or same folder + canonical key — i.e. re-download duplicates).
+  // Removing the visible representative must take its hidden twins too, or query()
+  // just promotes a twin back into view.
+  foldGroup(path: string, joins: Record<string, string> = {}, autoFold = true): string[] {
     const rp = resolve(path)
     const row = this.scripts.get(rp)
     if (!row) return [rp]
-    const key = dirname(rp) + '\0' + canonicalKey(row.name)
-    return [...this.scripts.values()]
-      .filter((s) => dirname(s.path) + '\0' + canonicalKey(s.name) === key)
-      .map((s) => s.path)
+    const joinReps = new Set(Object.values(joins))
+    const keyOf = (p: string, name: string) => {
+      const jr = joins[p] ?? (joinReps.has(p) ? p : null)
+      if (jr) return 'join:' + jr
+      return autoFold ? dirname(p) + '\0' + canonicalKey(name) : 'solo:' + p
+    }
+    const key = keyOf(rp, row.name)
+    return [...this.scripts.values()].filter((s) => keyOf(s.path, s.name) === key).map((s) => s.path)
   }
 
   async addFile(path: string): Promise<'added' | 'exists' | 'not_script' | 'unreadable'> {

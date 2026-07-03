@@ -30,11 +30,19 @@ contextBridge.exposeInMainWorld('scripty', {
     setMedium: (p: string, md: string) => ipcRenderer.invoke('eng:setMedium', p, md),
     open: (p: string) => ipcRenderer.invoke('eng:open', p),
     reveal: (p: string) => ipcRenderer.invoke('eng:reveal', p),
+    join: (paths: string[]) => ipcRenderer.invoke('eng:join', paths),
+    unjoin: (p: string) => ipcRenderer.invoke('eng:unjoin', p),
+    promote: (p: string) => ipcRenderer.invoke('eng:promote', p),
     prefs: () => ipcRenderer.invoke('eng:prefs'),
     setPref: (k: string, v: number | boolean) => ipcRenderer.invoke('eng:setPref', k, v),
     hidden: () => ipcRenderer.invoke('eng:hidden')
   },
-  rowMenu: (p: { path: string; name: string }) => ipcRenderer.invoke('row-menu', p),
+  rowMenu: (p: { path: string; name: string; stacked?: boolean }) => ipcRenderer.invoke('row-menu', p),
+  onPromoteRequest: (cb: (p: { path: string; name: string }) => void) => {
+    const l = (_e: unknown, p: { path: string; name: string }) => cb(p)
+    ipcRenderer.on('promote-request', l)
+    return () => ipcRenderer.removeListener('promote-request', l)
+  },
   onEditDetails: (cb: (p: { path: string; name: string }) => void) => {
     const l = (_e: unknown, p: { path: string; name: string }) => cb(p)
     ipcRenderer.on('edit-details-request', l)
@@ -54,6 +62,11 @@ contextBridge.exposeInMainWorld('scripty', {
     const l = (_e: unknown, p: { path: string; name: string }) => cb(p)
     ipcRenderer.on('prepare-request', l)
     return () => ipcRenderer.removeListener('prepare-request', l)
+  },
+  onUnjoinRequest: (cb: (p: { path: string; name: string }) => void) => {
+    const l = (_e: unknown, p: { path: string; name: string }) => cb(p)
+    ipcRenderer.on('unjoin-request', l)
+    return () => ipcRenderer.removeListener('unjoin-request', l)
   },
   pickFolder: () => ipcRenderer.invoke('pick-folder') as Promise<string | null>,
   pickFiles: () => ipcRenderer.invoke('pick-files') as Promise<string[]>,

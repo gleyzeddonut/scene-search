@@ -30,6 +30,7 @@ export interface SceneMatch {
   est_seconds: number
   added?: number // file creation/added time (ms epoch)
   monologue?: { who: string; seconds: number; scene: number } | null // biggest solo speech + its scene index
+  folded_into?: string | null // path of the duplicate-group representative this row folds under
 }
 
 export interface Folders {

@@ -35,6 +35,7 @@ interface ScriptGroup {
   medium: string | null
   added: number
   monologue: { who: string; seconds: number; scene: number } | null
+  foldedInto: string | null // duplicate of this rep path → hidden behind its chevron
 }
 
 // optional list columns the user can show/hide by right-clicking the header (Script
@@ -190,8 +191,10 @@ export function BrowseView({
   // then — not when an inline edit patches the scene list in place (which would
   // otherwise snap the selection back to the top)
   const freshResult = useRef(true)
-  // the script to restore on mount (captured once) — e.g. coming Back from Prepare
-  const restoreRef = useRef(selRef.current)
+  // the script to select when the NEXT result set lands — coming Back from Prepare
+  // (captured once on mount), or the representative after a Join/Separate, so the
+  // list doesn't snap to the top and lose the user's place
+  const restoreRef = useRef<{ path: string; index: number; jump?: boolean } | null>(selRef.current)
   const [qlOpen, setQlOpen] = useState(false)
 
   // the pop-out can be closed from its own window — keep our toggle state in sync
@@ -210,7 +213,7 @@ export function BrowseView({
       let g = map.get(s.script_path)
       if (!g) {
         // genre/medium/added/monologue are per-script, so any of its scenes carries them
-        g = { path: s.script_path, name: s.script_name, scenes: [], cast: [], genres: s.genres ?? [], medium: s.medium ?? null, added: s.added ?? 0, monologue: s.monologue ?? null }
+        g = { path: s.script_path, name: s.script_name, scenes: [], cast: [], genres: s.genres ?? [], medium: s.medium ?? null, added: s.added ?? 0, monologue: s.monologue ?? null, foldedInto: s.folded_into ?? null }
         map.set(s.script_path, g)
       }
       g.scenes.push(s)
@@ -229,6 +232,91 @@ export function BrowseView({
   }, [scenes])
 
   const sorted = useMemo(() => sortGroups(scripts, sort), [scripts, sort])
+
+  // duplicate folding: reps carry a chevron; their twins render beneath when expanded
+  const [unfolded, setUnfolded] = useState<Set<string>>(new Set())
+  const twinsByRep = useMemo(() => {
+    const m = new Map<string, ScriptGroup[]>()
+    for (const g of sorted) if (g.foldedInto) m.set(g.foldedInto, [...(m.get(g.foldedInto) || []), g])
+    return m
+  }, [sorted])
+  // the rows actually shown, in order: visible reps, each followed by its expanded twins
+  const displayRows = useMemo(() => {
+    const out: ScriptGroup[] = []
+    for (const g of sorted) {
+      if (g.foldedInto) continue
+      out.push(g)
+      if (unfolded.has(g.path)) out.push(...(twinsByRep.get(g.path) || []))
+    }
+    return out
+  }, [sorted, twinsByRep, unfolded])
+  const toggleFold = (path: string) =>
+    setUnfolded((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+
+  // multi-select (⌘-click toggles, ⇧-click extends a range) → manual duplicate Join
+  const [multiSel, setMultiSel] = useState<Set<string>>(new Set())
+  const anchorRef = useRef<string | null>(null)
+  const [joinBump, setJoinBump] = useState(0) // re-query after join/unjoin
+  const rowClick = (g: ScriptGroup, e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey) {
+      setMultiSel((prev) => {
+        const next = new Set(prev)
+        if (!next.size && selScript) next.add(selScript.path) // fold the current selection in
+        if (next.has(g.path)) next.delete(g.path)
+        else next.add(g.path)
+        return next
+      })
+      anchorRef.current = g.path
+      return
+    }
+    if (e.shiftKey) {
+      const a = anchorRef.current ?? selScript?.path
+      const i1 = a ? displayRows.findIndex((x) => x.path === a) : -1
+      const i2 = displayRows.findIndex((x) => x.path === g.path)
+      if (i1 >= 0 && i2 >= 0) {
+        const [lo, hi] = i1 < i2 ? [i1, i2] : [i2, i1]
+        setMultiSel(new Set(displayRows.slice(lo, hi + 1).map((x) => x.path)))
+        return
+      }
+    }
+    setMultiSel(new Set())
+    anchorRef.current = g.path
+    chooseScript(g)
+  }
+  const joinSelected = async () => {
+    const r = await api.joinScripts([...multiSel]).catch(() => null)
+    setMultiSel(new Set())
+    // keep the user's place: when the re-queried list lands, select the joined
+    // group's representative instead of snapping back to the top of the list
+    if (r?.rep) restoreRef.current = { path: r.rep, index: 0, jump: false }
+    setJoinBump((b) => b + 1)
+  }
+  // "Remove from stack" in the row's right-click menu
+  useEffect(
+    () =>
+      window.scripty.onUnjoinRequest?.(async (p) => {
+        await api.unjoinScript(p.path).catch(() => {})
+        restoreRef.current = { path: p.path, index: 0, jump: false } // stay on the separated script
+        setJoinBump((b) => b + 1)
+      }),
+    []
+  )
+  // "Move to top of stack" — promote, keep the stack open under its new top row
+  useEffect(
+    () =>
+      window.scripty.onPromoteRequest?.(async (p) => {
+        await api.promoteScript(p.path).catch(() => {})
+        setUnfolded((prev) => new Set(prev).add(p.path)) // the stack now lives under this path
+        restoreRef.current = { path: p.path, index: 0, jump: false }
+        setJoinBump((b) => b + 1)
+      }),
+    []
+  )
 
   // the genres actually assigned across the library + the fixed medium list, for the rail
   useEffect(() => {
@@ -258,7 +346,7 @@ export function BrowseView({
     return () => {
       active = false
     }
-  }, [size, pair, search, genres, mediums, refreshKey])
+  }, [size, pair, search, genres, mediums, refreshKey, joinBump])
 
   // select the first script (in the current sort order) and its earliest scene — but
   // ONLY when a fresh query result landed. An inline edit that patches scenes in place
@@ -273,6 +361,7 @@ export function BrowseView({
       return
     }
     freshResult.current = false
+    setMultiSel(new Set()) // a new result set invalidates a half-built selection
     // on mount, restore the remembered script (Back from Prepare); afterwards, and on
     // filter changes, fall back to the first row
     const restore = restoreRef.current
@@ -281,9 +370,10 @@ export function BrowseView({
     if (g) {
       setSelScript(g)
       setSelScene(g.scenes.find((s) => s.scene_index === restore!.index) || g.scenes[0] || null)
-      setSceneJump(true) // coming back from Prepare — land on the scene you prepared
+      setSceneJump(restore!.jump !== false) // Prepare-return lands on the scene; a Join stays at the top
+      if (g.foldedInto) setUnfolded((prev) => new Set(prev).add(g.foldedInto!)) // reveal a restored twin
     } else {
-      const first = sorted[0] || null
+      const first = sorted.find((x) => !x.foldedInto) || null
       setSelScript(first)
       setSelScene(first ? defaultScene(first) : null)
       setSceneJump(false)
@@ -403,17 +493,29 @@ export function BrowseView({
       const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
       if (typing) return
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        if (!sorted.length) return
+        if (!displayRows.length) return
         e.preventDefault()
-        const i = selScript ? sorted.indexOf(selScript) : -1
-        const ni = e.key === 'ArrowDown' ? Math.min(sorted.length - 1, i + 1) : Math.max(0, i - 1)
-        if (sorted[ni]) chooseScript(sorted[ni])
+        const i = selScript ? displayRows.indexOf(selScript) : -1
+        const ni = e.key === 'ArrowDown' ? Math.min(displayRows.length - 1, i + 1) : Math.max(0, i - 1)
+        if (displayRows[ni]) chooseScript(displayRows[ni])
       } else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && selScript && selScript.scenes.length > 1) {
         e.preventDefault()
         const list = selScript.scenes
         const i = selScene ? list.indexOf(selScene) : -1
         const ni = e.key === 'ArrowRight' ? Math.min(list.length - 1, i + 1) : Math.max(0, i - 1)
         if (list[ni]) chooseScene(list[ni])
+      } else if (e.key === 'Enter' && selScript) {
+        // fold/unfold the selected script's stack; collapsing while a stacked row
+        // is selected moves the selection to the stack's top row first
+        const rep = selScript.foldedInto ?? selScript.path
+        if (twinsByRep.has(rep)) {
+          e.preventDefault()
+          if (unfolded.has(rep) && selScript.foldedInto) {
+            const repGroup = sorted.find((g) => g.path === rep)
+            if (repGroup) chooseScript(repGroup)
+          }
+          toggleFold(rep)
+        }
       } else if (e.key === ' ' && !e.repeat && el?.tagName !== 'BUTTON') {
         e.preventDefault()
         toggleQuickLook() // !e.repeat: holding Space shouldn't strobe the pop-out
@@ -425,7 +527,7 @@ export function BrowseView({
     // jump flag, and Space must open Quick Look with the fresh payload, not a
     // stale top-of-file one (the close-reopen-fixes-it bug)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sorted, selScript, selScene, qlOpen, sceneJump])
+  }, [displayRows, selScript, selScene, qlOpen, sceneJump])
 
   // keep the keyboard-selected rows visible
   useEffect(() => {
@@ -593,7 +695,10 @@ export function BrowseView({
             )}
           </div>
           <span className="lhead-right">
-            <span className="result">{scripts.length} script{scripts.length !== 1 ? 's' : ''}</span>
+            <span className="result">
+              {sorted.filter((g) => !g.foldedInto).length} script
+              {sorted.filter((g) => !g.foldedInto).length !== 1 ? 's' : ''}
+            </span>
             <button
               className="sortbtn"
               title="Sort scripts"
@@ -619,21 +724,39 @@ export function BrowseView({
           {cols.scenes && <span style={{ width: 42, textAlign: 'right' }}>Scenes</span>}
         </div>
         <div className="list" ref={listRef}>
-          {sorted.length === 0 && <div className="empty">No scripts match these filters.</div>}
-          {sorted.map((g) => (
+          {displayRows.length === 0 && <div className="empty">No scripts match these filters.</div>}
+          {displayRows.map((g) => (
             <div
               key={g.path}
-              className={'row' + (selScript === g ? ' on' : '')}
-              onClick={() => chooseScript(g)}
+              className={'row' + (selScript === g ? ' on' : '') + (g.foldedInto ? ' twin' : '') + (multiSel.has(g.path) ? ' msel' : '')}
+              onClick={(e) => rowClick(g, e)}
+              onMouseDown={(e) => e.shiftKey && e.preventDefault()} // no browser text-selection on ⇧-range
               onDoubleClick={() => api.openFile(g.path)}
               onContextMenu={(e) => {
                 e.preventDefault()
                 chooseScript(g)
-                window.scripty.rowMenu({ path: g.path, name: g.name })
+                window.scripty.rowMenu({ path: g.path, name: g.name, stacked: !!g.foldedInto })
               }}
             >
               <div className="main">
-                <div className="title">{stem(g.name)}</div>
+                <div className="title">
+                  <span className="tname">{stem(g.name)}</span>
+                  {twinsByRep.has(g.path) && (
+                    <span
+                      className={'foldchev' + (unfolded.has(g.path) ? ' open' : '')}
+                      title={`${twinsByRep.get(g.path)!.length} more in this stack (Enter to toggle)`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleFold(g.path)
+                      }}
+                      // two quick toggles must not bubble as a row double-click (opens the file)
+                      onDoubleClick={(e) => e.stopPropagation()}
+                    >
+                      <IconChevron />
+                      <span className="fc-n">{twinsByRep.get(g.path)!.length}</span>
+                    </span>
+                  )}
+                </div>
                 {monoActive && g.monologue ? (
                   <div className="sub monohint">
                     Monologue · {g.monologue.who} · {mmss(g.monologue.seconds)}
@@ -756,6 +879,14 @@ export function BrowseView({
           </>
         )}
       </div>
+      )}
+
+      {multiSel.size >= 2 && (
+        <div className="join-toast">
+          <span className="jt-n">{multiSel.size} scripts highlighted</span>
+          <button className="jt-join" onClick={joinSelected}>Stack together</button>
+          <button className="jt-x" title="Clear selection" onClick={() => setMultiSel(new Set())}>✕</button>
+        </div>
       )}
 
       {sortMenu && (

@@ -143,15 +143,31 @@ function registerIpc() {
     })
   )
   ipcMain.handle('eng:hidden', onEngine(() => engine.hiddenFiles()))
+  ipcMain.handle('eng:join', onEngine((paths: string[]) => engine.joinDuplicates(paths)))
+  ipcMain.handle('eng:unjoin', onEngine((p: string) => engine.unjoinDuplicate(p)))
+  ipcMain.handle('eng:promote', onEngine((p: string) => engine.promoteDuplicate(p)))
   ipcMain.handle('eng:open', (_e, p: string) => { shell.openPath(p); return { ok: true } })
   ipcMain.handle('eng:reveal', (_e, p: string) => { shell.showItemInFolder(p); return { ok: true } })
-  // native right-click menu for a script row
-  ipcMain.handle('row-menu', (e, p: { path: string; name: string }) => {
+  // native right-click menu for a script row (p.stacked = a row INSIDE a stack,
+  // not its top — set by the renderer, which knows the fold state)
+  ipcMain.handle('row-menu', (e, p: { path: string; name: string; stacked?: boolean }) => {
+    let joined = false
+    try {
+      joined = !!engine?.isJoined(p.path) // manually joined → offer to separate
+    } catch {
+      /* engine still loading — menu just omits the item */
+    }
     const menu = Menu.buildFromTemplate([
       { label: 'Prepare scene', click: () => e.sender.send('prepare-request', p) },
       { label: 'Quick Look', click: () => e.sender.send('quicklook-request', p) },
       { label: 'Edit details…', click: () => e.sender.send('edit-details-request', p) },
-      { type: 'separator' },
+      ...(p.stacked
+        ? [{ label: 'Move to top of stack', click: () => e.sender.send('promote-request', p) } as const]
+        : []),
+      ...(joined
+        ? [{ label: 'Remove from stack', click: () => e.sender.send('unjoin-request', p) } as const]
+        : []),
+      { type: 'separator' as const },
       { label: 'Show in Finder', click: () => shell.showItemInFolder(p.path) },
       { label: 'Remove from library', click: () => e.sender.send('remove-request', p) }
     ])
