@@ -362,16 +362,23 @@ export function BrowseView({
     }
     freshResult.current = false
     setMultiSel(new Set()) // a new result set invalidates a half-built selection
-    // on mount, restore the remembered script (Back from Prepare); afterwards, and on
-    // filter changes, fall back to the first row
+    // selection priority for a fresh result: an explicit restore target (Back from
+    // Prepare, a Join), else KEEP the current selection if it still exists (closing
+    // Settings or removing another script must not snap the list to the top), else
+    // the first visible row
     const restore = restoreRef.current
     restoreRef.current = null
     const g = restore ? sorted.find((x) => x.path === restore.path) : undefined
+    const kept = !g && selScript ? sorted.find((x) => x.path === selScript.path) : undefined
     if (g) {
       setSelScript(g)
       setSelScene(g.scenes.find((s) => s.scene_index === restore!.index) || g.scenes[0] || null)
       setSceneJump(restore!.jump !== false) // Prepare-return lands on the scene; a Join stays at the top
       if (g.foldedInto) setUnfolded((prev) => new Set(prev).add(g.foldedInto!)) // reveal a restored twin
+    } else if (kept) {
+      setSelScript(kept)
+      setSelScene(kept.scenes.find((sc) => sc.scene_index === selScene?.scene_index) || kept.scenes[0] || null)
+      if (kept.foldedInto) setUnfolded((prev) => new Set(prev).add(kept.foldedInto!))
     } else {
       const first = sorted.find((x) => !x.foldedInto) || null
       setSelScript(first)

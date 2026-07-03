@@ -177,6 +177,26 @@ describe('Engine promote in stack', () => {
   })
 })
 
+describe('Engine stacks vs filters', () => {
+  it('a stacked twin that matches a search its top does not is shown unstacked', async () => {
+    seed(PARSER_VERSION)
+    const eng = new Engine()
+    const a = join(h.userData, 'Rocky.fountain')
+    const b = join(h.userData, 'Rocky Final.fountain') // auto-stacks under Rocky
+    writeFileSync(a, 'INT. GYM - DAY\n\nROCKY\nYo.\n')
+    writeFileSync(b, 'INT. GYM - DAY\n\nROCKY\nYo Adrian.\n')
+    await eng.add(a)
+    await eng.add(b)
+    // the search excludes the stack's top — the matching twin must surface on its own
+    const rows = eng.scenes({ search: 'final' }).scenes
+    expect(rows.length).toBe(1)
+    expect(rows[0].script_path).toBe(b)
+    expect(rows[0].folded_into ?? null).toBe(null)
+    // with no filter, it stays stacked as usual
+    expect(eng.scenes({}).scenes.find((r) => r.script_path === b)?.folded_into).toBe(a)
+  })
+})
+
 describe('Engine removed files', () => {
   it('lists removed files so Settings can restore them', async () => {
     seed(PARSER_VERSION)
