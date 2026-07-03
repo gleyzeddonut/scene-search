@@ -4,7 +4,7 @@ import type { Scene, SceneBlock, LayoutLine } from './types'
 // The persisted index records the version it was built with; on startup the
 // engine compares it to this and forces a full re-parse of every file (not just
 // changed ones) so parser improvements actually reach already-indexed scripts.
-export const PARSER_VERSION = 8
+export const PARSER_VERSION = 9
 
 // optional leading scene-number column (incl. "SC. 5.A5" from gutter numbers
 // some PDF extractors place at the start of the heading line), an optional glued
@@ -108,11 +108,11 @@ const isAllCaps = (t: string) => /[A-Z]/.test(t) && !/[a-z]/.test(t.replace(PARE
 // bare scene labels some sides use instead of slugs ("SCENE 2", "BEGIN SCENE 2")
 const SCENE_LABEL_RE = /^(?:BEGIN\s+)?SCENE\s+\d+[A-Za-z]?:?$/i
 
-// A scene heading is INT./EXT., a bare SCENE-n label, an ALL-CAPS location with a
-// time-of-day suffix ("KITCHEN - NIGHT"), or the first short ALL-CAPS location right
-// after a transition ("FADE IN:" → location). Lets us recover scripts that don't
-// use INT./EXT.
-function isHeading(text: string, afterTransition: boolean): boolean {
+// a REAL heading: an INT./EXT. slug, a SCENE-n label, or an ALL-CAPS location with
+// a time-of-day suffix — content that only occurs in actual scripts. (The
+// after-transition guess in isHeading is NOT real: "SHIP TO:" on a mailing label
+// satisfies it exactly like "CUT TO:" would.)
+function isRealHeading(text: string): boolean {
   const t = text.trim()
   if (!t) return false
   // A dotless "INT/EXT " slug (shorthand some scripts use) must be a caps-y line —
@@ -122,10 +122,26 @@ function isHeading(text: string, afterTransition: boolean): boolean {
     return /(?:\b(?:INT|EXT)[.:]|\bI\/E\b|\bE\/I\b|INT\.?\/EXT|EXT\.?\/INT)/i.test(text) || isAllCaps(t)
   }
   if (SCENE_LABEL_RE.test(t)) return true
-  if (!isAllCaps(t)) return false
-  if (TIME_OF_DAY_RE.test(t)) return true
-  if (afterTransition && t.split(/\s+/).filter(Boolean).length <= 9) return true
-  return false
+  return isAllCaps(t) && TIME_OF_DAY_RE.test(t)
+}
+
+// Does this document carry any script-exclusive marker? A real heading anywhere,
+// or a standalone "FADE IN" line (sketch scripts open with FADE IN: and a bare
+// location that only the after-transition guess can catch — but no mailing label,
+// tax form, or slide deck ever says FADE IN).
+function hasScriptMarker(lines: string[]): boolean {
+  return lines.some((l) => isRealHeading(l) || (/\bFADE\s+IN\b/i.test(l) && l.trim().length <= 12))
+}
+
+// A scene heading is a REAL heading (above), or the first short ALL-CAPS location
+// right after a transition ("FADE IN:" → location) — that guess recovers scripts
+// that don't use INT./EXT., but only counts when the document has a real heading
+// somewhere (the parsers reject documents made ONLY of guessed headings).
+function isHeading(text: string, afterTransition: boolean): boolean {
+  if (isRealHeading(text)) return true
+  const t = text.trim()
+  if (!t || !isAllCaps(t)) return false
+  return afterTransition && t.split(/\s+/).filter(Boolean).length <= 9
 }
 
 // Layout-aware parser for PDFs: classify each line by its left indentation rather
@@ -249,6 +265,10 @@ export function parseLayout(rawLines: LayoutLine[]): Scene[] {
   }
   flushDialogue()
   flushAction()
+  // if EVERY heading was an after-transition guess and nothing marks this document
+  // as a script, it isn't one — "SHIP TO:" on a mailing label fabricates scenes
+  // exactly like "CUT TO:" would. Return nothing; the strictly-gated fallbacks decide.
+  if (scenes.length && !hasScriptMarker(lines.map((l) => l.text))) return []
   // dialogue that PRECEDES the first heading (an excerpt that starts mid-scene) —
   // recover it as a synthetic leading scene, under the same dialogue-heavy gate as a
   // fully headingless doc, so a title page or synopsis never becomes a scene
@@ -343,6 +363,8 @@ export function parseScenes(text: string): Scene[] {
     action.push(raw.trim())
   }
   flushAction()
+  // same no-script-marker rejection as parseLayout (the mailing-label case)
+  if (scenes.length && !hasScriptMarker(lines)) return []
   // same mid-scene-start recovery as parseLayout: a dialogue-heavy excerpt before
   // the first heading becomes a synthetic leading scene; anything else is dropped
   if (scenes.length && prefix.some((l) => l.trim())) {
@@ -363,6 +385,14 @@ function dialogueHeavy(scenes: Scene[], minLines = 2): Scene[] {
   const lines = scenes[0].lines
   const short = lines.filter(([, t]) => t.split(/\s+/).length <= 60).length
   if (short < lines.length / 2) return []
+  // spoken text is prose: mostly letters, mostly sentence case. Labels and forms
+  // (shipping labels, 1099s) read as digit-dense ALL-CAPS values instead.
+  const text = lines.map(([, t]) => t).join(' ')
+  const digits = (text.match(/\d/g) || []).length
+  const letters = (text.match(/[A-Za-z]/g) || []).length
+  if (digits > (digits + letters) * 0.12) return []
+  const lower = lines.filter(([, t]) => /[a-z]/.test(t)).length
+  if (lower < lines.length / 2) return []
   const realNames = scenes[0].characters.filter(
     (c) => !/\d/.test(c) && (c.match(/[A-Za-zÀ-ÿ]/g)?.length ?? 0) >= 2
   )
@@ -395,7 +425,7 @@ export function parseScenesHeadingless(text: string, minLines = 2): Scene[] {
 const COLON_CUE_RE = /^\s*([A-Za-z][A-Za-z0-9 .'#/&-]{0,28}):[ \t]+(\S.*?)\s*$/
 const MIXED_NAME_RE = /^[A-Z][A-Za-z'’-]*(?:\s+[A-Z][A-Za-z'’-]*){0,2}$/
 const COLON_LABEL_RE =
-  /^(SFX|VFX|FX|MUSIC|MUS|SOT|SUPER|SUPERS|TITLE|CARD|LOGO|TAG|DISCLAIMER|LEGAL|CHYRON|GRAPHIC|TEXT|PACK ?SHOT|NOTE|WARNING|REMEMBER|SETTING|LOCATION|SLATE|SYNOPSIS|SCENE|START|END|CHAPTER|PART|ACT|EPISODE)$/
+  /^(SFX|VFX|FX|MUSIC|MUS|SOT|SUPER|SUPERS|TITLE|CARD|LOGO|TAG|DISCLAIMER|LEGAL|CHYRON|GRAPHIC|TEXT|PACK ?SHOT|NOTE|WARNING|REMEMBER|SETTING|LOCATION|SLATE|SYNOPSIS|SCENE|START|END|CHAPTER|PART|ACT|EPISODE|DISCUSSION|AGENDA|OVERVIEW|OBJECTIVES?|SUMMARY|HOMEWORK|INTRODUCTIONS?|CLASS|WEEK|SESSION|SURVEY|BREAK)$/
 export function parseColonDialogue(text: string): Scene[] {
   const lines = text.split('\n')
   const matches = lines.map((l) => l.match(COLON_CUE_RE))

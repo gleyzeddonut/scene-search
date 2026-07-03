@@ -228,6 +228,45 @@ describe('mid-scene sides (dialogue before the first heading)', () => {
   })
 })
 
+describe('non-scripts must not fabricate scenes (user-reported leaks)', () => {
+  const USPS = [
+    'US POSTAGE & FEES PAID', '5 OZ FIRST-CLASS PARCEL RATE', 'ZONE 6 NO SURCHARGE',
+    'USPS FIRST-CLASS PKG TM', 'JESSICA ALBANO', 'CIME',
+    '2108 N VERDUGO RD APT 5', 'GLENDALE CA 91208-2565',
+    'SHIP TO:', 'NEELY DALLAS BLOGGER', '10510 MAPLERIDGE DR', 'DALLAS TX 75238-2263',
+    'USPS TRACKING #', '9400 1112 0254 0896 3427 64'
+  ].join('\n')
+  const TAX = [
+    'CORRECTED (if checked)', 'CIME, LLC', '331 S Brent St', 'Ventura CA 93003',
+    'PAYERS TIN', '83-4205740', 'RECIPIENTS TIN', 'XXX-XX-1423',
+    '1 Nonemployee compensation', '$ 48130.00',
+    'Jessica Albano', '13260 Moorpark St', 'Apt 2', 'Sherman Oaks CA 91423', 'US',
+    '6 State/Payers state no.', 'CA 834205740', '7 State income', '$ 48130.00',
+    'Account number (see instructions)', '1GFFJKBBPLFI'
+  ].join('\n')
+  it('a shipping label is not a script ("SHIP TO:" is not a scene transition)', () => {
+    expect(parseScenes(USPS)).toEqual([])
+    expect(parseScenesHeadingless(USPS)).toEqual([])
+  })
+  it('a tax form is not a script (digit-dense, ALL-CAPS "dialogue")', () => {
+    expect(parseScenes(TAX)).toEqual([])
+    expect(parseScenesHeadingless(TAX)).toEqual([])
+  })
+  it('but a real script whose ONLY heading is a slug still parses', () => {
+    // guard: the no-real-heading gate must key on slugs/TOD, not kill normal scripts
+    const s = parseScenes('INT. ROOM - DAY\n\nJOHN\nHello there.\n\nMARY\nGo away, please.\n')
+    expect(s).toHaveLength(1)
+  })
+  it('a FADE IN: opening marks a document as a script even without slugs', () => {
+    // sketch scripts open "FADE IN:" then a bare location — no label ever says FADE IN
+    const s = parseScenes(
+      'FADE IN:\nMCCOOL AND ADAMS\nInterior, noisy catering hall.\n\nMCCOOL\nHey!\n\nADAMS\nOh yeah. Hi.\n'
+    )
+    expect(s).toHaveLength(1)
+    expect(s[0].characters).toEqual(['MCCOOL', 'ADAMS'])
+  })
+})
+
 describe('parseScenesHeadingless (sides with no slug line)', () => {
   it('recovers a single scene from dialogue with no scene heading', () => {
     const s = parseScenesHeadingless('GLORIA\nBum bum bum... death.\n\nALEX\nStop.\n\nSAM\nWho shuffled?\n')
