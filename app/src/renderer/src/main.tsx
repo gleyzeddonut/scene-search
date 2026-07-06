@@ -8,6 +8,18 @@ import { applyScriptScale, onScriptScale } from './api'
 applyScriptScale()
 onScriptScale(applyScriptScale)
 
+// forward renderer runtime errors to the main process so they ride along with the
+// next feedback submission (best-effort; never let reporting itself throw)
+const report = (where: string, msg: string) => {
+  try {
+    window.scripty.noteError?.(where, msg)
+  } catch {
+    /* ignore */
+  }
+}
+window.addEventListener('error', (e) => report('window.error', e.message + ' @ ' + (e.filename || '')))
+window.addEventListener('unhandledrejection', (e) => report('unhandledrejection', String(e.reason)))
+
 const root = createRoot(document.getElementById('root')!)
 const ql = new URLSearchParams(window.location.search).get('quicklook')
 if (ql) {

@@ -85,6 +85,9 @@ contextBridge.exposeInMainWorld('scripty', {
     ipcRenderer.on('kokoro-progress', l)
     return () => ipcRenderer.removeListener('kokoro-progress', l)
   },
+  sendFeedback: (input: { message: string; email?: string; kind?: string }) =>
+    ipcRenderer.invoke('feedback-send', input),
+  noteError: (where: string, msg: string) => ipcRenderer.send('note-error', where, msg),
   checkUpdates: () => ipcRenderer.invoke('check-updates'),
   downloadUpdate: () => ipcRenderer.invoke('download-update'),
   quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),

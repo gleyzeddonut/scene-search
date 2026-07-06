@@ -4,6 +4,7 @@ import { Engine } from './engine/engine'
 import { setupUpdater, checkForUpdatesManual, quitAndInstall, setAutoDownload, startupCheck, downloadUpdate } from './updater'
 import { registerVoice } from './voice'
 import { registerEleven } from './eleven'
+import { registerFeedback, noteError } from './feedback'
 
 const HELP_URL = 'https://github.com/gleyzeddonut/scene-search'
 let engine: Engine
@@ -294,6 +295,15 @@ function createWindow() {
       return ''
     }
   })
+  // feedback form → hosted endpoint; the diagnostics attachment includes the
+  // engine's failed-parse list so bad files surface in reports
+  registerFeedback(() => {
+    try {
+      return engine?.reindexStatus().errors ?? []
+    } catch {
+      return []
+    }
+  })
   buildMenu()
 
   mainWindow = new BrowserWindow({
@@ -319,6 +329,7 @@ function createWindow() {
       engine = new Engine()
     } catch (err) {
       console.error('Engine failed to initialize:', err)
+      noteError('engine-init', err) // surfaced in the next feedback report
     } finally {
       resolveEngineReady()
     }

@@ -22,12 +22,19 @@ const STATUS: Record<UpdatePhase, string> = {
   dev: 'Updates run in the installed app.'
 }
 
-type Tab = 'general' | 'library' | 'updates'
+type Tab = 'general' | 'library' | 'feedback' | 'updates'
 
 const TABS: [Tab, string, string][] = [
   ['general', 'General', 'ic-gen'],
   ['library', 'Library', 'ic-lib'],
+  ['feedback', 'Feedback', 'ic-fb'],
   ['updates', 'Updates', 'ic-upd']
+]
+
+const FEEDBACK_KINDS: [string, string][] = [
+  ['feedback', 'Feedback'],
+  ['bug', 'Bug'],
+  ['idea', 'Idea']
 ]
 
 function Switch(props: { on: boolean; onChange: (v: boolean) => void }) {
@@ -51,6 +58,11 @@ export function SettingsModal(props: { theme: string; onTheme: (t: string) => vo
   const [prefs, setPrefs] = useState<Prefs | null>(null)
   const [hidden, setHidden] = useState<string[]>([])
   const [onTop, setOnTop] = useState(localStorage.getItem('alwaysOnTop') === '1')
+  // feedback form
+  const [fbKind, setFbKind] = useState('feedback')
+  const [fbMsg, setFbMsg] = useState('')
+  const [fbEmail, setFbEmail] = useState(localStorage.getItem('fbEmail') || '')
+  const [fbState, setFbState] = useState<'idle' | 'sending' | 'sent' | 'error' | 'off'>('idle')
 
   useEffect(() => {
     // guard against an older preload (e.g. dev not fully restarted) so the
@@ -75,6 +87,23 @@ export function SettingsModal(props: { theme: string; onTheme: (t: string) => vo
   const restore = async (p: string) => {
     await api.addScript(p).catch(() => {})
     setHidden(await api.hiddenFiles().catch(() => []))
+  }
+
+  const sendFeedback = async () => {
+    if (!fbMsg.trim() || fbState === 'sending') return
+    setFbState('sending')
+    localStorage.setItem('fbEmail', fbEmail.trim()) // remember for next time
+    try {
+      const r = await window.scripty.sendFeedback?.({ message: fbMsg, email: fbEmail, kind: fbKind })
+      if (r?.ok) {
+        setFbState('sent')
+        setFbMsg('')
+      } else {
+        setFbState(r?.error === 'not_configured' ? 'off' : 'error')
+      }
+    } catch {
+      setFbState('error')
+    }
   }
 
   // Esc closes, like every macOS sheet
@@ -205,6 +234,55 @@ export function SettingsModal(props: { theme: string; onTheme: (t: string) => vo
                   </div>
                 </div>
                 <button className="ghost" onClick={rebuild}>Rebuild</button>
+              </div>
+            </>
+          )}
+
+          {tab === 'feedback' && (
+            <>
+              <div className="set-pane-title">Feedback</div>
+              <div className="set-sub" style={{ marginBottom: 12 }}>
+                Found a bug or have an idea? Send it straight to the developer. Your app version and
+                system info come along so issues are easier to track down.
+              </div>
+              <div className="fb-kind seg">
+                {FEEDBACK_KINDS.map(([v, label]) => (
+                  <span key={v} className={fbKind === v ? 'on' : ''} onClick={() => setFbKind(v)}>
+                    {label}
+                  </span>
+                ))}
+              </div>
+              <textarea
+                className="fb-msg"
+                placeholder={fbKind === 'bug' ? 'What went wrong? What were you doing when it happened?' : 'What’s on your mind?'}
+                value={fbMsg}
+                onChange={(e) => {
+                  setFbMsg(e.target.value)
+                  if (fbState !== 'idle') setFbState('idle')
+                }}
+              />
+              <input
+                className="fb-email"
+                type="email"
+                placeholder="Your email (optional — for a reply)"
+                value={fbEmail}
+                onChange={(e) => setFbEmail(e.target.value)}
+              />
+              <div className="fb-foot">
+                <span className={'fb-status' + (fbState === 'error' || fbState === 'off' ? ' err' : '')}>
+                  {fbState === 'sending'
+                    ? 'Sending…'
+                    : fbState === 'sent'
+                      ? 'Thanks — sent! 🎉'
+                      : fbState === 'error'
+                        ? 'Couldn’t send — check your connection.'
+                        : fbState === 'off'
+                          ? 'Feedback isn’t set up in this build yet.'
+                          : ''}
+                </span>
+                <button className="btn-accent" disabled={!fbMsg.trim() || fbState === 'sending'} onClick={sendFeedback}>
+                  Send
+                </button>
               </div>
             </>
           )}

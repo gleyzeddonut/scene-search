@@ -169,6 +169,8 @@ declare global {
       kokoroLoad: () => Promise<'none' | 'cached' | 'loading' | 'ready' | 'error'>
       kokoroSay: (text: string, voice: string, speed: number) => Promise<Uint8Array>
       onKokoroProgress: (cb: (pct: number) => void) => () => void
+      sendFeedback: (input: { message: string; email?: string; kind?: string }) => Promise<{ ok: boolean; error?: string }>
+      noteError: (where: string, msg: string) => void
       checkUpdates: () => Promise<void>
       downloadUpdate: () => Promise<void>
       quitAndInstall: () => Promise<void>
