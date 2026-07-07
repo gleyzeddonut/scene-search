@@ -96,6 +96,33 @@ describe('Engine medium clear + rename re-guess', () => {
   })
 })
 
+describe('Engine medium NONE sentinel (legacy compat)', () => {
+  it('treats a persisted legacy NUL sentinel as untagged', async () => {
+    // an earlier build had a NUL byte in the untagged sentinel ('\u0000none' instead
+    // of ' none'). A user who cleared an auto-guessed medium has that value stored —
+    // reading it must still mean "untagged", not fall back to the Commercial guess.
+    const dir = seed(PARSER_VERSION)
+    const f = join(h.userData, 'Acme_Commercial_Sides.fountain')
+    writeFileSync(f, 'INT. SET - DAY\n\nMOM\nTry Acme.\n\nKID\nYum!\n')
+    // hand-write the LEGACY (NUL) sentinel into meta.json before the engine loads it
+    writeFileSync(join(dir, 'meta.json'), JSON.stringify({ [f]: { medium: '\u0000none' } }))
+    const eng = new Engine()
+    await eng.add(f)
+    expect(eng.getMeta(f).medium).toBe('') // untagged, NOT the 'Commercial' guess
+    expect(eng.scenes({ mediums: ['Commercial'] }).scenes.length).toBe(0)
+  })
+  it('writes a clean (NUL-free) sentinel when a medium is cleared', async () => {
+    const dir = seed(PARSER_VERSION)
+    const f = join(h.userData, 'Acme_Commercial_Sides.fountain')
+    writeFileSync(f, 'INT. SET - DAY\n\nMOM\nTry Acme.\n\nKID\nYum!\n')
+    const eng = new Engine()
+    await eng.add(f)
+    eng.setMedium(f, '') // clear the auto-guessed Commercial
+    const stored = readFileSync(join(dir, 'meta.json'), 'utf-8')
+    expect(stored.includes('\u0000')).toBe(false) // no NUL byte reaches disk
+  })
+})
+
 describe('Engine remove + re-add', () => {
   it('removes a script and lets the same file be added again', async () => {
     seed(PARSER_VERSION)
